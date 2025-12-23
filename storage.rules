@@ -1,0 +1,26 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to upload their own documents
+    match /providers/{userId}/documents/{fileName} {
+      // Allow read: if user is authenticated and owns the document
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow write: if user is authenticated and owns the document
+      // File size limit: 5MB
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      
+      // Allow delete: if user is authenticated and owns the document
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

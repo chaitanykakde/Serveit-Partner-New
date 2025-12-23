@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "400699081138",
+    "project_id": "serveit-1f333",
+    "storage_bucket": "serveit-1f333.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:400699081138:android:bd5c0d15f88650b6ace4ab",
+        "android_client_info": {
+          "package_name": "com.nextserve.serveitpartnernew"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBomgYpC8ZsRGPIQXby98C363M253ReaLE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:400699081138:android:553cb266fa5fee83ace4ab",
+        "android_client_info": {
+          "package_name": "com.nextserve.servit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBomgYpC8ZsRGPIQXby98C363M253ReaLE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:400699081138:android:a3b200ccc4a8980bace4ab",
+        "android_client_info": {
+          "package_name": "com.nextserve.servitpartner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBomgYpC8ZsRGPIQXby98C363M253ReaLE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
