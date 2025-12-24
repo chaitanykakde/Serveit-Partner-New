@@ -18,9 +18,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.ServiceSelector
+import com.nextserve.serveitpartnernew.utils.LanguageManager
 
 @Composable
 fun Step1BasicInfo(
@@ -34,10 +38,13 @@ fun Step1BasicInfo(
     isLoadingServices: Boolean = false,
     email: String,
     onEmailChange: (String) -> Unit,
+    language: String = "en",
+    onLanguageChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     Column(
         modifier = modifier
@@ -48,7 +55,7 @@ fun Step1BasicInfo(
     ) {
         // Section Title
         Text(
-            text = "Basic Information",
+            text = stringResource(R.string.onboarding_basic_info),
             style = MaterialTheme.typography.headlineSmall,
             color = colorScheme.onSurface,
             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -56,24 +63,15 @@ fun Step1BasicInfo(
 
         // Subtitle
         Text(
-            text = "Tell us about yourself",
+            text = stringResource(R.string.onboarding_tell_about_yourself),
             style = MaterialTheme.typography.bodyMedium,
             color = colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // Full Name
-        OutlinedInputField(
-            value = fullName,
-            onValueChange = onFullNameChange,
-            label = "Full Name",
-            placeholder = "Full Name",
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // Gender
+        // Language Selector
         Text(
-            text = "Gender",
+            text = stringResource(R.string.language),
             style = MaterialTheme.typography.labelLarge,
             color = colorScheme.onSurface,
             modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
@@ -82,12 +80,47 @@ fun Step1BasicInfo(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
         ) {
-            val genders = listOf("Male", "Female")
-            genders.forEach { genderOption ->
+            val languages = listOf("en", "hi", "mr")
+            languages.forEach { langCode ->
+                LanguageButton(
+                    languageCode = langCode,
+                    displayName = LanguageManager.getLanguageDisplayName(langCode, context),
+                    isSelected = language == langCode,
+                    onClick = { onLanguageChange(langCode) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // Full Name
+        OutlinedInputField(
+            value = fullName,
+            onValueChange = onFullNameChange,
+            label = stringResource(R.string.full_name),
+            placeholder = stringResource(R.string.full_name),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Gender
+        Text(
+            text = stringResource(R.string.gender),
+            style = MaterialTheme.typography.labelLarge,
+            color = colorScheme.onSurface,
+            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+        ) {
+            val genders = listOf(
+                stringResource(R.string.male) to "Male",
+                stringResource(R.string.female) to "Female"
+            )
+            genders.forEach { (displayText, genderValue) ->
                 GenderButton(
-                    text = genderOption,
-                    isSelected = gender == genderOption,
-                    onClick = { onGenderChange(genderOption) },
+                    text = displayText,
+                    isSelected = gender == genderValue,
+                    onClick = { onGenderChange(genderValue) },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -96,7 +129,7 @@ fun Step1BasicInfo(
         // Primary Service
         if (isLoadingServices) {
             Text(
-                text = "Loading services...",
+                text = stringResource(R.string.loading_services),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 16.dp)
@@ -106,6 +139,8 @@ fun Step1BasicInfo(
                 selectedService = primaryService,
                 services = primaryServices.map { it.name },
                 onServiceSelected = onPrimaryServiceChange,
+                label = stringResource(R.string.primary_service),
+                placeholder = stringResource(R.string.select_primary_service),
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -114,13 +149,58 @@ fun Step1BasicInfo(
         OutlinedInputField(
             value = email,
             onValueChange = onEmailChange,
-            label = "Email (optional)",
-            placeholder = "Email (optional)",
+            label = stringResource(R.string.email_optional),
+            placeholder = stringResource(R.string.email_optional),
             keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun LanguageButton(
+    languageCode: String,
+    displayName: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colorScheme = MaterialTheme.colorScheme
+
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .background(
+                color = if (isSelected) {
+                    colorScheme.primaryContainer
+                } else {
+                    colorScheme.surface
+                },
+                shape = RoundedCornerShape(12.dp)
+            )
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) {
+                    colorScheme.primary
+                } else {
+                    colorScheme.outline.copy(alpha = 0.5f)
+                },
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = displayName,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (isSelected) {
+                colorScheme.onPrimaryContainer
+            } else {
+                colorScheme.onSurface
+            }
+        )
     }
 }
 

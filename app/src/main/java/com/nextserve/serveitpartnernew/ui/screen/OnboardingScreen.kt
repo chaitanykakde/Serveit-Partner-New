@@ -110,6 +110,8 @@ fun OnboardingScreen(
                                 isLoadingServices = uiState.isLoadingServices,
                                 email = uiState.email,
                                 onEmailChange = { onboardingViewModel.updateEmail(it) },
+                                language = uiState.language,
+                                onLanguageChange = { onboardingViewModel.updateLanguage(it) },
                                 modifier = Modifier.fillMaxSize()
                             )
                             2 -> {

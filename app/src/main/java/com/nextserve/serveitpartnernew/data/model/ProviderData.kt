@@ -55,6 +55,9 @@ data class ProviderData(
     val reviewedBy: String? = null,
     
     // FCM Token
-    val fcmToken: String = ""
+    val fcmToken: String = "",
+    
+    // Language Preference
+    val language: String = "en" // en, hi, mr
 )
 

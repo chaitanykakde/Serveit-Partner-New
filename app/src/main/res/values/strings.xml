@@ -1,3 +1,167 @@
 <resources>
+    <!-- App Name -->
     <string name="app_name">Serveit Partner New</string>
+    
+    <!-- Login Screen -->
+    <string name="login_title">Serveit Partner</string>
+    <string name="login_subtitle">Login to start earning</string>
+    <string name="mobile_number">Mobile Number</string>
+    <string name="enter_mobile_number">Enter mobile number</string>
+    <string name="send_otp">Send OTP</string>
+    <string name="sending">Sending…</string>
+    <string name="otp_verification_info">We\'ll send you a verification code</string>
+    
+    <!-- OTP Screen -->
+    <string name="otp_title">Enter OTP</string>
+    <string name="otp_subtitle">We sent a code to %1$s</string>
+    <string name="resend_otp">Resend OTP</string>
+    <string name="verify">Verify</string>
+    <string name="verifying">Verifying…</string>
+    
+    <!-- Onboarding -->
+    <string name="onboarding_basic_info">Basic Information</string>
+    <string name="onboarding_tell_about_yourself">Tell us about yourself</string>
+    <string name="full_name">Full Name</string>
+    <string name="gender">Gender</string>
+    <string name="male">Male</string>
+    <string name="female">Female</string>
+    <string name="primary_service">Primary Service</string>
+    <string name="select_primary_service">Select primary service</string>
+    <string name="email_optional">Email (optional)</string>
+    <string name="loading_services">Loading services…</string>
+    <string name="language">Language</string>
+    <string name="select_language">Select Language</string>
+    <string name="language_english">English</string>
+    <string name="language_hindi">हिंदी</string>
+    <string name="language_marathi">मराठी</string>
+    
+    <!-- Service Selection -->
+    <string name="select_services">Select Services</string>
+    <string name="select_main_service">Select Main Service</string>
+    <string name="select_sub_services">Select Sub Services</string>
+    <string name="select_all">Select All</string>
+    <string name="other_service">Other Service</string>
+    <string name="enter_other_service">Enter other service</string>
+    
+    <!-- Location -->
+    <string name="where_provide_services">Where do you provide services?</string>
+    <string name="location_subtitle">We\'ll use your location to find nearby service requests</string>
+    <string name="use_current_location">Use Current Location</string>
+    <string name="getting_location">Getting location…</string>
+    <string name="state">State</string>
+    <string name="city">City</string>
+    <string name="area_locality">Area / Locality / Landmark</string>
+    <string name="full_address">Full Address</string>
+    <string name="enter_full_address">Enter your complete address</string>
+    <string name="pincode">Pincode</string>
+    <string name="service_radius_info">You will get jobs within %1$d km</string>
+    <string name="location_auto_filled">Auto-filled from your location. You can change if needed.</string>
+    
+    <!-- Documents -->
+    <string name="upload_documents">Upload Documents</string>
+    <string name="upload_aadhaar">Upload Aadhaar Card</string>
+    <string name="aadhaar_front">Aadhaar Front</string>
+    <string name="aadhaar_back">Aadhaar Back</string>
+    <string name="upload">Upload</string>
+    <string name="uploading">Uploading…</string>
+    <string name="uploaded">Uploaded</string>
+    <string name="upload_progress">Upload Progress: %1$d%%</string>
+    
+    <!-- Review -->
+    <string name="review_profile">Review Profile</string>
+    <string name="submit_for_verification">Submit for Verification</string>
+    <string name="submitting">Submitting…</string>
+    
+    <!-- Status Screens -->
+    <string name="waiting_title">Profile Under Review</string>
+    <string name="waiting_message">Your profile is being reviewed. We will notify you once the verification is complete.</string>
+    <string name="rejection_title">Profile Rejected</string>
+    <string name="rejection_reason">Rejection Reason</string>
+    <string name="edit_profile">Edit Profile</string>
+    
+    <!-- Profile -->
+    <string name="profile_completion">Profile completion</string>
+    <string name="verified">Verified</string>
+    <string name="rejected">Rejected</string>
+    <string name="pending_verification">Pending Verification</string>
+    <string name="under_review">Under Review</string>
+    <string name="not_submitted">Not Submitted</string>
+    <string name="edit_profile_button">Edit Profile</string>
+    <string name="personal_information">Personal Information</string>
+    <string name="personal_info_subtitle">Name, phone, email</string>
+    <string name="service_information">Service Information</string>
+    <string name="service_info_subtitle">Skills, categories</string>
+    <string name="address_information">Address Information</string>
+    <string name="address_info_subtitle">City, radius, pincode</string>
+    <string name="documents">Documents</string>
+    <string name="documents_subtitle">Aadhaar, verification</string>
+    <string name="notifications">Notifications</string>
+    <string name="notifications_subtitle">Manage push alerts</string>
+    <string name="help_support">Help &amp; Support</string>
+    <string name="help_support_subtitle">FAQs, contact us</string>
+    <string name="about_app">About App</string>
+    <string name="about_app_subtitle">Version, terms &amp; privacy</string>
+    <string name="logout">Logout</string>
+    <string name="app_version">App version 1.0</string>
+    <string name="account">Account</string>
+    <string name="preferences">Preferences</string>
+    <string name="support_about">Support &amp; About</string>
+    <string name="rating">Rating</string>
+    <string name="jobs_done">Jobs done</string>
+    <string name="earnings">Earnings</string>
+    <string name="approved_status">Approved</string>
+    <string name="approved_message">You are ready to accept jobs</string>
+    <string name="rejected_status">Profile rejected</string>
+    <string name="pending_status">Pending Review</string>
+    <string name="pending_message">Your profile is under review</string>
+    
+    <!-- Edit Profile -->
+    <string name="edit_basic_info">Edit Basic Info</string>
+    <string name="update_personal_details">Update your personal details</string>
+    <string name="email">Email</string>
+    <string name="enter_email">Enter email</string>
+    <string name="phone_readonly">Phone number is managed by login and cannot be edited here.</string>
+    <string name="save_changes">Save changes</string>
+    <string name="saving">Saving…</string>
+    <string name="edit_services">Edit Services</string>
+    <string name="update_service_info">Update your service information</string>
+    <string name="edit_address">Edit Address</string>
+    <string name="update_address_info">Update your address and service radius</string>
+    <string name="edit_documents">Edit Documents</string>
+    <string name="update_documents">Update your verification documents</string>
+    <string name="edit_preferences">Edit Preferences</string>
+    <string name="update_preferences">Update your app preferences</string>
+    <string name="current_language">Current Language</string>
+    <string name="enable_notifications">Enable Notifications</string>
+    
+    <!-- Common -->
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="loading">Loading…</string>
+    <string name="error">Error</string>
+    <string name="success">Success</string>
+    <string name="retry">Retry</string>
+    <string name="back">Back</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_jobs">Jobs</string>
+    <string name="nav_earnings">Earnings</string>
+    <string name="nav_profile">Profile</string>
+    
+    <!-- Home -->
+    <string name="welcome_serveit">Welcome to Serveit Partner</string>
+    <string name="welcome">Welcome!</string>
+    <string name="login_success">You have successfully logged in</string>
+    
+    <!-- Jobs -->
+    <string name="no_jobs">No jobs available</string>
+    <string name="jobs_empty_message">Check back later for new service requests</string>
+    
+    <!-- Earnings -->
+    <string name="earnings_title">Earnings</string>
+    <string name="no_earnings">No earnings yet</string>
+    <string name="earnings_empty_message">Start accepting jobs to see your earnings here</string>
 </resources>

@@ -22,7 +22,7 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
     }
     
     composable(BottomNavItem.Profile.route) {
-        ProfileScreen()
+        ProfileScreen(navController = navController)
     }
 }
 

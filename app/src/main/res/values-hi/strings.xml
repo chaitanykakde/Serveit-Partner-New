@@ -1,0 +1,168 @@
+<resources>
+    <!-- App Name -->
+    <string name="app_name">Serveit Partner New</string>
+    
+    <!-- Login Screen -->
+    <string name="login_title">Serveit Partner</string>
+    <string name="login_subtitle">कमाई शुरू करने के लिए लॉगिन करें</string>
+    <string name="mobile_number">मोबाइल नंबर</string>
+    <string name="enter_mobile_number">मोबाइल नंबर दर्ज करें</string>
+    <string name="send_otp">OTP भेजें</string>
+    <string name="sending">भेजा जा रहा है…</string>
+    <string name="otp_verification_info">हम आपको एक सत्यापन कोड भेजेंगे</string>
+    
+    <!-- OTP Screen -->
+    <string name="otp_title">OTP दर्ज करें</string>
+    <string name="otp_subtitle">हमने %1$s पर एक कोड भेजा है</string>
+    <string name="resend_otp">OTP पुनः भेजें</string>
+    <string name="verify">सत्यापित करें</string>
+    <string name="verifying">सत्यापित किया जा रहा है…</string>
+    
+    <!-- Onboarding -->
+    <string name="onboarding_basic_info">मूल जानकारी</string>
+    <string name="onboarding_tell_about_yourself">अपने बारे में बताएं</string>
+    <string name="full_name">पूरा नाम</string>
+    <string name="gender">लिंग</string>
+    <string name="male">पुरुष</string>
+    <string name="female">महिला</string>
+    <string name="primary_service">प्राथमिक सेवा</string>
+    <string name="select_primary_service">प्राथमिक सेवा चुनें</string>
+    <string name="email_optional">ईमेल (वैकल्पिक)</string>
+    <string name="loading_services">सेवाएं लोड हो रही हैं…</string>
+    <string name="language">भाषा</string>
+    <string name="select_language">भाषा चुनें</string>
+    <string name="language_english">English</string>
+    <string name="language_hindi">हिंदी</string>
+    <string name="language_marathi">मराठी</string>
+    
+    <!-- Service Selection -->
+    <string name="select_services">सेवाएं चुनें</string>
+    <string name="select_main_service">मुख्य सेवा चुनें</string>
+    <string name="select_sub_services">उप-सेवाएं चुनें</string>
+    <string name="select_all">सभी चुनें</string>
+    <string name="other_service">अन्य सेवा</string>
+    <string name="enter_other_service">अन्य सेवा दर्ज करें</string>
+    
+    <!-- Location -->
+    <string name="where_provide_services">आप कहां सेवाएं प्रदान करते हैं?</string>
+    <string name="location_subtitle">हम आस-पास के सेवा अनुरोधों को खोजने के लिए आपके स्थान का उपयोग करेंगे</string>
+    <string name="use_current_location">वर्तमान स्थान का उपयोग करें</string>
+    <string name="getting_location">स्थान प्राप्त किया जा रहा है…</string>
+    <string name="state">राज्य</string>
+    <string name="city">शहर</string>
+    <string name="area_locality">क्षेत्र / इलाका / लैंडमार्क</string>
+    <string name="full_address">पूरा पता</string>
+    <string name="enter_full_address">अपना पूरा पता दर्ज करें</string>
+    <string name="pincode">पिनकोड</string>
+    <string name="service_radius_info">आपको %1$d किमी के भीतर नौकरियां मिलेंगी</string>
+    <string name="location_auto_filled">आपके स्थान से स्वचालित रूप से भरा गया। आवश्यकता होने पर आप बदल सकते हैं।</string>
+    
+    <!-- Documents -->
+    <string name="upload_documents">दस्तावेज़ अपलोड करें</string>
+    <string name="upload_aadhaar">आधार कार्ड अपलोड करें</string>
+    <string name="aadhaar_front">आधार सामने</string>
+    <string name="aadhaar_back">आधार पीछे</string>
+    <string name="upload">अपलोड करें</string>
+    <string name="uploading">अपलोड हो रहा है…</string>
+    <string name="uploaded">अपलोड हो गया</string>
+    <string name="upload_progress">अपलोड प्रगति: %1$d%%</string>
+    
+    <!-- Review -->
+    <string name="review_profile">प्रोफ़ाइल की समीक्षा करें</string>
+    <string name="submit_for_verification">सत्यापन के लिए सबमिट करें</string>
+    <string name="submitting">सबमिट किया जा रहा है…</string>
+    
+    <!-- Status Screens -->
+    <string name="waiting_title">प्रोफ़ाइल समीक्षा के अधीन</string>
+    <string name="waiting_message">आपकी प्रोफ़ाइल की समीक्षा की जा रही है। सत्यापन पूरा होने पर हम आपको सूचित करेंगे।</string>
+    <string name="rejection_title">प्रोफ़ाइल अस्वीकृत</string>
+    <string name="rejection_reason">अस्वीकृति का कारण</string>
+    <string name="edit_profile">प्रोफ़ाइल संपादित करें</string>
+    
+    <!-- Profile -->
+    <string name="profile_completion">प्रोफ़ाइल पूर्णता</string>
+    <string name="verified">सत्यापित</string>
+    <string name="rejected">अस्वीकृत</string>
+    <string name="pending_verification">सत्यापन लंबित</string>
+    <string name="under_review">समीक्षा के अधीन</string>
+    <string name="not_submitted">सबमिट नहीं किया गया</string>
+    <string name="edit_profile_button">प्रोफ़ाइल संपादित करें</string>
+    <string name="personal_information">व्यक्तिगत जानकारी</string>
+    <string name="personal_info_subtitle">नाम, फोन, ईमेल</string>
+    <string name="service_information">सेवा जानकारी</string>
+    <string name="service_info_subtitle">कौशल, श्रेणियां</string>
+    <string name="address_information">पता जानकारी</string>
+    <string name="address_info_subtitle">शहर, त्रिज्या, पिनकोड</string>
+    <string name="documents">दस्तावेज़</string>
+    <string name="documents_subtitle">आधार, सत्यापन</string>
+    <string name="notifications">सूचनाएं</string>
+    <string name="notifications_subtitle">पुश अलर्ट प्रबंधित करें</string>
+    <string name="help_support">सहायता और समर्थन</string>
+    <string name="help_support_subtitle">FAQ, हमसे संपर्क करें</string>
+    <string name="about_app">ऐप के बारे में</string>
+    <string name="about_app_subtitle">संस्करण, नियम और गोपनीयता</string>
+    <string name="logout">लॉगआउट</string>
+    <string name="app_version">ऐप संस्करण 1.0</string>
+    <string name="account">खाता</string>
+    <string name="preferences">प्राथमिकताएं</string>
+    <string name="support_about">समर्थन और के बारे में</string>
+    <string name="rating">रेटिंग</string>
+    <string name="jobs_done">नौकरियां पूरी</string>
+    <string name="earnings">कमाई</string>
+    <string name="approved_status">अनुमोदित</string>
+    <string name="approved_message">आप नौकरियां स्वीकार करने के लिए तैयार हैं</string>
+    <string name="rejected_status">प्रोफ़ाइल अस्वीकृत</string>
+    <string name="pending_status">समीक्षा लंबित</string>
+    <string name="pending_message">आपकी प्रोफ़ाइल समीक्षा के अधीन है</string>
+    
+    <!-- Edit Profile -->
+    <string name="edit_basic_info">मूल जानकारी संपादित करें</string>
+    <string name="update_personal_details">अपनी व्यक्तिगत जानकारी अपडेट करें</string>
+    <string name="email">ईमेल</string>
+    <string name="enter_email">ईमेल दर्ज करें</string>
+    <string name="phone_readonly">फोन नंबर लॉगिन द्वारा प्रबंधित किया जाता है और यहां संपादित नहीं किया जा सकता।</string>
+    <string name="save_changes">परिवर्तन सहेजें</string>
+    <string name="saving">सहेजा जा रहा है…</string>
+    <string name="edit_services">सेवाएं संपादित करें</string>
+    <string name="update_service_info">अपनी सेवा जानकारी अपडेट करें</string>
+    <string name="edit_address">पता संपादित करें</string>
+    <string name="update_address_info">अपना पता और सेवा त्रिज्या अपडेट करें</string>
+    <string name="edit_documents">दस्तावेज़ संपादित करें</string>
+    <string name="update_documents">अपने सत्यापन दस्तावेज़ अपडेट करें</string>
+    <string name="edit_preferences">प्राथमिकताएं संपादित करें</string>
+    <string name="update_preferences">अपनी ऐप प्राथमिकताएं अपडेट करें</string>
+    <string name="current_language">वर्तमान भाषा</string>
+    <string name="enable_notifications">सूचनाएं सक्षम करें</string>
+    
+    <!-- Common -->
+    <string name="previous">पिछला</string>
+    <string name="next">अगला</string>
+    <string name="cancel">रद्द करें</string>
+    <string name="save">सहेजें</string>
+    <string name="loading">लोड हो रहा है…</string>
+    <string name="error">त्रुटि</string>
+    <string name="success">सफलता</string>
+    <string name="retry">पुनः प्रयास करें</string>
+    <string name="back">वापस</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">होम</string>
+    <string name="nav_jobs">नौकरियां</string>
+    <string name="nav_earnings">कमाई</string>
+    <string name="nav_profile">प्रोफ़ाइल</string>
+    
+    <!-- Home -->
+    <string name="welcome_serveit">Serveit Partner में आपका स्वागत है</string>
+    <string name="welcome">स्वागत है!</string>
+    <string name="login_success">आपने सफलतापूर्वक लॉगिन किया है</string>
+    
+    <!-- Jobs -->
+    <string name="no_jobs">कोई नौकरी उपलब्ध नहीं</string>
+    <string name="jobs_empty_message">नए सेवा अनुरोधों के लिए बाद में वापस जांचें</string>
+    
+    <!-- Earnings -->
+    <string name="earnings_title">कमाई</string>
+    <string name="no_earnings">अभी तक कोई कमाई नहीं</string>
+    <string name="earnings_empty_message">अपनी कमाई यहां देखने के लिए नौकरियां स्वीकार करना शुरू करें</string>
+</resources>
+

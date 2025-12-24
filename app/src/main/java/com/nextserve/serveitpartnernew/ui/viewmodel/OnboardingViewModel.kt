@@ -28,6 +28,7 @@ data class OnboardingUiState(
     val gender: String = "",
     val primaryService: String = "",
     val email: String = "",
+    val language: String = "en",
     val isLoadingServices: Boolean = false,
     // Step 2 data
     val selectedMainService: String = "",
@@ -100,6 +101,7 @@ class OnboardingViewModel(
                         gender = providerData.gender,
                         primaryService = providerData.primaryService,
                         email = providerData.email,
+                        language = providerData.language.ifEmpty { "en" },
                         selectedMainService = providerData.selectedMainService,
                         selectedSubServices = providerData.selectedSubServices.toSet(),
                         otherService = providerData.otherService,
@@ -254,6 +256,13 @@ class OnboardingViewModel(
         saveStep1Data()
     }
 
+    fun updateLanguage(languageCode: String) {
+        uiState = uiState.copy(language = languageCode)
+        // Apply language immediately
+        com.nextserve.serveitpartnernew.utils.LanguageManager.applyLanguage(context, languageCode)
+        saveStep1Data()
+    }
+
     private fun saveStep1Data() {
         viewModelScope.launch {
             firestoreRepository.saveOnboardingStep(
@@ -262,7 +271,8 @@ class OnboardingViewModel(
                     "fullName" to uiState.fullName,
                     "gender" to uiState.gender,
                     "primaryService" to uiState.primaryService,
-                    "email" to uiState.email
+                    "email" to uiState.email,
+                    "language" to uiState.language
                 )
             )
         }
@@ -509,7 +519,8 @@ class OnboardingViewModel(
                 "approvalStatus" to "PENDING",
                 "submittedAt" to com.google.firebase.Timestamp.now(),
                 "updatedAt" to com.google.firebase.Timestamp.now(),
-                "rejectionReason" to "" // Clear rejection reason
+                "rejectionReason" to "", // Clear rejection reason
+                "language" to uiState.language
             )
             
             val result = firestoreRepository.updateProviderData(uid, updateData)

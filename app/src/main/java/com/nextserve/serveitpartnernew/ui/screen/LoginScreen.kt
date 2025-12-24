@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -76,7 +77,7 @@ fun LoginScreen(
     BottomStickyButtonContainer(
         button = {
             PrimaryButton(
-                text = if (uiState.isSendingOtp) "Sending..." else "Send OTP",
+                text = if (uiState.isSendingOtp) stringResource(R.string.sending) else stringResource(R.string.send_otp),
                 onClick = {
                     if (uiState.isPhoneNumberValid && !uiState.isSendingOtp) {
                         viewModel.sendOtp(activity)
@@ -117,7 +118,7 @@ fun LoginScreen(
 
                     // App Title
                     Text(
-                        text = "Serveit Partner",
+                        text = stringResource(R.string.login_title),
                         style = MaterialTheme.typography.displayMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
@@ -127,7 +128,7 @@ fun LoginScreen(
 
                     // Subtitle
                     Text(
-                        text = "Login to start earning",
+                        text = stringResource(R.string.login_subtitle),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
@@ -143,8 +144,8 @@ fun LoginScreen(
                                 viewModel.clearError()
                             }
                         },
-                        label = "Mobile Number",
-                        placeholder = "Enter mobile number",
+                        label = stringResource(R.string.mobile_number),
+                        placeholder = stringResource(R.string.enter_mobile_number),
                         leadingIcon = {
                             Text(
                                 text = "+91",
@@ -175,7 +176,7 @@ fun LoginScreen(
 
                     // Info text
                     Text(
-                        text = "We'll send you a verification code",
+                        text = stringResource(R.string.otp_verification_info),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 4.dp)

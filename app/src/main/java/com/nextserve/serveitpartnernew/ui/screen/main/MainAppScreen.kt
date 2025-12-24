@@ -16,6 +16,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.nextserve.serveitpartnernew.ui.components.BottomNavigationBar
 import com.nextserve.serveitpartnernew.ui.navigation.BottomNavItem
+import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditAddressScreen
+import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditBasicScreen
+import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditDocumentsScreen
+import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditPreferencesScreen
+import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditServicesScreen
 
 @Composable
 fun MainAppScreen(
@@ -63,8 +68,13 @@ fun MainAppScreen(
                 EarningsScreen()
             }
             composable(BottomNavItem.Profile.route) {
-                ProfileScreen()
+                ProfileScreen(navController = navController)
             }
+            composable("profile/edit/basic") { ProfileEditBasicScreen(navController) }
+            composable("profile/edit/services") { ProfileEditServicesScreen(navController) }
+            composable("profile/edit/address") { ProfileEditAddressScreen(navController) }
+            composable("profile/edit/documents") { ProfileEditDocumentsScreen(navController) }
+            composable("profile/edit/preferences") { ProfileEditPreferencesScreen(navController) }
         }
     }
 }
