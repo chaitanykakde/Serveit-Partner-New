@@ -3,6 +3,7 @@ package com.nextserve.serveitpartnernew.data.repository
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.nextserve.serveitpartnernew.data.mapper.ProviderFirestoreMapper
 import com.nextserve.serveitpartnernew.data.model.MainServiceModel
 import com.nextserve.serveitpartnernew.data.model.ProviderData
 import com.nextserve.serveitpartnernew.data.model.SubServiceModel
@@ -11,14 +12,16 @@ import kotlinx.coroutines.tasks.await
 class FirestoreRepository(
     private val firestore: FirebaseFirestore
 ) {
-    private val providersCollection = firestore.collection("providers")
+    // CRITICAL: Changed from "providers" to "partners" to match Cloud Functions
+    private val partnersCollection = firestore.collection("partners")
 
     suspend fun getProviderData(uid: String): Result<ProviderData?> {
         return try {
-            val document = providersCollection.document(uid).get().await()
+            val document = partnersCollection.document(uid).get().await()
             if (document.exists()) {
-                val data = document.toObject(ProviderData::class.java)
-                Result.success(data?.copy(uid = uid))
+                // Use mapper to convert nested Firestore structure to flat app model
+                val providerData = ProviderFirestoreMapper.fromFirestore(document, uid)
+                Result.success(providerData)
             } else {
                 Result.success(null)
             }
@@ -29,12 +32,6 @@ class FirestoreRepository(
 
     suspend fun createProviderDocument(uid: String, phoneNumber: String): Result<Unit> {
         return try {
-            // #region agent log
-            try {
-                java.io.File("c:\\Users\\Chaitany Kakde\\StudioProjects\\Serveit-Partner-New\\.cursor\\debug.log").appendText("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"FirestoreRepository.kt:30\",\"message\":\"createProviderDocument called\",\"data\":{\"uid\":\"$uid\",\"phoneNumber\":\"$phoneNumber\",\"collection\":\"providers\"},\"timestamp\":${System.currentTimeMillis()}}\n")
-            } catch (e: Exception) {}
-            // #endregion
-            
             // Ensure phone number has +91 prefix
             val formattedPhone = if (phoneNumber.startsWith("+91")) {
                 phoneNumber
@@ -44,7 +41,7 @@ class FirestoreRepository(
                 "+91$phoneNumber"
             }
             
-            val data = ProviderData(
+            val providerData = ProviderData(
                 uid = uid,
                 phoneNumber = formattedPhone,
                 createdAt = Timestamp.now(),
@@ -53,34 +50,21 @@ class FirestoreRepository(
                 currentStep = 1
             )
             
-            // #region agent log
-            try {
-                java.io.File("c:\\Users\\Chaitany Kakde\\StudioProjects\\Serveit-Partner-New\\.cursor\\debug.log").appendText("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"FirestoreRepository.kt:49\",\"message\":\"Writing to Firestore\",\"data\":{\"uid\":\"$uid\",\"collection\":\"providers\",\"dataStructure\":\"flat\",\"hasLocationDetails\":false,\"hasVerificationDetails\":false,\"hasPersonalDetails\":false},\"timestamp\":${System.currentTimeMillis()}}\n")
-            } catch (e: Exception) {}
-            // #endregion
+            // Transform flat model to nested Firestore structure using mapper
+            val firestoreData = ProviderFirestoreMapper.toFirestore(providerData)
             
-            providersCollection.document(uid).set(data).await()
-            
-            // #region agent log
-            try {
-                java.io.File("c:\\Users\\Chaitany Kakde\\StudioProjects\\Serveit-Partner-New\\.cursor\\debug.log").appendText("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"FirestoreRepository.kt:50\",\"message\":\"createProviderDocument success\",\"data\":{\"uid\":\"$uid\"},\"timestamp\":${System.currentTimeMillis()}}\n")
-            } catch (e: Exception) {}
-            // #endregion
+            // Write to partners collection (Cloud Functions expect this)
+            partnersCollection.document(uid).set(firestoreData).await()
             
             Result.success(Unit)
         } catch (e: Exception) {
-            // #region agent log
-            try {
-                java.io.File("c:\\Users\\Chaitany Kakde\\StudioProjects\\Serveit-Partner-New\\.cursor\\debug.log").appendText("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\",\"location\":\"FirestoreRepository.kt:52\",\"message\":\"createProviderDocument error\",\"data\":{\"error\":\"${e.message}\"},\"timestamp\":${System.currentTimeMillis()}}\n")
-            } catch (e2: Exception) {}
-            // #endregion
             Result.failure(e)
         }
     }
 
     suspend fun updateLastLogin(uid: String): Result<Unit> {
         return try {
-            providersCollection.document(uid)
+            partnersCollection.document(uid)
                 .update("lastLoginAt", Timestamp.now())
                 .await()
             Result.success(Unit)
@@ -91,8 +75,10 @@ class FirestoreRepository(
 
     suspend fun updateProviderData(uid: String, data: Map<String, Any>): Result<Unit> {
         return try {
-            providersCollection.document(uid)
-                .update(data)
+            // Transform flat update map to nested Firestore structure
+            val firestoreUpdate = ProviderFirestoreMapper.toFirestoreUpdate(data)
+            partnersCollection.document(uid)
+                .update(firestoreUpdate)
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -102,42 +88,26 @@ class FirestoreRepository(
 
     suspend fun saveOnboardingStep(uid: String, data: Map<String, Any>): Result<Unit> {
         return try {
-            // #region agent log
-            try {
-                val dataKeys = data.keys.joinToString(",")
-                val hasLocation = data.containsKey("latitude") || data.containsKey("longitude")
-                val hasServices = data.containsKey("selectedSubServices") || data.containsKey("primaryService")
-                java.io.File("c:\\Users\\Chaitany Kakde\\StudioProjects\\Serveit-Partner-New\\.cursor\\debug.log").appendText("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\",\"location\":\"FirestoreRepository.kt:78\",\"message\":\"saveOnboardingStep called\",\"data\":{\"uid\":\"$uid\",\"collection\":\"providers\",\"dataKeys\":\"$dataKeys\",\"hasLocation\":$hasLocation,\"hasServices\":$hasServices,\"structure\":\"flat\"},\"timestamp\":${System.currentTimeMillis()}}\n")
-            } catch (e: Exception) {}
-            // #endregion
-            
             val updateData = data.toMutableMap()
             updateData["updatedAt"] = Timestamp.now()
             
-            providersCollection.document(uid)
-                .set(updateData, SetOptions.merge())
-                .await()
+            // Transform flat update map to nested Firestore structure
+            val firestoreUpdate = ProviderFirestoreMapper.toFirestoreUpdate(updateData)
             
-            // #region agent log
-            try {
-                java.io.File("c:\\Users\\Chaitany Kakde\\StudioProjects\\Serveit-Partner-New\\.cursor\\debug.log").appendText("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\",\"location\":\"FirestoreRepository.kt:85\",\"message\":\"saveOnboardingStep success\",\"data\":{\"uid\":\"$uid\"},\"timestamp\":${System.currentTimeMillis()}}\n")
-            } catch (e: Exception) {}
-            // #endregion
+            // Write to partners collection with merge to preserve existing nested fields
+            partnersCollection.document(uid)
+                .set(firestoreUpdate, SetOptions.merge())
+                .await()
             
             Result.success(Unit)
         } catch (e: Exception) {
-            // #region agent log
-            try {
-                java.io.File("c:\\Users\\Chaitany Kakde\\StudioProjects\\Serveit-Partner-New\\.cursor\\debug.log").appendText("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\",\"location\":\"FirestoreRepository.kt:88\",\"message\":\"saveOnboardingStep error\",\"data\":{\"error\":\"${e.message}\"},\"timestamp\":${System.currentTimeMillis()}}\n")
-            } catch (e2: Exception) {}
-            // #endregion
             Result.failure(e)
         }
     }
 
     suspend fun updateCurrentStep(uid: String, step: Int): Result<Unit> {
         return try {
-            providersCollection.document(uid)
+            partnersCollection.document(uid)
                 .update(
                     mapOf(
                         "currentStep" to step,
@@ -157,7 +127,7 @@ class FirestoreRepository(
         aadhaarBackUrl: String
     ): Result<Unit> {
         return try {
-            providersCollection.document(uid)
+            partnersCollection.document(uid)
                 .update(
                     mapOf(
                         "aadhaarFrontUrl" to aadhaarFrontUrl,
@@ -175,38 +145,25 @@ class FirestoreRepository(
 
     suspend fun submitForVerification(uid: String): Result<Unit> {
         return try {
-            // #region agent log
-            try {
-                java.io.File("c:\\Users\\Chaitany Kakde\\StudioProjects\\Serveit-Partner-New\\.cursor\\debug.log").appendText("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\",\"location\":\"FirestoreRepository.kt:130\",\"message\":\"submitForVerification called\",\"data\":{\"uid\":\"$uid\",\"collection\":\"providers\",\"updates\":[\"onboardingStatus=SUBMITTED\",\"approvalStatus=PENDING\"],\"structure\":\"flat\"},\"timestamp\":${System.currentTimeMillis()}}\n")
-            } catch (e: Exception) {}
-            // #endregion
+            // Transform approvalStatus string to nested verificationDetails booleans
+            val updateMap = mapOf(
+                "onboardingStatus" to "SUBMITTED",
+                "approvalStatus" to "PENDING", // Will be converted to booleans by mapper
+                "submittedAt" to Timestamp.now(),
+                "updatedAt" to Timestamp.now()
+            )
             
-            providersCollection.document(uid)
-                .update(
-                    mapOf(
-                        "onboardingStatus" to "SUBMITTED",
-                        "approvalStatus" to "PENDING",
-                        "submittedAt" to Timestamp.now(),
-                        "updatedAt" to Timestamp.now()
-                    )
-                )
+            // Use mapper to convert to nested structure
+            val firestoreUpdate = ProviderFirestoreMapper.toFirestoreUpdate(updateMap)
+            
+            partnersCollection.document(uid)
+                .update(firestoreUpdate)
                 .await()
-            
-            // #region agent log
-            try {
-                java.io.File("c:\\Users\\Chaitany Kakde\\StudioProjects\\Serveit-Partner-New\\.cursor\\debug.log").appendText("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\",\"location\":\"FirestoreRepository.kt:141\",\"message\":\"submitForVerification success\",\"data\":{\"uid\":\"$uid\"},\"timestamp\":${System.currentTimeMillis()}}\n")
-            } catch (e: Exception) {}
-            // #endregion
             
             // Note: FCM notification will be sent by backend/admin when status changes
             // The notification will be received via ServeitFirebaseMessagingService
             Result.success(Unit)
         } catch (e: Exception) {
-            // #region agent log
-            try {
-                java.io.File("c:\\Users\\Chaitany Kakde\\StudioProjects\\Serveit-Partner-New\\.cursor\\debug.log").appendText("{\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\",\"location\":\"FirestoreRepository.kt:147\",\"message\":\"submitForVerification error\",\"data\":{\"error\":\"${e.message}\"},\"timestamp\":${System.currentTimeMillis()}}\n")
-            } catch (e2: Exception) {}
-            // #endregion
             Result.failure(e)
         }
     }

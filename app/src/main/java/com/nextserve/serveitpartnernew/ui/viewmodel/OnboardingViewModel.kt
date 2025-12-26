@@ -517,6 +517,29 @@ class OnboardingViewModel(
         // Allow resubmission if rejected
         if (uiState.onboardingStatus == "SUBMITTED" && uiState.approvalStatus != "REJECTED") return
         
+        // VALIDATION: Ensure required fields for Cloud Functions are present
+        // Cloud Function dispatchJobToProviders requires location and services
+        val validationErrors = mutableListOf<String>()
+        
+        // Validate location (required for job dispatch)
+        if (uiState.latitude == null || uiState.longitude == null) {
+            validationErrors.add("Location is required. Please complete Step 3 and set your service location.")
+        }
+        
+        // Validate services (required for job dispatch)
+        val hasServices = uiState.primaryService.isNotEmpty() || uiState.selectedSubServices.isNotEmpty()
+        if (!hasServices) {
+            validationErrors.add("At least one service must be selected. Please complete Step 2 and select services.")
+        }
+        
+        // If validation fails, show error and block submission
+        if (validationErrors.isNotEmpty()) {
+            uiState = uiState.copy(
+                errorMessage = validationErrors.joinToString("\n")
+            )
+            return
+        }
+        
         uiState = uiState.copy(isLoading = true, errorMessage = null)
         viewModelScope.launch {
             // Reset approval status when resubmitting after rejection

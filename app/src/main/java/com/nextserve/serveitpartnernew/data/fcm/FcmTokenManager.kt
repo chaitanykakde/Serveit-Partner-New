@@ -21,8 +21,9 @@ object FcmTokenManager {
     
     private suspend fun saveTokenToFirestore(uid: String, token: String) {
         try {
+            // CRITICAL: Changed from "providers" to "partners" to match Cloud Functions
             val tokensRef = FirebaseProvider.firestore
-                .collection("providers")
+                .collection("partners")
                 .document(uid)
                 .collection("fcmTokens")
                 .document(token)
@@ -33,9 +34,9 @@ object FcmTokenManager {
                 "deviceInfo" to android.os.Build.MODEL
             )).await()
             
-            // Also update the main provider document with latest token
+            // Also update the main partner document with latest token
             FirebaseProvider.firestore
-                .collection("providers")
+                .collection("partners")
                 .document(uid)
                 .update("fcmToken", token)
                 .await()
