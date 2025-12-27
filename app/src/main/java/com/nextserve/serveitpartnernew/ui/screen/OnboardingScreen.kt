@@ -1,5 +1,7 @@
 package com.nextserve.serveitpartnernew.ui.screen
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,8 +17,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -82,6 +88,28 @@ fun OnboardingScreen(
                     .fillMaxSize()
                     .systemBarsPadding()
             ) {
+                // Background Image - Same as Login Screen
+                Image(
+                    painter = painterResource(id = R.drawable.serveit_partner_flow_bg),
+                    contentDescription = "Background",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                
+                // Light gradient overlay for readability
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xFFE3F2FD).copy(alpha = 0.3f),
+                                    Color(0xFFFFFFFF).copy(alpha = 0.4f)
+                                )
+                            )
+                        )
+                )
+                
                 Column(
                     modifier = Modifier
                         .fillMaxSize()

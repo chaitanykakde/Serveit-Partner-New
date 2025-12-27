@@ -61,10 +61,12 @@ fun MainAppScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             composable(BottomNavItem.Home.route) {
-                HomeScreen()
+                val providerId = com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.auth.currentUser?.uid ?: ""
+                HomeScreen(providerId = providerId)
             }
             composable(BottomNavItem.Jobs.route) {
-                JobsScreen()
+                val providerId = com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.auth.currentUser?.uid ?: ""
+                JobsScreen(providerId = providerId)
             }
             composable(BottomNavItem.Earnings.route) {
                 EarningsScreen()

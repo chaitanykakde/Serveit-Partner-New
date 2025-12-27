@@ -2,8 +2,10 @@ package com.nextserve.serveitpartnernew.ui.screen
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -32,10 +35,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.OTPInputField
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
+import com.nextserve.serveitpartnernew.ui.screen.otp.OtpComponents
+import com.nextserve.serveitpartnernew.ui.theme.OrangeAccent
+import com.nextserve.serveitpartnernew.ui.util.Dimens
 import com.nextserve.serveitpartnernew.ui.viewmodel.OtpViewModel
 import com.nextserve.serveitpartnernew.utils.NetworkMonitor
 
@@ -52,14 +60,12 @@ fun OtpScreen(
     val context = LocalContext.current
     val activity = context as? android.app.Activity
     
-    // Initialize NetworkMonitor for offline detection
     val networkMonitor = remember { NetworkMonitor(context) }
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val isTablet = screenWidth >= 600.dp
     val scrollState = rememberScrollState()
 
-    // Initialize phone number, verification ID, and resend token
     LaunchedEffect(phoneNumber, verificationId) {
         viewModel.setPhoneNumber(phoneNumber)
         if (verificationId.isNotEmpty()) {
@@ -70,78 +76,111 @@ fun OtpScreen(
         }
     }
 
-    // Setup verification success callback
     LaunchedEffect(Unit) {
         viewModel.onVerificationSuccess = { uid ->
             onNavigateToOnboarding(uid)
         }
     }
 
-    // Cancel verification on back navigation
-    androidx.compose.runtime.DisposableEffect(Unit) {
-        onDispose {
-            // Cleanup handled in ViewModel.onCleared()
-        }
-    }
-
-    // Light gradient background (matching Login screen)
-    val backgroundGradient = Brush.verticalGradient(
-        colors = listOf(
-            Color(0xFFF8FAFF), // Light blue-white
-            Color(0xFFFFFFFF)  // White
-        )
-    )
-
+    // Background with image and gradient overlay
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundGradient)
             .systemBarsPadding()
     ) {
+        // Background Image - Fill entire screen
+        Image(
+            painter = painterResource(id = R.drawable.serveit_partner_flow_bg),
+            contentDescription = "Background",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        
+        // Light gradient overlay for readability (reduced opacity)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFE3F2FD).copy(alpha = 0.3f),
+                            Color(0xFFFFFFFF).copy(alpha = 0.4f)
+                        )
+                    )
+                )
+        )
+
+        // Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .widthIn(max = if (isTablet) 600.dp else screenWidth)
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = Dimens.paddingLg)
                 .align(Alignment.TopCenter),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(if (isTablet) 60.dp else 48.dp))
 
-            // Serveit Partner Logo (smaller than login screen)
-            Image(
-                painter = painterResource(id = R.drawable.serveitpartnerlogo),
-                contentDescription = "Serveit Partner Logo",
-                modifier = Modifier
-                    .fillMaxWidth(0.4f)
-                    .widthIn(max = 120.dp),
-                contentScale = ContentScale.Fit
-            )
+            // Logo
+            OtpComponents.ServeitLogo()
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(Dimens.spacingXxl))
 
-            // Title: "Enter OTP"
+            // Title - Centered
             Text(
-                text = stringResource(R.string.otp_title),
+                text = "Enter OTP Code",
                 style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(Dimens.spacingSm))
 
-            // Subtitle: "We've sent a 6-digit verification code to +91 XXXXXX1234"
+            // Subtitle - Centered
             Text(
-                text = stringResource(R.string.otp_subtitle_new, maskPhoneNumber(phoneNumber)),
+                text = "A 6-digit verification code was just sent to",
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Normal
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(Dimens.spacingSm))
 
-            // 6-Digit OTP Input
+            // Phone Number Display with Wrong Number link
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatPhoneNumber(phoneNumber),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(Dimens.spacingXs))
+            
+            TextButton(
+                onClick = onNavigateBack,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+            ) {
+                Text(
+                    text = "Wrong number?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(Dimens.spacingXxl))
+
+            // OTP Input Fields
             OTPInputField(
                 otpLength = 6,
                 onOtpChange = { otp ->
@@ -150,7 +189,7 @@ fun OtpScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(Dimens.spacingXl))
 
             // Error message
             if (uiState.errorMessage != null) {
@@ -160,12 +199,11 @@ fun OtpScreen(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
+                        .padding(horizontal = Dimens.paddingXs),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(Dimens.spacingSm))
             }
-
-            Spacer(modifier = Modifier.height(32.dp))
 
             // Verify Button
             PrimaryButton(
@@ -177,32 +215,32 @@ fun OtpScreen(
                 },
                 enabled = uiState.isOtpValid && !uiState.isVerifying,
                 isLoading = uiState.isVerifying,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Retry button (shown on error with retries available)
-            if (uiState.errorMessage != null && uiState.retryCount < uiState.maxRetries && !uiState.isVerifying) {
-                Spacer(modifier = Modifier.height(8.dp))
-                androidx.compose.material3.TextButton(
-                    onClick = { viewModel.retryVerification(activity) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "Retry (${uiState.maxRetries - uiState.retryCount} attempts left)",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
+                modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
-            }
+            )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Dimens.spacingLg))
 
-            // Resend & Change Number Section
+            // Resend Section
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Resend timer or resend button
+                Text(
+                    text = "Didn't receive the OTP?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(Dimens.spacingSm))
+                
                 if (uiState.canResend) {
                     TextButton(
                         onClick = { viewModel.resendOtp(activity) },
@@ -215,61 +253,46 @@ fun OtpScreen(
                         )
                     }
                 } else {
-                    Text(
-                        text = stringResource(R.string.resend_code_in, formatTime(uiState.timeRemaining)),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Change Number link
-                TextButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = stringResource(R.string.change_number),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        textDecoration = TextDecoration.Underline
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ri_time_line),
+                            contentDescription = "Timer",
+                            modifier = Modifier.size(16.dp),
+                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onSurfaceVariant)
+                        )
+                        Spacer(modifier = Modifier.width(Dimens.spacingXs))
+                        Text(
+                            text = "Resend code in ${formatTime(uiState.timeRemaining)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
-
-            // Main Illustration (big_enter_otp)
-            Image(
-                painter = painterResource(id = R.drawable.big_enter_otp),
-                contentDescription = "OTP Illustration",
-                modifier = Modifier
-                    .fillMaxWidth(0.75f)
-                    .widthIn(max = 280.dp),
-                contentScale = ContentScale.Fit
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(Dimens.spacingXxl))
         }
     }
 }
 
 /**
- * Masks phone number to show only last 4 digits
- * Example: "1234567890" -> "XXXXXX7890"
+ * Formats phone number for display
  */
-private fun maskPhoneNumber(phoneNumber: String): String {
-    return if (phoneNumber.length >= 4) {
-        "XXXXXX${phoneNumber.takeLast(4)}"
+private fun formatPhoneNumber(phoneNumber: String): String {
+    val cleaned = phoneNumber.replace(Regex("[^0-9]"), "")
+    return if (cleaned.length == 10) {
+        "+91 ${cleaned.substring(0, 5)} ${cleaned.substring(5)}"
     } else {
-        "XXXXXX"
+        "+91 $phoneNumber"
     }
 }
 
 /**
  * Formats seconds to MM:SS format
- * Example: 45 -> "00:45", 125 -> "02:05"
  */
 private fun formatTime(seconds: Int): String {
     val minutes = seconds / 60

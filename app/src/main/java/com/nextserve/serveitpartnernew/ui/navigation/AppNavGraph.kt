@@ -11,9 +11,13 @@ import com.nextserve.serveitpartnernew.ui.screen.LoginScreen
 import com.nextserve.serveitpartnernew.ui.screen.OnboardingScreen
 import com.nextserve.serveitpartnernew.ui.screen.OtpScreen
 import com.nextserve.serveitpartnernew.ui.screen.RejectionScreen
+import com.nextserve.serveitpartnernew.ui.screen.SplashScreen
 import com.nextserve.serveitpartnernew.ui.screen.WaitingScreen
+import com.nextserve.serveitpartnernew.ui.screen.welcome.WelcomeScreen
 
 sealed class Screen(val route: String) {
+    object Splash : Screen("splash")
+    object Welcome : Screen("welcome")
     object Login : Screen("login")
     object Otp : Screen("otp/{phoneNumber}/{verificationId}") {
         fun createRoute(phoneNumber: String, verificationId: String) = "otp/$phoneNumber/$verificationId"
@@ -28,6 +32,31 @@ sealed class Screen(val route: String) {
 }
 
 fun NavGraphBuilder.appNavGraph(navController: NavController) {
+    composable(Screen.Splash.route) {
+        SplashScreen(
+            onNavigateToWelcome = {
+                navController.navigate(Screen.Welcome.route) {
+                    popUpTo(Screen.Splash.route) { inclusive = true }
+                }
+            },
+            onNavigateToLogin = {
+                navController.navigate(Screen.Login.route) {
+                    popUpTo(Screen.Splash.route) { inclusive = true }
+                }
+            }
+        )
+    }
+    
+    composable(Screen.Welcome.route) {
+        WelcomeScreen(
+            onJoinClick = {
+                navController.navigate(Screen.Login.route) {
+                    popUpTo(Screen.Welcome.route) { inclusive = true }
+                }
+            }
+        )
+    }
+    
     composable(Screen.Login.route) {
         LoginScreen(
             onNavigateToOtp = { phoneNumber, verificationId, _ ->

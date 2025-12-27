@@ -20,11 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.ServiceSelector
-import com.nextserve.serveitpartnernew.utils.LanguageManager
+import com.nextserve.serveitpartnernew.ui.util.Dimens
 
 @Composable
 fun Step1BasicInfo(
@@ -44,53 +45,33 @@ fun Step1BasicInfo(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val scrollState = rememberScrollState()
-    val context = LocalContext.current
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .verticalScroll(scrollState)
-            .padding(horizontal = 24.dp),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+            .padding(horizontal = Dimens.paddingLg),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.spacingMd)
     ) {
-        // Section Title
+        Spacer(modifier = Modifier.height(Dimens.spacingMd))
+        
+        // Section Title - Large and Bold
         Text(
             text = stringResource(R.string.onboarding_basic_info),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
             color = colorScheme.onSurface,
-            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+            modifier = Modifier.padding(bottom = Dimens.spacingXs)
         )
 
         // Subtitle
         Text(
             text = stringResource(R.string.onboarding_tell_about_yourself),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Normal,
             color = colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.padding(bottom = Dimens.spacingLg)
         )
-
-        // Language Selector
-        Text(
-            text = stringResource(R.string.language),
-            style = MaterialTheme.typography.labelLarge,
-            color = colorScheme.onSurface,
-            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
-        ) {
-            val languages = listOf("en", "hi", "mr")
-            languages.forEach { langCode ->
-                LanguageButton(
-                    languageCode = langCode,
-                    displayName = LanguageManager.getLanguageDisplayName(langCode, context),
-                    isSelected = language == langCode,
-                    onClick = { onLanguageChange(langCode) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
 
         // Full Name
         OutlinedInputField(
@@ -102,28 +83,40 @@ fun Step1BasicInfo(
         )
 
         // Gender
-        Text(
-            text = stringResource(R.string.gender),
-            style = MaterialTheme.typography.labelLarge,
-            color = colorScheme.onSurface,
-            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+        Column(
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.spacingSm)
         ) {
-            val genders = listOf(
-                stringResource(R.string.male) to "Male",
-                stringResource(R.string.female) to "Female"
+            Text(
+                text = stringResource(R.string.gender),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = Dimens.spacingXs)
             )
-            genders.forEach { (displayText, genderValue) ->
-                GenderButton(
-                    text = displayText,
-                    isSelected = gender == genderValue,
-                    onClick = { onGenderChange(genderValue) },
-                    modifier = Modifier.weight(1f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.spacingMd)
+            ) {
+                val genders = listOf(
+                    stringResource(R.string.male) to "Male",
+                    stringResource(R.string.female) to "Female"
                 )
+                genders.forEach { (displayText, genderValue) ->
+                    GenderButton(
+                        text = displayText,
+                        isSelected = gender == genderValue,
+                        onClick = { onGenderChange(genderValue) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
+            // Helper text for gender
+            Text(
+                text = "This helps us assign you relevant jobs",
+                style = MaterialTheme.typography.bodySmall,
+                color = colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Dimens.spacingXs)
+            )
         }
 
         // Primary Service
@@ -132,7 +125,7 @@ fun Step1BasicInfo(
                 text = stringResource(R.string.loading_services),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 16.dp)
+                modifier = Modifier.padding(vertical = Dimens.spacingMd)
             )
         } else {
             ServiceSelector(
@@ -155,52 +148,7 @@ fun Step1BasicInfo(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-    }
-}
-
-@Composable
-private fun LanguageButton(
-    languageCode: String,
-    displayName: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val colorScheme = MaterialTheme.colorScheme
-
-    Box(
-        modifier = modifier
-            .height(48.dp)
-            .background(
-                color = if (isSelected) {
-                    colorScheme.primaryContainer
-                } else {
-                    colorScheme.surface
-                },
-                shape = RoundedCornerShape(12.dp)
-            )
-            .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) {
-                    colorScheme.primary
-                } else {
-                    colorScheme.outline.copy(alpha = 0.5f)
-                },
-                shape = RoundedCornerShape(12.dp)
-            )
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = displayName,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (isSelected) {
-                colorScheme.onPrimaryContainer
-            } else {
-                colorScheme.onSurface
-            }
-        )
+        Spacer(modifier = Modifier.height(Dimens.spacingXl))
     }
 }
 
@@ -215,32 +163,33 @@ private fun GenderButton(
 
     Box(
         modifier = modifier
-            .height(48.dp)
+            .height(56.dp)
             .background(
                 color = if (isSelected) {
-                    colorScheme.primaryContainer
+                    colorScheme.primaryContainer.copy(alpha = 0.2f)
                 } else {
                     colorScheme.surface
                 },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(16.dp)
             )
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
                 color = if (isSelected) {
                     colorScheme.primary
                 } else {
-                    colorScheme.outline.copy(alpha = 0.5f)
+                    colorScheme.outline.copy(alpha = 0.3f)
                 },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(16.dp)
             )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (isSelected) {
-                colorScheme.onPrimaryContainer
+                colorScheme.primary
             } else {
                 colorScheme.onSurface
             }

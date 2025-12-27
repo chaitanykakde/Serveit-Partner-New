@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     val currentUser = FirebaseProvider.auth.currentUser
                     if (currentUser != null) {
+                        // User is logged in, skip splash and go directly to destination
                         // Save FCM token
                         FcmTokenManager.getAndSaveToken(currentUser.uid)
                         
@@ -84,7 +85,8 @@ class MainActivity : ComponentActivity() {
                             startDestination = Screen.Onboarding.route
                         }
                     } else {
-                        startDestination = Screen.Login.route
+                        // User not logged in, start with Splash screen
+                        startDestination = Screen.Splash.route
                     }
                 }
                 

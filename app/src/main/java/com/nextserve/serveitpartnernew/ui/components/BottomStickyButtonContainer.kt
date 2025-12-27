@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -25,7 +26,7 @@ fun BottomStickyButtonContainer(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(colorScheme.background)
+            // No background - let parent background show through
     ) {
         // Content area - padding for button and navigation bar
         Box(

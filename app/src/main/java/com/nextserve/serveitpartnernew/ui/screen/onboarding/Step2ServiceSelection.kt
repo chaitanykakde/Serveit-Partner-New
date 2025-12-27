@@ -1,6 +1,8 @@
 package com.nextserve.serveitpartnernew.ui.screen.onboarding
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.BottomStickyButtonContainer
@@ -36,6 +40,7 @@ import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
 import com.nextserve.serveitpartnernew.ui.components.SecondaryButton
 import com.nextserve.serveitpartnernew.ui.theme.CardShape
+import com.nextserve.serveitpartnernew.ui.util.Dimens
 
 @Composable
 fun Step2ServiceSelection(
@@ -81,72 +86,64 @@ fun Step2ServiceSelection(
             }
         },
         content = {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = Dimens.paddingLg)
             ) {
-                // Header content (fixed at top)
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Title
-                    Text(
-                        text = stringResource(R.string.select_services_you_provide),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = colorScheme.onSurface,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
+                Spacer(modifier = Modifier.height(Dimens.spacingMd))
+                
+                // Title - Large and Bold
+                Text(
+                    text = stringResource(R.string.select_services_you_provide),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = Dimens.spacingXs)
+                )
 
-                    // Subtitle
-                    Text(
-                        text = stringResource(R.string.based_on_service, primaryServiceName),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                // Subtitle
+                Text(
+                    text = stringResource(R.string.based_on_service, primaryServiceName),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Normal,
+                    color = colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = Dimens.spacingLg)
+                )
 
-                    // Select All / Deselect All
-                    if (availableSubServices.isNotEmpty()) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                // Select All / Deselect All
+                if (availableSubServices.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = Dimens.spacingMd),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        Checkbox(
+                            checked = isSelectAllChecked,
+                            onCheckedChange = { onSelectAllToggle() },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = colorScheme.primary
                             )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = isSelectAllChecked,
-                                    onCheckedChange = { onSelectAllToggle() }
-                                )
-                                Spacer(modifier = Modifier.size(8.dp))
-                                Text(
-                                    text = if (isSelectAllChecked) stringResource(R.string.deselect_all) else stringResource(R.string.select_all),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = colorScheme.onSurface,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable(onClick = onSelectAllToggle)
-                                )
-                            }
-                        }
+                        )
+                        Spacer(modifier = Modifier.size(Dimens.spacingSm))
+                        Text(
+                            text = if (isSelectAllChecked) stringResource(R.string.deselect_all) else stringResource(R.string.select_all),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = colorScheme.onSurface,
+                            modifier = Modifier.clickable(onClick = onSelectAllToggle)
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                // Sub-services Grid - Below header, scrollable
+                // Sub-services Grid - Scrollable
                 if (isLoadingSubServices) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(top = 180.dp),
+                            .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -157,14 +154,15 @@ fun Step2ServiceSelection(
                     }
                 } else if (availableSubServices.isNotEmpty()) {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(columns),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        columns = GridCells.Fixed(2),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spacingMd),
+                        verticalArrangement = Arrangement.spacedBy(Dimens.spacingMd),
                         contentPadding = PaddingValues(
-                            top = 180.dp, // Approximate header height
-                            bottom = 8.dp
+                            bottom = Dimens.spacingXl
                         ),
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f)
                     ) {
                         items(availableSubServices) { subService ->
                             SubServiceCard(
@@ -178,7 +176,7 @@ fun Step2ServiceSelection(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(top = 180.dp)
+                            .weight(1f)
                     ) {
                         OutlinedInputField(
                             value = otherService,
@@ -203,58 +201,55 @@ private fun SubServiceCard(
 ) {
     val colorScheme = MaterialTheme.colorScheme
 
-    Card(
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(80.dp)
-            .clickable(onClick = onToggle),
-        shape = CardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                colorScheme.primaryContainer.copy(alpha = 0.5f)
-            } else {
-                colorScheme.surface
-            }
-        ),
-        border = BorderStroke(
-            width = if (isSelected) 2.dp else 1.dp,
-            color = if (isSelected) {
-                colorScheme.primary
-            } else {
-                colorScheme.outline.copy(alpha = 0.5f)
-            }
-        )
+            .height(100.dp)
+            .background(
+                color = if (isSelected) {
+                    colorScheme.primaryContainer.copy(alpha = 0.2f)
+                } else {
+                    colorScheme.surface
+                },
+                shape = RoundedCornerShape(16.dp)
+            )
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) {
+                    colorScheme.primary
+                } else {
+                    colorScheme.outline.copy(alpha = 0.3f)
+                },
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onToggle)
+            .padding(Dimens.spacingMd),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(80.dp)
-                .padding(12.dp),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spacingSm),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onToggle() },
-                    modifier = Modifier.size(20.dp)
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = { onToggle() },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = colorScheme.primary
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = subService.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isSelected) {
-                        colorScheme.onPrimaryContainer
-                    } else {
-                        colorScheme.onSurface
-                    },
-                    maxLines = 2,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            )
+            Text(
+                text = subService.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isSelected) {
+                    colorScheme.primary
+                } else {
+                    colorScheme.onSurface
+                },
+                maxLines = 2,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }

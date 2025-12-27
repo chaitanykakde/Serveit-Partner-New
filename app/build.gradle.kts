@@ -58,6 +58,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
     
+    // Compose Foundation (for HorizontalPager) - version managed by BOM
+    implementation("androidx.compose.foundation:foundation")
+    
     // Firebase BOM
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-analytics")
@@ -65,6 +68,7 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.firebase:firebase-functions")
     
     // Google Play Services Location
     implementation("com.google.android.gms:play-services-location:21.3.0")

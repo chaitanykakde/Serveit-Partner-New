@@ -25,7 +25,8 @@ fun PrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     isLoading: Boolean = false,
-    leadingIcon: @Composable (() -> Unit)? = null
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null
 ) {
     Button(
         onClick = onClick,
@@ -56,6 +57,10 @@ fun PrimaryButton(
                 fontWeight = FontWeight.Medium,
                 style = MaterialTheme.typography.labelLarge
             )
+            if (trailingIcon != null && !isLoading) {
+                Spacer(modifier = Modifier.width(8.dp))
+                trailingIcon()
+            }
         }
     }
 }

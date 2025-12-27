@@ -2,6 +2,7 @@ package com.nextserve.serveitpartnernew.ui.screen
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,12 +14,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,11 +39,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nextserve.serveitpartnernew.R
-import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
+import com.nextserve.serveitpartnernew.ui.screen.login.LoginComponents
+import com.nextserve.serveitpartnernew.ui.theme.OrangeAccent
+import com.nextserve.serveitpartnernew.ui.util.Dimens
 import com.nextserve.serveitpartnernew.ui.viewmodel.LoginViewModel
 import com.nextserve.serveitpartnernew.utils.NetworkMonitor
 
@@ -53,7 +62,6 @@ fun LoginScreen(
     val context = LocalContext.current
     val activity = context as? android.app.Activity
     
-    // Initialize NetworkMonitor for offline detection
     val networkMonitor = remember { NetworkMonitor(context) }
     val focusRequester = remember { FocusRequester() }
     val configuration = LocalConfiguration.current
@@ -65,13 +73,11 @@ fun LoginScreen(
         focusRequester.requestFocus()
     }
 
-    // Setup callbacks
     LaunchedEffect(Unit) {
         viewModel.onOtpSent = { phoneNumber, verificationId, resendToken ->
             onNavigateToOtp(phoneNumber, verificationId, resendToken)
         }
         viewModel.onAutoVerified = { uid ->
-            // Auto-verification succeeded, navigate directly to onboarding
             onNavigateToOnboarding(uid)
         }
         viewModel.onError = { error ->
@@ -79,92 +85,84 @@ fun LoginScreen(
         }
     }
 
-    // Light gradient background
-    val backgroundGradient = Brush.verticalGradient(
-        colors = listOf(
-            Color(0xFFF8FAFF), // Light blue-white
-            Color(0xFFFFFFFF)  // White
-        )
-    )
-
+    // Background with image and gradient overlay
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundGradient)
             .systemBarsPadding()
     ) {
+        // Background Image - Fill entire screen
+        Image(
+            painter = painterResource(id = R.drawable.serveit_partner_flow_bg),
+            contentDescription = "Background",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        
+        // Light gradient overlay for readability (reduced opacity)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFE3F2FD).copy(alpha = 0.3f),
+                            Color(0xFFFFFFFF).copy(alpha = 0.4f)
+                        )
+                    )
+                )
+        )
+
+        // Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .widthIn(max = if (isTablet) 600.dp else screenWidth)
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = Dimens.paddingLg)
                 .align(Alignment.TopCenter),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(if (isTablet) 60.dp else 48.dp))
 
-            // Serveit Partner Logo
-            Image(
-                painter = painterResource(id = R.drawable.serveitpartnerlogo),
-                contentDescription = "Serveit Partner Logo",
-                modifier = Modifier
-                    .fillMaxWidth(0.5f)
-                    .widthIn(max = 180.dp),
-                contentScale = ContentScale.Fit
-            )
+            // Logo
+            LoginComponents.ServeitLogo()
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(Dimens.spacingXxl))
 
-            // App Name
+            // Title - Centered
             Text(
-                text = stringResource(R.string.login_title),
+                text = "Welcome back",
                 style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(Dimens.spacingSm))
 
-            // Subtitle
+            // Subtitle - Centered
             Text(
-                text = stringResource(R.string.login_subtitle),
+                text = "Login using your registered mobile number",
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Normal
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(Dimens.spacingXxl))
 
-            // Mobile Number Input with India Flag and +91
-            OutlinedInputField(
-                value = uiState.phoneNumber,
-                onValueChange = { newValue ->
+            // Phone Number Input with +91 prefix
+            LoginComponents.PhoneNumberInput(
+                phoneNumber = uiState.phoneNumber,
+                onPhoneNumberChange = { newValue ->
                     viewModel.updatePhoneNumber(newValue)
                     if (uiState.errorMessage != null) {
                         viewModel.clearError()
                     }
                 },
-                placeholder = stringResource(R.string.enter_mobile_number),
-                leadingIcon = {
-                    Row(
-                        modifier = Modifier.padding(start = 16.dp, end = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "🇮🇳",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = "+91",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                },
-                keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone,
                 isError = uiState.errorMessage != null,
                 errorMessage = uiState.errorMessage,
                 modifier = Modifier
@@ -172,17 +170,7 @@ fun LoginScreen(
                     .focusRequester(focusRequester)
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Helper Text
-            Text(
-                text = stringResource(R.string.otp_verification_info),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(Dimens.spacingXl))
 
             // Send OTP Button
             PrimaryButton(
@@ -194,35 +182,72 @@ fun LoginScreen(
                 },
                 enabled = uiState.isPhoneNumberValid && !uiState.isSendingOtp,
                 isLoading = uiState.isSendingOtp,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            )
+
+            Spacer(modifier = Modifier.height(Dimens.spacingMd))
+
+            // Helper Text
+            Text(
+                text = "You'll receive a 6-digit verification code on this number",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
             // Error message
             if (uiState.errorMessage != null) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(Dimens.spacingSm))
                 Text(
                     text = uiState.errorMessage!!,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
+                        .padding(horizontal = Dimens.paddingXs),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
-            // Main Illustration
-            Image(
-                painter = painterResource(id = R.drawable.big_loginpageicon),
-                contentDescription = "Login Illustration",
+            // Footer - Two rows
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth(0.75f)
-                    .widthIn(max = 280.dp),
-                contentScale = ContentScale.Fit
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
+                    .fillMaxWidth()
+                    .padding(bottom = Dimens.spacingXl),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Row 1: "By continuing, you agree to our" (unbolded)
+                Text(
+                    text = "By continuing, you agree to our",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                
+                // Row 2: "Terms and Privacy Policy" (bolded)
+                TextButton(
+                    onClick = { /* Handle Terms & Privacy click */ },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text = "Terms and Privacy Policy",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }

@@ -2,10 +2,14 @@ package com.nextserve.serveitpartnernew.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary Blue Colors - Light Mode
-val BluePrimary = Color(0xFF1976D2)
+// Primary Blue Colors - Light Mode (Based on Figma design)
+val BluePrimary = Color(0xFF1976D2) // Main button blue
 val BluePrimaryDark = Color(0xFF1565C0)
 val BluePrimaryLight = Color(0xFF42A5F5)
+val BlueLight = Color(0xFFE3F2FD) // Light blue for backgrounds
+
+// Orange Accent (from logo)
+val OrangeAccent = Color(0xFFFF6B35) // Orange in "Serveit" logo
 
 // Primary Blue Colors - Dark Mode (lighter for better contrast)
 val BluePrimaryDarkMode = Color(0xFF64B5F6)
