@@ -4,6 +4,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.EmptyState
 
 @Composable
@@ -12,8 +14,8 @@ fun EarningsScreen(
 ) {
     EmptyState(
         icon = Icons.Default.Star,
-        title = "Earnings",
-        description = "Your earnings will appear here once you complete your first service.",
+        title = stringResource(R.string.earnings_title),
+        description = stringResource(R.string.earnings_empty_message),
         modifier = modifier
     )
 }

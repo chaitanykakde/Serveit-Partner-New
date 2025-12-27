@@ -17,8 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
 import com.nextserve.serveitpartnernew.ui.components.BottomStickyButtonContainer
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
@@ -64,7 +66,7 @@ fun OnboardingScreen(
             // Steps 2, 3, 4, and 5 have their own buttons
             if (uiState.currentStep != 2 && uiState.currentStep != 3 && uiState.currentStep != 4 && uiState.currentStep != 5) {
                 PrimaryButton(
-                    text = "Continue",
+                    text = stringResource(R.string.continue_button),
                     onClick = {
                         if (uiState.currentStep < 5) {
                             onboardingViewModel.nextStep()

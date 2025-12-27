@@ -1,6 +1,10 @@
 package com.nextserve.serveitpartnernew.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,8 +17,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -26,10 +33,22 @@ fun QuickActionChip(
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = tween(100), label = ""
+    )
+
     Surface(
         modifier = modifier
             .wrapContentSize()
-            .clickable(onClick = onClick),
+            .scale(scale)
+            .clickable(
+                onClick = onClick,
+                interactionSource = interactionSource,
+                indication = null
+            ),
         shape = RoundedCornerShape(16.dp),
         tonalElevation = 2.dp,
         color = MaterialTheme.colorScheme.surfaceVariant
@@ -59,8 +78,14 @@ fun QuickActionChip(
 fun StatChip(
     value: String,
     label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     modifier: Modifier = Modifier
 ) {
+    val animatedFloat by animateFloatAsState(
+        targetValue = value.toFloatOrNull() ?: 0f,
+        animationSpec = tween(durationMillis = 1000), label = ""
+    )
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
@@ -70,8 +95,16 @@ fun StatChip(
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,

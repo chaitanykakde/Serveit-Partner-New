@@ -17,7 +17,9 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
 import com.nextserve.serveitpartnernew.ui.components.SecondaryButton
@@ -57,7 +59,7 @@ fun Step3Location(
     ) {
         // Title
         Text(
-            text = "Where do you provide services?",
+            text = stringResource(R.string.where_provide_services),
             style = MaterialTheme.typography.headlineMedium,
             color = colorScheme.onSurface,
             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -65,7 +67,7 @@ fun Step3Location(
 
         // Subtitle
         Text(
-            text = "We'll use your location to find nearby service requests",
+            text = stringResource(R.string.location_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -75,14 +77,14 @@ fun Step3Location(
 
         // Use Current Location Button
         PrimaryButton(
-            text = if (isLocationLoading) "Getting location..." else "Use Current Location",
+            text = if (isLocationLoading) stringResource(R.string.getting_location) else stringResource(R.string.use_current_location),
             onClick = { onUseCurrentLocation(hasLocationPermission, requestLocationPermission) },
             isLoading = isLocationLoading,
             leadingIcon = {
                 if (!isLocationLoading) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Location",
+                        contentDescription = stringResource(R.string.location),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -96,8 +98,8 @@ fun Step3Location(
         OutlinedInputField(
             value = state,
             onValueChange = onStateChange,
-            label = "State",
-            placeholder = "State",
+            label = stringResource(R.string.state),
+            placeholder = stringResource(R.string.state),
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -105,8 +107,8 @@ fun Step3Location(
         OutlinedInputField(
             value = city,
             onValueChange = onCityChange,
-            label = "City",
-            placeholder = "City",
+            label = stringResource(R.string.city),
+            placeholder = stringResource(R.string.city),
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -114,8 +116,8 @@ fun Step3Location(
         OutlinedInputField(
             value = address,
             onValueChange = onAddressChange,
-            label = "Area / Locality / Landmark",
-            placeholder = "Area / locality / landmark",
+            label = stringResource(R.string.area_locality),
+            placeholder = stringResource(R.string.area_locality),
             singleLine = false,
             modifier = Modifier.fillMaxWidth()
         )
@@ -124,8 +126,8 @@ fun Step3Location(
         OutlinedInputField(
             value = fullAddress,
             onValueChange = onFullAddressChange,
-            label = "Full Address",
-            placeholder = "Enter your complete address",
+            label = stringResource(R.string.full_address),
+            placeholder = stringResource(R.string.enter_full_address),
             singleLine = false,
             modifier = Modifier.fillMaxWidth()
         )
@@ -134,8 +136,8 @@ fun Step3Location(
         OutlinedInputField(
             value = locationPincode,
             onValueChange = onLocationPincodeChange,
-            label = "Pincode",
-            placeholder = "Pincode",
+            label = stringResource(R.string.pincode),
+            placeholder = stringResource(R.string.pincode),
             keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
             modifier = Modifier.fillMaxWidth()
         )
@@ -152,7 +154,7 @@ fun Step3Location(
 
         // Helper text
         Text(
-            text = "Auto-filled from your location. You can change if needed.",
+            text = stringResource(R.string.location_auto_filled),
             style = MaterialTheme.typography.bodySmall,
             color = colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
@@ -162,7 +164,7 @@ fun Step3Location(
 
         // Service Radius
         Text(
-            text = "You will get jobs within ${serviceRadius.toInt()} km",
+            text = stringResource(R.string.service_radius_info, serviceRadius.toInt()),
             style = MaterialTheme.typography.titleMedium,
             color = colorScheme.primary,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -184,12 +186,12 @@ fun Step3Location(
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
         ) {
             SecondaryButton(
-                text = "Previous",
+                text = stringResource(R.string.previous),
                 onClick = onPrevious,
                 modifier = Modifier.weight(1f)
             )
             PrimaryButton(
-                text = "Next",
+                text = stringResource(R.string.next),
                 onClick = onNext,
                 modifier = Modifier.weight(1f)
             )

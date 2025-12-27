@@ -14,7 +14,10 @@
     <!-- OTP Screen -->
     <string name="otp_title">Enter OTP</string>
     <string name="otp_subtitle">We sent a code to %1$s</string>
+    <string name="otp_subtitle_new">We\'ve sent a 6-digit verification code to +91 %1$s</string>
     <string name="resend_otp">Resend OTP</string>
+    <string name="resend_code_in">Resend code in %1$s</string>
+    <string name="change_number">Change Number</string>
     <string name="verify">Verify</string>
     <string name="verifying">Verifying…</string>
     
@@ -164,4 +167,85 @@
     <string name="earnings_title">Earnings</string>
     <string name="no_earnings">No earnings yet</string>
     <string name="earnings_empty_message">Start accepting jobs to see your earnings here</string>
+    
+    <!-- Additional strings -->
+    <string name="services">Services</string>
+    <string name="verify_otp">Verify OTP</string>
+    <string name="otp_sent_to">OTP sent to +91 %1$s</string>
+    <string name="enter_6_digit_code">Enter the 6-digit code sent to your mobile number</string>
+    <string name="resend_otp_in">Resend OTP in %1$ds</string>
+    <string name="continue_button">Continue</string>
+    <string name="select_services_you_provide">Select services you provide</string>
+    <string name="based_on_service">Based on your selected service: %1$s</string>
+    <string name="deselect_all">Deselect all</string>
+    <string name="loading_sub_services">Loading sub-services…</string>
+    <string name="specify_other_service">Specify other service</string>
+    <string name="enter_service_name">Enter service name</string>
+    <string name="upload_aadhaar_verification">Upload your Aadhaar card for verification</string>
+    <string name="uploading_percent">Uploading: %1$d%%</string>
+    <string name="tap_to_upload">Tap to upload</string>
+    <string name="not_uploaded">Not uploaded</string>
+    <string name="review_submit">Review &amp; Submit</string>
+    <string name="verify_details_before_submit">Please verify your details before submitting</string>
+    <string name="details_submitted_successfully">Details submitted successfully</string>
+    <string name="profile_under_verification">Your profile is under verification</string>
+    <string name="basic_information">Basic Information</string>
+    <string name="name">Name</string>
+    <string name="not_provided">Not provided</string>
+    <string name="main_service">Main Service</string>
+    <string name="not_selected">Not selected</string>
+    <string name="sub_services">Sub-Services:</string>
+    <string name="custom_service">Custom Service</string>
+    <string name="location">Location</string>
+    <string name="area">Area</string>
+    <string name="service_radius">Service Radius</string>
+    <string name="km">km</string>
+    <string name="edit">Edit</string>
+    <string name="complete_profile">Complete your profile</string>
+    <string name="finish_steps_to_submit">Finish the steps to submit for review</string>
+    <string name="we_will_notify_once_verification_completes">We\'ll notify you once verification completes</string>
+    <string name="please_review_your_documents">Please review your documents</string>
+    <string name="name_phone_email">Name, phone, email</string>
+    <string name="skills_categories">Skills, categories</string>
+    <string name="city_radius_pincode">City, radius, pincode</string>
+    <string name="aadhaar_verification">Aadhaar, verification</string>
+    <string name="manage_push_alerts">Manage push alerts</string>
+    <string name="faqs_contact_us">FAQs, contact us</string>
+    <string name="version_terms_privacy">Version, terms &amp; privacy</string>
+    <string name="push_notifications">Push Notifications</string>
+    
+    <!-- Help & Support -->
+    <string name="contact_support">Contact Support</string>
+    <string name="call_us">Call Us</string>
+    <string name="call_support_number">+91 1234567890</string>
+    <string name="email_us">Email Us</string>
+    <string name="email_support_address">support@serveit.com</string>
+    <string name="frequently_asked_questions">Frequently Asked Questions</string>
+    <string name="faq_question_1">How do I update my profile?</string>
+    <string name="faq_answer_1">You can update your profile by going to Profile section and clicking on any section you want to edit.</string>
+    <string name="faq_question_2">How long does verification take?</string>
+    <string name="faq_answer_2">Profile verification usually takes 24-48 hours after submission. You will receive a notification once it\'s complete.</string>
+    <string name="faq_question_3">Can I change my service area?</string>
+    <string name="faq_answer_3">Yes, you can update your service area and radius from Profile → Address Information.</string>
+    <string name="faq_question_4">What documents are required?</string>
+    <string name="faq_answer_4">You need to upload both sides of your Aadhaar card for verification purposes.</string>
+    
+    <!-- About App -->
+    <string name="app_description">Serveit Partner helps service providers connect with customers and grow their business.</string>
+    <string name="legal_information">Legal Information</string>
+    <string name="terms_and_conditions">Terms &amp; Conditions</string>
+    <string name="privacy_policy">Privacy Policy</string>
+    <string name="developed_by">Developed By</string>
+    <string name="developer_name">Serveit Technologies</string>
+    
+    <!-- Profile Photo -->
+    <string name="upload_profile_photo">Upload Profile Photo</string>
+    <string name="profile_photo_updated">Profile photo updated</string>
+    <string name="failed_to_upload_profile_photo">Failed to upload profile photo</string>
+    
+    <!-- Status Banner -->
+    <string name="complete_now">Complete Now</string>
+    
+    <!-- Stats -->
+    <string name="loading_stats">Loading stats…</string>
 </resources>

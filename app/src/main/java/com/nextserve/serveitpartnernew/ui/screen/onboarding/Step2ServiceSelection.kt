@@ -28,7 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.BottomStickyButtonContainer
 import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
@@ -62,12 +64,12 @@ fun Step2ServiceSelection(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 SecondaryButton(
-                    text = "Previous",
+                    text = stringResource(R.string.previous),
                     onClick = onPrevious,
                     modifier = Modifier.weight(1f)
                 )
                 PrimaryButton(
-                    text = "Next",
+                    text = stringResource(R.string.next),
                     onClick = onNext,
                     enabled = if (primaryServiceName == "Other Services") {
                         otherService.isNotEmpty()
@@ -90,7 +92,7 @@ fun Step2ServiceSelection(
                 ) {
                     // Title
                     Text(
-                        text = "Select services you provide",
+                        text = stringResource(R.string.select_services_you_provide),
                         style = MaterialTheme.typography.headlineSmall,
                         color = colorScheme.onSurface,
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -98,7 +100,7 @@ fun Step2ServiceSelection(
 
                     // Subtitle
                     Text(
-                        text = "Based on your selected service: $primaryServiceName",
+                        text = stringResource(R.string.based_on_service, primaryServiceName),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -125,7 +127,7 @@ fun Step2ServiceSelection(
                                 )
                                 Spacer(modifier = Modifier.size(8.dp))
                                 Text(
-                                    text = if (isSelectAllChecked) "Deselect all" else "Select all",
+                                    text = if (isSelectAllChecked) stringResource(R.string.deselect_all) else stringResource(R.string.select_all),
                                     style = MaterialTheme.typography.labelLarge,
                                     color = colorScheme.onSurface,
                                     modifier = Modifier
@@ -148,7 +150,7 @@ fun Step2ServiceSelection(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Loading sub-services...",
+                            text = stringResource(R.string.loading_sub_services),
                             style = MaterialTheme.typography.bodyMedium,
                             color = colorScheme.onSurfaceVariant
                         )
@@ -181,8 +183,8 @@ fun Step2ServiceSelection(
                         OutlinedInputField(
                             value = otherService,
                             onValueChange = onOtherServiceChange,
-                            label = "Specify other service",
-                            placeholder = "Enter service name",
+                            label = stringResource(R.string.specify_other_service),
+                            placeholder = stringResource(R.string.enter_service_name),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

@@ -1,6 +1,7 @@
 package com.nextserve.serveitpartnernew.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,8 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.nextserve.serveitpartnernew.R
 import kotlin.math.roundToInt
 
 @Composable
@@ -37,6 +42,8 @@ fun ProfileHeader(
     onboardingStatus: String,
     currentStep: Int = 1,
     totalSteps: Int = 5,
+    profilePhotoUrl: String = "",
+    onProfilePhotoClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val gradient = Brush.linearGradient(
@@ -45,15 +52,16 @@ fun ProfileHeader(
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
         )
     )
+    val context = LocalContext.current
     val (statusText, statusColor, statusBg) = when (approvalStatus) {
-        "APPROVED" -> Triple("Verified", MaterialTheme.colorScheme.onPrimary, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f))
-        "REJECTED" -> Triple("Rejected", MaterialTheme.colorScheme.onErrorContainer, MaterialTheme.colorScheme.errorContainer)
+        "APPROVED" -> Triple(stringResource(R.string.verified), MaterialTheme.colorScheme.onPrimary, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f))
+        "REJECTED" -> Triple(stringResource(R.string.rejected), MaterialTheme.colorScheme.onErrorContainer, MaterialTheme.colorScheme.errorContainer)
         "PENDING" -> Triple(
-            if (onboardingStatus == "SUBMITTED") "Under Review" else "Pending Verification",
+            if (onboardingStatus == "SUBMITTED") stringResource(R.string.under_review) else stringResource(R.string.pending_verification),
             MaterialTheme.colorScheme.onPrimary,
             MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f)
         )
-        else -> Triple("Not Submitted", MaterialTheme.colorScheme.onPrimary, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f))
+        else -> Triple(stringResource(R.string.not_submitted), MaterialTheme.colorScheme.onPrimary, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f))
     }
     val progress = (currentStep.coerceAtLeast(0).coerceAtMost(totalSteps)).toFloat() / totalSteps.toFloat()
     val progressPercent = (progress * 100).roundToInt()
@@ -79,19 +87,31 @@ fun ProfileHeader(
                     Surface(
                         modifier = Modifier
                             .size(82.dp)
-                            .clip(CircleShape),
+                            .clip(CircleShape)
+                            .then(if (onProfilePhotoClick != null) Modifier.clickable(onClick = onProfilePhotoClick) else Modifier),
                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f)
                     ) {
                         Box(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = fullName.takeIf { it.isNotEmpty() }?.firstOrNull()?.uppercase() ?: "U",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.Bold
-                            )
+                            if (profilePhotoUrl.isNotEmpty()) {
+                                AsyncImage(
+                                    model = profilePhotoUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(CircleShape),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
+                            } else {
+                                Text(
+                                    text = fullName.takeIf { it.isNotEmpty() }?.firstOrNull()?.uppercase() ?: "U",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
 
@@ -147,7 +167,7 @@ fun ProfileHeader(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Profile completion",
+                            text = stringResource(R.string.profile_completion),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
                         )

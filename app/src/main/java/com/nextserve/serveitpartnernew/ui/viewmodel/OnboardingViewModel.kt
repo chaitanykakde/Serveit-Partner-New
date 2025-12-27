@@ -16,6 +16,7 @@ import com.nextserve.serveitpartnernew.data.model.SubServiceModel
 import com.nextserve.serveitpartnernew.data.repository.FirestoreRepository
 import com.nextserve.serveitpartnernew.data.repository.LocationRepository
 import com.nextserve.serveitpartnernew.data.repository.StorageRepository
+import com.nextserve.serveitpartnernew.utils.LanguageManager
 import kotlinx.coroutines.launch
 
 data class OnboardingUiState(
@@ -75,6 +76,11 @@ class OnboardingViewModel(
     val mainServices: State<List<MainServiceModel>> = _mainServices
 
     init {
+        // Load saved language and apply it
+        val savedLanguage = LanguageManager.getSavedLanguage(context)
+        uiState = uiState.copy(language = savedLanguage)
+        LanguageManager.applyLanguage(context, savedLanguage)
+        
         loadProviderData()
     }
 

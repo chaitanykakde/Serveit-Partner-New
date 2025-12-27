@@ -146,5 +146,54 @@ class StorageRepository(
             Result.failure(e)
         }
     }
+
+    suspend fun uploadProfilePhoto(
+        uid: String,
+        imageUri: Uri,
+        onProgress: (Double) -> Unit
+    ): Result<String> {
+        return try {
+            if (uid.isEmpty()) {
+                return Result.failure(Exception("User not authenticated. Please login again."))
+            }
+            
+            val compressedBitmap = compressImage(imageUri)
+            val byteArray = bitmapToByteArray(compressedBitmap)
+            
+            val path = "providers/$uid/profile/photo.jpg"
+            val storageRef = storage.reference.child(path)
+            
+            val metadata = com.google.firebase.storage.StorageMetadata.Builder()
+                .setContentType("image/jpeg")
+                .build()
+            
+            val uploadTask = storageRef.putBytes(byteArray, metadata)
+            
+            uploadTask.addOnProgressListener { taskSnapshot ->
+                val progress = (100.0 * taskSnapshot.bytesTransferred) / taskSnapshot.totalByteCount
+                onProgress(progress)
+            }
+            
+            val result = uploadTask.await()
+            val downloadUrl = result.storage.downloadUrl.await()
+            
+            Result.success(downloadUrl.toString())
+        } catch (e: com.google.firebase.storage.StorageException) {
+            val errorMessage = when {
+                e.errorCode == -13021 || e.message?.contains("403") == true || e.message?.contains("Permission denied") == true -> {
+                    "Storage permission denied. Please configure Firebase Storage rules."
+                }
+                e.errorCode == -13020 || e.message?.contains("401") == true -> {
+                    "Not authenticated. Please login again."
+                }
+                else -> {
+                    "Upload failed: ${e.message ?: "Unknown error"}"
+                }
+            }
+            Result.failure(Exception(errorMessage))
+        } catch (e: Exception) {
+            Result.failure(Exception(e.message ?: "Upload failed. Please try again."))
+        }
+    }
 }
 

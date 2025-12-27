@@ -8,48 +8,115 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.PhoneAuthCredential
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
 import com.nextserve.serveitpartnernew.data.repository.AuthRepository
+import com.nextserve.serveitpartnernew.data.repository.FirestoreRepository
+import com.nextserve.serveitpartnernew.utils.ErrorMapper
+import com.nextserve.serveitpartnernew.utils.NetworkMonitor
+import com.nextserve.serveitpartnernew.utils.PhoneNumberFormatter
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
+/**
+ * UI state for Login screen.
+ */
 data class LoginUiState(
     val phoneNumber: String = "",
     val isPhoneNumberValid: Boolean = false,
     val errorMessage: String? = null,
-    val isSendingOtp: Boolean = false
+    val isSendingOtp: Boolean = false,
+    val verificationId: String? = null,
+    val resendToken: com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken? = null,
+    val isOffline: Boolean = false
 )
 
+/**
+ * ViewModel for Login screen.
+ * Handles phone number validation and OTP sending.
+ */
 class LoginViewModel(
     private val authRepository: AuthRepository = AuthRepository(
         FirebaseProvider.auth,
         null // Activity will be passed from screen
-    )
+    ),
+    private val firestoreRepository: FirestoreRepository = FirestoreRepository(
+        FirebaseProvider.firestore
+    ),
+    private val networkMonitor: NetworkMonitor? = null
 ) : ViewModel() {
     var uiState by mutableStateOf(LoginUiState())
         private set
 
-    var onOtpSent: ((String) -> Unit)? = null
-    var onAutoVerified: ((PhoneAuthCredential) -> Unit)? = null
+    var onOtpSent: ((String, String, com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken?) -> Unit)? = null
+    var onAutoVerified: ((String) -> Unit)? = null // UID callback for auto-verification
     var onError: ((String) -> Unit)? = null
-    var autoVerificationCredential: PhoneAuthCredential? = null
 
+    private var lastClickTime: Long = 0
+    private val CLICK_DEBOUNCE_MS = 1000L // 1 second debounce
+
+    init {
+        // Monitor network connectivity if NetworkMonitor is provided
+        networkMonitor?.let { monitor ->
+            viewModelScope.launch {
+                monitor.connectivityFlow().collect { isConnected ->
+                    uiState = uiState.copy(isOffline = !isConnected)
+                    if (!isConnected && uiState.isSendingOtp) {
+                        uiState = uiState.copy(
+                            isSendingOtp = false,
+                            errorMessage = "No internet connection. Please check your network and try again."
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Updates phone number and validates it.
+     * @param phoneNumber The phone number to update
+     */
     fun updatePhoneNumber(phoneNumber: String) {
-        val cleaned = phoneNumber.filter { it.isDigit() }
-        val isValid = cleaned.length == 10
+        val cleaned = PhoneNumberFormatter.cleanPhoneNumber(phoneNumber)
+        val isValid = PhoneNumberFormatter.isValidIndianPhoneNumber(cleaned)
         
         uiState = uiState.copy(
             phoneNumber = cleaned,
             isPhoneNumberValid = isValid,
             errorMessage = if (cleaned.isNotEmpty() && !isValid) {
-                "Please enter a valid 10-digit mobile number"
+                "Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9"
             } else null
         )
     }
 
+    /**
+     * Clears the current error message.
+     */
     fun clearError() {
         uiState = uiState.copy(errorMessage = null)
     }
 
+    /**
+     * Sends OTP to the phone number.
+     * Includes rate limiting to prevent multiple rapid clicks.
+     * @param activity The activity for reCAPTCHA verification
+     */
     fun sendOtp(activity: android.app.Activity?) {
         if (!uiState.isPhoneNumberValid) return
+
+        // Check offline status
+        if (uiState.isOffline || (networkMonitor != null && !networkMonitor.isConnected())) {
+            uiState = uiState.copy(
+                errorMessage = "No internet connection. Please check your network and try again."
+            )
+            return
+        }
+
+        // Rate limiting: prevent rapid clicks
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastClickTime < CLICK_DEBOUNCE_MS) {
+            return
+        }
+        lastClickTime = currentTime
+
+        if (uiState.isSendingOtp) return // Already sending
 
         uiState = uiState.copy(isSendingOtp = true, errorMessage = null)
 
@@ -63,23 +130,90 @@ class LoginViewModel(
             repository.sendOtp(
                 phoneNumber = uiState.phoneNumber,
                 onVerificationComplete = { credential ->
-                    uiState = uiState.copy(isSendingOtp = false)
-                    autoVerificationCredential = credential
-                    onAutoVerified?.invoke(credential)
+                    // Auto-verification: verify immediately
+                    handleAutoVerification(credential, activity)
                 },
-                onCodeSent = { verificationId, _ ->
-                    uiState = uiState.copy(isSendingOtp = false)
-                    onOtpSent?.invoke(verificationId)
-                },
-                onError = { error ->
+                onCodeSent = { verificationId, resendToken ->
                     uiState = uiState.copy(
                         isSendingOtp = false,
-                        errorMessage = error
+                        verificationId = verificationId,
+                        resendToken = resendToken
                     )
-                    onError?.invoke(error)
+                    onOtpSent?.invoke(uiState.phoneNumber, verificationId, resendToken)
+                },
+                onError = { error ->
+                    val friendlyError = ErrorMapper.getErrorMessage(Exception(error))
+                    uiState = uiState.copy(
+                        isSendingOtp = false,
+                        errorMessage = friendlyError
+                    )
+                    onError?.invoke(friendlyError)
                 }
             )
         }
+    }
+
+    /**
+     * Handles auto-verification when Firebase automatically verifies the phone.
+     * @param credential The auto-verification credential
+     * @param activity The activity context
+     */
+    private fun handleAutoVerification(
+        credential: PhoneAuthCredential,
+        activity: android.app.Activity?
+    ) {
+        viewModelScope.launch {
+            try {
+                val result = authRepository.verifyOtpWithCredential(credential)
+                result.onSuccess { uid ->
+                    // Create or update provider document
+                    val providerResult = firestoreRepository.getProviderData(uid)
+                    providerResult.onSuccess { providerData ->
+                        if (providerData == null) {
+                            val formattedPhone = PhoneNumberFormatter.formatPhoneNumber(uiState.phoneNumber)
+                            firestoreRepository.createProviderDocument(uid, formattedPhone)
+                        } else {
+                            if (providerData.phoneNumber.isEmpty()) {
+                                val formattedPhone = PhoneNumberFormatter.formatPhoneNumber(uiState.phoneNumber)
+                                firestoreRepository.updateProviderData(uid, mapOf("phoneNumber" to formattedPhone))
+                            }
+                            firestoreRepository.updateLastLogin(uid)
+                        }
+                    }
+                    
+                    // Save FCM token (non-blocking, failure is not critical)
+                    try {
+                        com.nextserve.serveitpartnernew.data.fcm.FcmTokenManager.getAndSaveToken(uid)
+                    } catch (e: Exception) {
+                        // FCM token save failure is not critical, continue anyway
+                    }
+                    
+                    uiState = uiState.copy(isSendingOtp = false)
+                    onAutoVerified?.invoke(uid)
+                }.onFailure { exception ->
+                    val friendlyError = ErrorMapper.getErrorMessage(exception)
+                    uiState = uiState.copy(
+                        isSendingOtp = false,
+                        errorMessage = friendlyError
+                    )
+                    onError?.invoke(friendlyError)
+                }
+            } catch (e: Exception) {
+                val friendlyError = ErrorMapper.getErrorMessage(e)
+                uiState = uiState.copy(
+                    isSendingOtp = false,
+                    errorMessage = friendlyError
+                )
+                onError?.invoke(friendlyError)
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        onOtpSent = null
+        onAutoVerified = null
+        onError = null
     }
 }
 

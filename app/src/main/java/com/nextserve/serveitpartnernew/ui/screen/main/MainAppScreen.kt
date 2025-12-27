@@ -16,11 +16,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.nextserve.serveitpartnernew.ui.components.BottomNavigationBar
 import com.nextserve.serveitpartnernew.ui.navigation.BottomNavItem
+import com.nextserve.serveitpartnernew.ui.screen.about.AboutAppScreen
 import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditAddressScreen
 import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditBasicScreen
 import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditDocumentsScreen
 import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditPreferencesScreen
 import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditServicesScreen
+import com.nextserve.serveitpartnernew.ui.screen.support.HelpSupportScreen
 
 @Composable
 fun MainAppScreen(
@@ -75,6 +77,8 @@ fun MainAppScreen(
             composable("profile/edit/address") { ProfileEditAddressScreen(navController) }
             composable("profile/edit/documents") { ProfileEditDocumentsScreen(navController) }
             composable("profile/edit/preferences") { ProfileEditPreferencesScreen(navController) }
+            composable("help/support") { HelpSupportScreen(navController) }
+            composable("about/app") { AboutAppScreen(navController) }
         }
     }
 }

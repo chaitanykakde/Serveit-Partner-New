@@ -35,8 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.BottomStickyButtonContainer
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
 import com.nextserve.serveitpartnernew.ui.components.SecondaryButton
@@ -81,12 +83,12 @@ fun Step4Verification(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 SecondaryButton(
-                    text = "Previous",
+                    text = stringResource(R.string.previous),
                     onClick = onPrevious,
                     modifier = Modifier.weight(1f)
                 )
                 PrimaryButton(
-                    text = "Next",
+                    text = stringResource(R.string.next),
                     onClick = onNext,
                     enabled = aadhaarFrontUploaded && aadhaarBackUploaded && !isUploading,
                     modifier = Modifier.weight(1f)
@@ -102,7 +104,7 @@ fun Step4Verification(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Upload your Aadhaar card for verification",
+                    text = stringResource(R.string.upload_aadhaar_verification),
                     style = MaterialTheme.typography.bodyLarge,
                     color = colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
@@ -140,7 +142,7 @@ fun Step4Verification(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Uploading: ${uploadProgress.toInt()}%",
+                            text = stringResource(R.string.uploading_percent, uploadProgress.toInt()),
                             style = MaterialTheme.typography.bodySmall,
                             color = colorScheme.onSurfaceVariant
                         )
@@ -153,7 +155,7 @@ fun Step4Verification(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         UploadCard(
-                            title = "Aadhaar Front",
+                            title = stringResource(R.string.aadhaar_front),
                             isUploaded = aadhaarFrontUploaded,
                             isUploading = isUploading,
                             onClick = { 
@@ -164,7 +166,7 @@ fun Step4Verification(
                             modifier = Modifier.weight(1f)
                         )
                         UploadCard(
-                            title = "Aadhaar Back",
+                            title = stringResource(R.string.aadhaar_back),
                             isUploaded = aadhaarBackUploaded,
                             isUploading = isUploading,
                             onClick = { 
@@ -177,7 +179,7 @@ fun Step4Verification(
                     }
                 } else {
                     UploadCard(
-                        title = "Aadhaar Front",
+                        title = stringResource(R.string.aadhaar_front),
                         isUploaded = aadhaarFrontUploaded,
                         isUploading = isUploading,
                         onClick = { 
@@ -188,7 +190,7 @@ fun Step4Verification(
                         modifier = Modifier.fillMaxWidth()
                     )
                     UploadCard(
-                        title = "Aadhaar Back",
+                        title = stringResource(R.string.aadhaar_back),
                         isUploaded = aadhaarBackUploaded,
                         isUploading = isUploading,
                         onClick = { 
@@ -256,14 +258,14 @@ private fun UploadCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Uploaded",
+                    text = stringResource(R.string.uploaded),
                     style = MaterialTheme.typography.titleMedium,
                     color = colorScheme.primary
                 )
             } else {
                 if (isUploading) {
                     Text(
-                        text = "Uploading...",
+                        text = stringResource(R.string.uploading),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -271,13 +273,13 @@ private fun UploadCard(
                 } else {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Upload",
+                        contentDescription = stringResource(R.string.upload),
                         modifier = Modifier.size(48.dp),
                         tint = colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Tap to upload",
+                        text = stringResource(R.string.tap_to_upload),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center

@@ -9,30 +9,30 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class BottomNavItem(
     val route: String,
-    val title: String,
+    val titleResId: Int,
     val icon: ImageVector
 ) {
     object Home : BottomNavItem(
         route = "home",
-        title = "Home",
+        titleResId = com.nextserve.serveitpartnernew.R.string.nav_home,
         icon = Icons.Default.Home
     )
     
     object Jobs : BottomNavItem(
         route = "jobs",
-        title = "Jobs",
+        titleResId = com.nextserve.serveitpartnernew.R.string.nav_jobs,
         icon = Icons.Default.List
     )
     
     object Earnings : BottomNavItem(
         route = "earnings",
-        title = "Earnings",
+        titleResId = com.nextserve.serveitpartnernew.R.string.nav_earnings,
         icon = Icons.Default.Star
     )
     
     object Profile : BottomNavItem(
         route = "profile",
-        title = "Profile",
+        titleResId = com.nextserve.serveitpartnernew.R.string.nav_profile,
         icon = Icons.Default.Person
     )
     

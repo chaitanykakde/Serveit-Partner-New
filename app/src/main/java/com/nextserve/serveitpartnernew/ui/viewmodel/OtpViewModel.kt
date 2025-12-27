@@ -8,10 +8,18 @@ import androidx.lifecycle.viewModelScope
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
 import com.nextserve.serveitpartnernew.data.repository.AuthRepository
 import com.nextserve.serveitpartnernew.data.repository.FirestoreRepository
+import com.nextserve.serveitpartnernew.utils.ErrorMapper
+import com.nextserve.serveitpartnernew.utils.NetworkMonitor
+import com.nextserve.serveitpartnernew.utils.PhoneNumberFormatter
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
+/**
+ * UI state for OTP screen.
+ */
 data class OtpUiState(
     val otp: String = "",
     val isOtpValid: Boolean = false,
@@ -21,9 +29,16 @@ data class OtpUiState(
     val timeRemaining: Int = 60,
     val canResend: Boolean = false,
     val isVerifying: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val retryCount: Int = 0,
+    val maxRetries: Int = 3,
+    val isOffline: Boolean = false
 )
 
+/**
+ * ViewModel for OTP verification screen.
+ * Handles OTP input, verification, resend, and timer management.
+ */
 class OtpViewModel(
     private val authRepository: AuthRepository = AuthRepository(
         FirebaseProvider.auth,
@@ -31,23 +46,47 @@ class OtpViewModel(
     ),
     private val firestoreRepository: FirestoreRepository = FirestoreRepository(
         FirebaseProvider.firestore
-    )
+    ),
+    private val networkMonitor: NetworkMonitor? = null
 ) : ViewModel() {
     var uiState by mutableStateOf(OtpUiState())
         private set
 
     private var timerJob: Job? = null
+    private var verificationJob: Job? = null
     var onVerificationSuccess: ((String) -> Unit)? = null // UID callback
 
+    private var lastResendClickTime: Long = 0
+    private val RESEND_DEBOUNCE_MS = 2000L // 2 seconds debounce for resend
+
     init {
-        startTimer()
+        // Monitor network connectivity if NetworkMonitor is provided
+        networkMonitor?.let { monitor ->
+            viewModelScope.launch {
+                monitor.connectivityFlow().collect { isConnected ->
+                    uiState = uiState.copy(isOffline = !isConnected)
+                    if (!isConnected && (uiState.isVerifying || uiState.canResend)) {
+                        uiState = uiState.copy(
+                            isVerifying = false,
+                            errorMessage = "No internet connection. Please check your network and try again."
+                        )
+                    }
+                }
+            }
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
         timerJob?.cancel()
+        verificationJob?.cancel()
+        onVerificationSuccess = null
     }
 
+    /**
+     * Updates OTP input and validates it.
+     * @param otp The OTP string to update
+     */
     fun updateOtp(otp: String) {
         val cleaned = otp.filter { it.isDigit() }
         val isValid = cleaned.length == 6
@@ -59,14 +98,37 @@ class OtpViewModel(
         )
     }
 
+    /**
+     * Sets the phone number.
+     * @param phoneNumber The phone number
+     */
     fun setPhoneNumber(phoneNumber: String) {
-        uiState = uiState.copy(phoneNumber = phoneNumber)
+        val cleaned = PhoneNumberFormatter.cleanPhoneNumber(phoneNumber)
+        uiState = uiState.copy(phoneNumber = cleaned)
     }
 
+    /**
+     * Sets the verification ID and starts the timer.
+     * @param verificationId The verification ID from Firebase
+     */
     fun setVerificationId(verificationId: String) {
-        uiState = uiState.copy(verificationId = verificationId)
+        if (verificationId.isNotEmpty()) {
+            uiState = uiState.copy(verificationId = verificationId)
+            startTimer()
+        }
     }
 
+    /**
+     * Sets the resend token.
+     * @param resendToken The resend token from Firebase
+     */
+    fun setResendToken(resendToken: com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken?) {
+        uiState = uiState.copy(resendToken = resendToken)
+    }
+
+    /**
+     * Starts the resend timer.
+     */
     private fun startTimer() {
         timerJob?.cancel()
         uiState = uiState.copy(
@@ -87,8 +149,28 @@ class OtpViewModel(
         }
     }
 
+    /**
+     * Resends OTP to the phone number.
+     * Includes rate limiting and proper state management.
+     * @param activity The activity for reCAPTCHA verification
+     */
     fun resendOtp(activity: android.app.Activity?) {
         if (!uiState.canResend) return
+
+        // Check offline status
+        if (uiState.isOffline || (networkMonitor != null && !networkMonitor.isConnected())) {
+            uiState = uiState.copy(
+                errorMessage = "No internet connection. Please check your network and try again."
+            )
+            return
+        }
+
+        // Rate limiting: prevent rapid clicks
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastResendClickTime < RESEND_DEBOUNCE_MS) {
+            return
+        }
+        lastResendClickTime = currentTime
 
         val repository = if (activity != null) {
             AuthRepository(FirebaseProvider.auth, activity)
@@ -103,17 +185,25 @@ class OtpViewModel(
                 onCodeSent = { verificationId, resendToken ->
                     uiState = uiState.copy(
                         verificationId = verificationId,
-                        resendToken = resendToken
+                        resendToken = resendToken,
+                        errorMessage = null,
+                        retryCount = 0 // Reset retry count on successful resend
                     )
                     startTimer()
                 },
                 onError = { error ->
-                    uiState = uiState.copy(errorMessage = error)
+                    val friendlyError = ErrorMapper.getErrorMessage(Exception(error))
+                    uiState = uiState.copy(errorMessage = friendlyError)
                 }
             )
         }
     }
 
+    /**
+     * Verifies the OTP code.
+     * Handles Firestore operations with proper error handling.
+     * @param activity The activity context
+     */
     fun verifyOtp(activity: android.app.Activity?) {
         if (!uiState.isOtpValid) return
         
@@ -125,9 +215,22 @@ class OtpViewModel(
             return
         }
 
+        // Check offline status
+        if (uiState.isOffline || (networkMonitor != null && !networkMonitor.isConnected())) {
+            uiState = uiState.copy(
+                errorMessage = "No internet connection. Please check your network and try again."
+            )
+            return
+        }
+
+        if (uiState.isVerifying) return // Already verifying
+
+        // Cancel any previous verification
+        verificationJob?.cancel()
+
         uiState = uiState.copy(isVerifying = true, errorMessage = null)
 
-        viewModelScope.launch {
+        verificationJob = viewModelScope.launch {
             try {
                 val credential = com.google.firebase.auth.PhoneAuthProvider.getCredential(
                     verificationId,
@@ -137,91 +240,113 @@ class OtpViewModel(
                 val result = authRepository.verifyOtpWithCredential(credential)
                 
                 result.onSuccess { uid ->
-                    // Create or update provider document
-                    val providerResult = firestoreRepository.getProviderData(uid)
-                    providerResult.onSuccess { providerData ->
-                        if (providerData == null) {
-                            // Create new document with phone number
-                            val phoneToSave = if (uiState.phoneNumber.startsWith("+91")) {
-                                uiState.phoneNumber
-                            } else {
-                                "+91${uiState.phoneNumber}"
-                            }
-                            firestoreRepository.createProviderDocument(uid, phoneToSave)
-                        } else {
-                            // Update last login and phone number if missing
-                            if (providerData.phoneNumber.isEmpty()) {
-                                val phoneToSave = if (uiState.phoneNumber.startsWith("+91")) {
-                                    uiState.phoneNumber
-                                } else {
-                                    "+91${uiState.phoneNumber}"
-                                }
-                                firestoreRepository.updateProviderData(uid, mapOf("phoneNumber" to phoneToSave))
-                            }
-                            firestoreRepository.updateLastLogin(uid)
-                        }
-                    }
-                    
-                    // Save FCM token after successful verification
-                    com.nextserve.serveitpartnernew.data.fcm.FcmTokenManager.getAndSaveToken(uid)
-                    
-                    uiState = uiState.copy(isVerifying = false)
-                    onVerificationSuccess?.invoke(uid)
+                    // Handle Firestore operations with proper error handling
+                    handleFirestoreOperations(uid)
                 }.onFailure { exception ->
+                    val friendlyError = ErrorMapper.getErrorMessage(exception)
                     uiState = uiState.copy(
                         isVerifying = false,
-                        errorMessage = exception.message ?: "Verification failed"
+                        errorMessage = friendlyError,
+                        retryCount = uiState.retryCount + 1
                     )
                 }
             } catch (e: Exception) {
+                val friendlyError = ErrorMapper.getErrorMessage(e)
                 uiState = uiState.copy(
                     isVerifying = false,
-                    errorMessage = e.message ?: "Verification failed"
+                    errorMessage = friendlyError,
+                    retryCount = uiState.retryCount + 1
                 )
             }
         }
     }
 
-    fun verifyWithCredential(credential: com.google.firebase.auth.PhoneAuthCredential) {
-        uiState = uiState.copy(isVerifying = true, errorMessage = null)
-
-        viewModelScope.launch {
-            val result = authRepository.verifyOtpWithCredential(credential)
-            
-            result.onSuccess { uid ->
-                val providerResult = firestoreRepository.getProviderData(uid)
-                providerResult.onSuccess { providerData ->
-                    if (providerData == null) {
-                        // Create new document with phone number
-                        val phoneToSave = if (uiState.phoneNumber.startsWith("+91")) {
-                            uiState.phoneNumber
-                        } else {
-                            "+91${uiState.phoneNumber}"
-                        }
-                        firestoreRepository.createProviderDocument(uid, phoneToSave)
-                    } else {
-                        // Update last login and phone number if missing
-                        if (providerData.phoneNumber.isEmpty()) {
-                            val phoneToSave = if (uiState.phoneNumber.startsWith("+91")) {
-                                uiState.phoneNumber
-                            } else {
-                                "+91${uiState.phoneNumber}"
-                            }
-                            firestoreRepository.updateProviderData(uid, mapOf("phoneNumber" to phoneToSave))
-                        }
-                        firestoreRepository.updateLastLogin(uid)
+    /**
+     * Handles Firestore operations after successful authentication.
+     * Creates or updates provider document with proper error handling.
+     * @param uid The user ID
+     */
+    private suspend fun handleFirestoreOperations(uid: String) {
+        val providerResult = firestoreRepository.getProviderData(uid)
+        
+        providerResult.onSuccess { providerData ->
+            if (providerData == null) {
+                // Create new document
+                val formattedPhone = PhoneNumberFormatter.formatPhoneNumber(uiState.phoneNumber)
+                val createResult = firestoreRepository.createProviderDocument(uid, formattedPhone)
+                
+                createResult.onSuccess {
+                    // Successfully created
+                    saveFcmTokenAndNavigate(uid)
+                }.onFailure { exception ->
+                    val friendlyError = ErrorMapper.getErrorMessage(exception)
+                    uiState = uiState.copy(
+                        isVerifying = false,
+                        errorMessage = "Failed to create profile: $friendlyError"
+                    )
+                }
+            } else {
+                // Update existing document
+                val updateJobs = mutableListOf<kotlinx.coroutines.Job>()
+                
+                if (providerData.phoneNumber.isEmpty()) {
+                    val formattedPhone = PhoneNumberFormatter.formatPhoneNumber(uiState.phoneNumber)
+                    val updateResult = firestoreRepository.updateProviderData(uid, mapOf("phoneNumber" to formattedPhone))
+                    updateResult.onFailure { exception ->
+                        val friendlyError = ErrorMapper.getErrorMessage(exception)
+                        uiState = uiState.copy(
+                            isVerifying = false,
+                            errorMessage = "Failed to update phone number: $friendlyError"
+                        )
+                        return
                     }
                 }
                 
-                uiState = uiState.copy(isVerifying = false)
-                onVerificationSuccess?.invoke(uid)
-            }.onFailure { exception ->
-                uiState = uiState.copy(
-                    isVerifying = false,
-                    errorMessage = exception.message ?: "Verification failed"
-                )
+                val lastLoginResult = firestoreRepository.updateLastLogin(uid)
+                lastLoginResult.onSuccess {
+                    saveFcmTokenAndNavigate(uid)
+                }.onFailure { exception ->
+                    // Last login update failure is not critical, proceed anyway
+                    saveFcmTokenAndNavigate(uid)
+                }
             }
+        }.onFailure { exception ->
+            val friendlyError = ErrorMapper.getErrorMessage(exception)
+            uiState = uiState.copy(
+                isVerifying = false,
+                errorMessage = "Failed to load profile: $friendlyError"
+            )
         }
+    }
+
+    /**
+     * Saves FCM token and navigates to onboarding.
+     * @param uid The user ID
+     */
+    private suspend fun saveFcmTokenAndNavigate(uid: String) {
+        // Save FCM token (non-blocking, failure is not critical)
+        try {
+            com.nextserve.serveitpartnernew.data.fcm.FcmTokenManager.getAndSaveToken(uid)
+        } catch (e: Exception) {
+            // FCM token save failure is not critical, continue anyway
+        }
+        
+        uiState = uiState.copy(isVerifying = false)
+        onVerificationSuccess?.invoke(uid)
+    }
+
+    /**
+     * Retries the last failed operation.
+     * @param activity The activity context
+     */
+    fun retryVerification(activity: android.app.Activity?) {
+        if (uiState.retryCount >= uiState.maxRetries) {
+            uiState = uiState.copy(
+                errorMessage = "Maximum retry attempts reached. Please request a new OTP."
+            )
+            return
+        }
+        verifyOtp(activity)
     }
 }
 

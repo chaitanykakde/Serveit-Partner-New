@@ -24,7 +24,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.BottomStickyButtonContainer
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
 import com.nextserve.serveitpartnernew.ui.theme.CardShape
@@ -61,7 +63,7 @@ fun Step5Review(
         button = {
             if (!isSubmitted) {
                 PrimaryButton(
-                    text = "Submit for Verification",
+                    text = stringResource(R.string.submit_for_verification),
                     onClick = onSubmit,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -95,13 +97,13 @@ fun Step5Review(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Details submitted successfully",
+                                text = stringResource(R.string.details_submitted_successfully),
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = colorScheme.primary
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Your profile is under verification",
+                                text = stringResource(R.string.profile_under_verification),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colorScheme.onSurfaceVariant
                             )
@@ -110,7 +112,7 @@ fun Step5Review(
                 } else {
                     // Title
                     Text(
-                        text = "Review & Submit",
+                        text = stringResource(R.string.review_submit),
                         style = MaterialTheme.typography.headlineMedium,
                         color = colorScheme.onSurface,
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -118,7 +120,7 @@ fun Step5Review(
 
                     // Subtitle
                     Text(
-                        text = "Please verify your details before submitting",
+                        text = stringResource(R.string.verify_details_before_submit),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -126,34 +128,34 @@ fun Step5Review(
 
                     // Basic Information Card
                     ReviewSectionCard(
-                        title = "Basic Information",
+                        title = stringResource(R.string.basic_information),
                         onEdit = onEditBasicInfo,
                         content = {
-                            ReviewLabelValue(label = "Name", value = fullName.ifEmpty { "Not provided" })
-                            ReviewLabelValue(label = "Gender", value = gender.ifEmpty { "Not provided" })
+                            ReviewLabelValue(label = stringResource(R.string.name), value = fullName.ifEmpty { stringResource(R.string.not_provided) })
+                            ReviewLabelValue(label = stringResource(R.string.gender), value = gender.ifEmpty { stringResource(R.string.not_provided) })
                             ReviewLabelValue(
-                                label = "Primary Service",
-                                value = primaryService.ifEmpty { "Not provided" }
+                                label = stringResource(R.string.primary_service),
+                                value = primaryService.ifEmpty { stringResource(R.string.not_provided) }
                             )
                             if (email.isNotEmpty()) {
-                                ReviewLabelValue(label = "Email", value = email)
+                                ReviewLabelValue(label = stringResource(R.string.email), value = email)
                             }
                         }
                     )
 
                     // Services Card
                     ReviewSectionCard(
-                        title = "Services",
+                        title = stringResource(R.string.services),
                         onEdit = onEditServices,
                         content = {
                             ReviewLabelValue(
-                                label = "Main Service",
-                                value = selectedMainService.ifEmpty { "Not selected" }
+                                label = stringResource(R.string.main_service),
+                                value = selectedMainService.ifEmpty { stringResource(R.string.not_selected) }
                             )
                             if (selectedSubServices.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "Sub-Services:",
+                                    text = stringResource(R.string.sub_services),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(bottom = 4.dp)
@@ -177,45 +179,45 @@ fun Step5Review(
                             }
                             if (selectedMainService == "Other Services" && otherService.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(8.dp))
-                                ReviewLabelValue(label = "Custom Service", value = otherService)
+                                ReviewLabelValue(label = stringResource(R.string.custom_service), value = otherService)
                             }
                         }
                     )
 
                     // Location Card
                     ReviewSectionCard(
-                        title = "Location",
+                        title = stringResource(R.string.location),
                         onEdit = onEditLocation,
                         content = {
-                            ReviewLabelValue(label = "State", value = state.ifEmpty { "Not provided" })
-                            ReviewLabelValue(label = "City", value = city.ifEmpty { "Not provided" })
+                            ReviewLabelValue(label = stringResource(R.string.state), value = state.ifEmpty { stringResource(R.string.not_provided) })
+                            ReviewLabelValue(label = stringResource(R.string.city), value = city.ifEmpty { stringResource(R.string.not_provided) })
                             if (address.isNotEmpty()) {
-                                ReviewLabelValue(label = "Area", value = address)
+                                ReviewLabelValue(label = stringResource(R.string.area), value = address)
                             }
                             if (fullAddress.isNotEmpty()) {
-                                ReviewLabelValue(label = "Full Address", value = fullAddress)
+                                ReviewLabelValue(label = stringResource(R.string.full_address), value = fullAddress)
                             }
                             if (locationPincode.isNotEmpty()) {
-                                ReviewLabelValue(label = "Pincode", value = locationPincode)
+                                ReviewLabelValue(label = stringResource(R.string.pincode), value = locationPincode)
                             }
                             ReviewLabelValue(
-                                label = "Service Radius",
-                                value = "${serviceRadius.toInt()} km"
+                                label = stringResource(R.string.service_radius),
+                                value = "${serviceRadius.toInt()} ${stringResource(R.string.km)}"
                             )
                         }
                     )
 
                     // Documents Card
                     ReviewSectionCard(
-                        title = "Documents",
+                        title = stringResource(R.string.documents),
                         onEdit = onEditDocuments,
                         content = {
                             DocumentStatusRow(
-                                label = "Aadhaar Front",
+                                label = stringResource(R.string.aadhaar_front),
                                 isUploaded = aadhaarFrontUploaded
                             )
                             DocumentStatusRow(
-                                label = "Aadhaar Back",
+                                label = stringResource(R.string.aadhaar_back),
                                 isUploaded = aadhaarBackUploaded
                             )
                         }
@@ -266,7 +268,7 @@ private fun ReviewSectionCard(
                     onClick = onEdit
                 ) {
                     Text(
-                        text = "Edit",
+                        text = stringResource(R.string.edit),
                         style = MaterialTheme.typography.labelLarge,
                         color = colorScheme.primary
                     )
@@ -335,18 +337,18 @@ private fun DocumentStatusRow(
             if (isUploaded) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Uploaded",
+                    contentDescription = stringResource(R.string.uploaded),
                     modifier = Modifier.size(20.dp),
                     tint = colorScheme.primary
                 )
                 Text(
-                    text = "Uploaded",
+                    text = stringResource(R.string.uploaded),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colorScheme.primary
                 )
             } else {
                 Text(
-                    text = "Not uploaded",
+                    text = stringResource(R.string.not_uploaded),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colorScheme.onSurfaceVariant
                 )

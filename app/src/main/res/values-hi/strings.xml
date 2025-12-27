@@ -164,5 +164,86 @@
     <string name="earnings_title">कमाई</string>
     <string name="no_earnings">अभी तक कोई कमाई नहीं</string>
     <string name="earnings_empty_message">अपनी कमाई यहां देखने के लिए नौकरियां स्वीकार करना शुरू करें</string>
+    
+    <!-- Additional strings -->
+    <string name="services">सेवाएं</string>
+    <string name="verify_otp">OTP सत्यापित करें</string>
+    <string name="otp_sent_to">+91 %1$s पर OTP भेजा गया</string>
+    <string name="enter_6_digit_code">अपने मोबाइल नंबर पर भेजे गए 6 अंकों के कोड को दर्ज करें</string>
+    <string name="resend_otp_in">%1$ds में OTP पुनः भेजें</string>
+    <string name="continue_button">जारी रखें</string>
+    <string name="select_services_you_provide">आप जो सेवाएं प्रदान करते हैं उन्हें चुनें</string>
+    <string name="based_on_service">आपकी चयनित सेवा के आधार पर: %1$s</string>
+    <string name="deselect_all">सभी अचयनित करें</string>
+    <string name="loading_sub_services">उप-सेवाएं लोड हो रही हैं…</string>
+    <string name="specify_other_service">अन्य सेवा निर्दिष्ट करें</string>
+    <string name="enter_service_name">सेवा का नाम दर्ज करें</string>
+    <string name="upload_aadhaar_verification">सत्यापन के लिए अपना आधार कार्ड अपलोड करें</string>
+    <string name="uploading_percent">अपलोड हो रहा है: %1$d%%</string>
+    <string name="tap_to_upload">अपलोड करने के लिए टैप करें</string>
+    <string name="not_uploaded">अपलोड नहीं किया गया</string>
+    <string name="review_submit">समीक्षा करें और सबमिट करें</string>
+    <string name="verify_details_before_submit">सबमिट करने से पहले कृपया अपनी जानकारी सत्यापित करें</string>
+    <string name="details_submitted_successfully">विवरण सफलतापूर्वक सबमिट किए गए</string>
+    <string name="profile_under_verification">आपकी प्रोफ़ाइल सत्यापन के अधीन है</string>
+    <string name="basic_information">मूल जानकारी</string>
+    <string name="name">नाम</string>
+    <string name="not_provided">प्रदान नहीं किया गया</string>
+    <string name="main_service">मुख्य सेवा</string>
+    <string name="not_selected">चयनित नहीं</string>
+    <string name="sub_services">उप-सेवाएं:</string>
+    <string name="custom_service">कस्टम सेवा</string>
+    <string name="location">स्थान</string>
+    <string name="area">क्षेत्र</string>
+    <string name="service_radius">सेवा त्रिज्या</string>
+    <string name="km">किमी</string>
+    <string name="edit">संपादित करें</string>
+    <string name="complete_profile">अपनी प्रोफ़ाइल पूरी करें</string>
+    <string name="finish_steps_to_submit">समीक्षा के लिए सबमिट करने के लिए चरण पूरे करें</string>
+    <string name="we_will_notify_once_verification_completes">सत्यापन पूरा होने पर हम आपको सूचित करेंगे</string>
+    <string name="please_review_your_documents">कृपया अपने दस्तावेज़ों की समीक्षा करें</string>
+    <string name="name_phone_email">नाम, फोन, ईमेल</string>
+    <string name="skills_categories">कौशल, श्रेणियां</string>
+    <string name="city_radius_pincode">शहर, त्रिज्या, पिनकोड</string>
+    <string name="aadhaar_verification">आधार, सत्यापन</string>
+    <string name="manage_push_alerts">पुश अलर्ट प्रबंधित करें</string>
+    <string name="faqs_contact_us">FAQ, हमसे संपर्क करें</string>
+    <string name="version_terms_privacy">संस्करण, नियम और गोपनीयता</string>
+    <string name="push_notifications">पुश सूचनाएं</string>
+    
+    <!-- Help & Support -->
+    <string name="contact_support">समर्थन से संपर्क करें</string>
+    <string name="call_us">हमें कॉल करें</string>
+    <string name="call_support_number">+91 1234567890</string>
+    <string name="email_us">हमें ईमेल करें</string>
+    <string name="email_support_address">support@serveit.com</string>
+    <string name="frequently_asked_questions">अक्सर पूछे जाने वाले प्रश्न</string>
+    <string name="faq_question_1">मैं अपनी प्रोफ़ाइल कैसे अपडेट करूं?</string>
+    <string name="faq_answer_1">आप प्रोफ़ाइल अनुभाग में जाकर किसी भी अनुभाग पर क्लिक करके अपनी प्रोफ़ाइल अपडेट कर सकते हैं जिसे आप संपादित करना चाहते हैं।</string>
+    <string name="faq_question_2">सत्यापन में कितना समय लगता है?</string>
+    <string name="faq_answer_2">प्रोफ़ाइल सत्यापन आमतौर पर सबमिशन के बाद 24-48 घंटे लगते हैं। पूरा होने पर आपको एक सूचना मिलेगी।</string>
+    <string name="faq_question_3">क्या मैं अपना सेवा क्षेत्र बदल सकता हूं?</string>
+    <string name="faq_answer_3">हां, आप प्रोफ़ाइल → पता जानकारी से अपना सेवा क्षेत्र और त्रिज्या अपडेट कर सकते हैं।</string>
+    <string name="faq_question_4">कौन से दस्तावेज़ आवश्यक हैं?</string>
+    <string name="faq_answer_4">सत्यापन उद्देश्यों के लिए आपको अपने आधार कार्ड के दोनों पक्ष अपलोड करने होंगे।</string>
+    
+    <!-- About App -->
+    <string name="app_description">Serveit Partner सेवा प्रदाताओं को ग्राहकों से जुड़ने और अपने व्यवसाय को बढ़ाने में मदद करता है।</string>
+    <string name="legal_information">कानूनी जानकारी</string>
+    <string name="terms_and_conditions">नियम और शर्तें</string>
+    <string name="privacy_policy">गोपनीयता नीति</string>
+    <string name="developed_by">द्वारा विकसित</string>
+    <string name="developer_name">Serveit Technologies</string>
+    
+    <!-- Profile Photo -->
+    <string name="upload_profile_photo">प्रोफ़ाइल फोटो अपलोड करें</string>
+    <string name="profile_photo_updated">प्रोफ़ाइल फोटो अपडेट हो गया</string>
+    <string name="failed_to_upload_profile_photo">प्रोफ़ाइल फोटो अपलोड करने में विफल</string>
+    
+    <!-- Status Banner -->
+    <string name="complete_now">अभी पूरा करें</string>
+    
+    <!-- Stats -->
+    <string name="loading_stats">सांख्यिकी लोड हो रही है…</string>
 </resources>
 

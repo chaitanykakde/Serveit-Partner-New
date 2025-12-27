@@ -168,6 +168,34 @@ class ProfileEditViewModel(
         }
     }
 
+    fun uploadProfilePhoto(imageUri: Uri, onProgress: (Double) -> Unit = {}) {
+        uiState = uiState.copy(isSaving = true, errorMessage = null, successMessage = null)
+        viewModelScope.launch {
+            try {
+                val photoUrl = storageRepository.uploadProfilePhoto(
+                    uid = uid,
+                    imageUri = imageUri,
+                    onProgress = onProgress
+                ).getOrThrow()
+
+                firestoreRepository.updateProviderData(uid, mapOf("profilePhotoUrl" to photoUrl))
+                    .onFailure { throw it }
+
+                val current = uiState.providerData
+                uiState = uiState.copy(
+                    isSaving = false,
+                    providerData = current?.copy(profilePhotoUrl = photoUrl),
+                    successMessage = "Profile photo updated"
+                )
+            } catch (e: Exception) {
+                uiState = uiState.copy(
+                    isSaving = false,
+                    errorMessage = e.message ?: "Failed to upload profile photo"
+                )
+            }
+        }
+    }
+
     fun uploadDocuments(frontUri: Uri?, backUri: Uri?) {
         if (frontUri == null && backUri == null) return
         uiState = uiState.copy(isSaving = true, errorMessage = null, successMessage = null)

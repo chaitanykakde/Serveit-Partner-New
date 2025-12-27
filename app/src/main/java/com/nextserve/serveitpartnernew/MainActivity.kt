@@ -22,6 +22,7 @@ import com.nextserve.serveitpartnernew.ui.navigation.Screen
 import com.nextserve.serveitpartnernew.ui.navigation.appNavGraph
 import com.nextserve.serveitpartnernew.ui.theme.ServeitPartnerNewTheme
 import com.nextserve.serveitpartnernew.ui.utils.rememberNotificationPermissionState
+import com.nextserve.serveitpartnernew.utils.LanguageManager
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 
@@ -29,6 +30,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Apply saved language on app start
+        LanguageManager.applySavedLanguage(this)
         
         // Save FCM token on app start/resume
         lifecycle.addObserver(object : LifecycleEventObserver {

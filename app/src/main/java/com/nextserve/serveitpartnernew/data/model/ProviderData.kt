@@ -58,6 +58,9 @@ data class ProviderData(
     val fcmToken: String = "",
     
     // Language Preference
-    val language: String = "en" // en, hi, mr
+    val language: String = "en", // en, hi, mr
+    
+    // Profile Photo
+    val profilePhotoUrl: String = ""
 )
 

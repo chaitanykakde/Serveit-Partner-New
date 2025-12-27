@@ -6,9 +6,14 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
+import com.nextserve.serveitpartnernew.utils.ErrorMapper
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit
 
+/**
+ * Repository for Firebase Authentication operations.
+ * Handles OTP sending, verification, and resending.
+ */
 class AuthRepository(
     private val auth: FirebaseAuth,
     private val activity: Activity? = null
@@ -16,6 +21,13 @@ class AuthRepository(
     private var verificationId: String? = null
     private var resendToken: PhoneAuthProvider.ForceResendingToken? = null
 
+    /**
+     * Sends OTP to the specified phone number.
+     * @param phoneNumber The phone number (with or without +91 prefix)
+     * @param onVerificationComplete Callback when auto-verification completes
+     * @param onCodeSent Callback when OTP code is sent
+     * @param onError Callback when error occurs
+     */
     suspend fun sendOtp(
         phoneNumber: String,
         onVerificationComplete: (PhoneAuthCredential) -> Unit,
@@ -37,7 +49,8 @@ class AuthRepository(
                 }
 
                 override fun onVerificationFailed(e: FirebaseException) {
-                    onError(e.message ?: "Verification failed")
+                    val friendlyError = ErrorMapper.getErrorMessage(e)
+                    onError(friendlyError)
                 }
 
                 override fun onCodeSent(
@@ -80,6 +93,13 @@ class AuthRepository(
         }
     }
 
+    /**
+     * Resends OTP to the specified phone number.
+     * @param phoneNumber The phone number (with or without +91 prefix)
+     * @param resendToken The resend token from previous OTP send (optional)
+     * @param onCodeSent Callback when OTP code is sent
+     * @param onError Callback when error occurs
+     */
     suspend fun resendOtp(
         phoneNumber: String,
         resendToken: com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken? = null,
@@ -103,7 +123,8 @@ class AuthRepository(
                     }
 
                     override fun onVerificationFailed(e: FirebaseException) {
-                        onError(e.message ?: "Resend failed")
+                        val friendlyError = ErrorMapper.getErrorMessage(e)
+                        onError(friendlyError)
                     }
 
                     override fun onCodeSent(
@@ -122,7 +143,7 @@ class AuthRepository(
 
             PhoneAuthProvider.verifyPhoneNumber(options)
         } else {
-            // First time send
+            // First time send (no resend token available)
             sendOtp(
                 formattedPhone,
                 {}, // onVerificationComplete

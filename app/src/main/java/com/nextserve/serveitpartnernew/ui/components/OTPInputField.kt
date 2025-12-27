@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -34,6 +36,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nextserve.serveitpartnernew.ui.theme.OTPBoxShape
 
+/**
+ * OTP input field with support for paste, SMS autofill, and improved backspace handling.
+ * @param otpLength The length of OTP (default 6)
+ * @param onOtpChange Callback when OTP changes
+ * @param modifier Modifier for the component
+ */
 @Composable
 fun OTPInputField(
     otpLength: Int = 6,
@@ -113,8 +121,22 @@ fun OTPInputField(
                     ),
                     onValueChange = { newValue ->
                         val input = newValue.text.filter { it.isDigit() }
+                        
+                        // Handle paste: if input length matches or exceeds OTP length, take first N digits
+                        if (input.length >= otpLength) {
+                            val pastedOtp = input.take(otpLength)
+                            otpText = pastedOtp
+                            // Focus last box after paste
+                            if (pastedOtp.length == otpLength) {
+                                focusRequesters[otpLength - 1].requestFocus()
+                                keyboardController?.hide()
+                            }
+                            return@BasicTextField
+                        }
+                        
                         if (input.isNotEmpty()) {
                             val digit = input.last().toString()
+                            // Only add if current box is empty or we're at the right position
                             if (otpText.length == index) {
                                 val newOtp = otpText + digit
                                 if (newOtp.length <= otpLength) {
@@ -125,11 +147,29 @@ fun OTPInputField(
                                         keyboardController?.hide()
                                     }
                                 }
+                            } else if (otpText.length < index) {
+                                // Fill gap if user skipped boxes
+                                val newOtp = otpText + "0".repeat(index - otpText.length) + digit
+                                if (newOtp.length <= otpLength) {
+                                    otpText = newOtp
+                                    if (index < otpLength - 1) {
+                                        focusRequesters[index + 1].requestFocus()
+                                    } else {
+                                        keyboardController?.hide()
+                                    }
+                                }
                             }
-                        } else if (input.isEmpty() && otpText.length > index) {
-                            // Backspace handling
-                            otpText = otpText.substring(0, index)
-                            if (index > 0) {
+                        } else {
+                            // Backspace handling: improved logic
+                            if (otpText.length > index) {
+                                // Delete current character
+                                otpText = otpText.substring(0, index) + otpText.substring(index + 1)
+                                if (index > 0) {
+                                    focusRequesters[index - 1].requestFocus()
+                                }
+                            } else if (otpText.length == index && index > 0) {
+                                // Delete previous character if current is empty
+                                otpText = otpText.substring(0, index - 1)
                                 focusRequesters[index - 1].requestFocus()
                             }
                         }
@@ -140,7 +180,15 @@ fun OTPInputField(
                         textAlign = TextAlign.Center,
                         color = androidx.compose.ui.graphics.Color.Transparent // Hide the actual text, we show it above
                     ),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = if (index == otpLength - 1) ImeAction.Done else ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            keyboardController?.hide()
+                        }
+                    ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

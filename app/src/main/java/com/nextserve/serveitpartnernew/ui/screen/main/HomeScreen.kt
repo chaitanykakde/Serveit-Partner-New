@@ -4,6 +4,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.EmptyState
 
 @Composable
@@ -12,8 +14,8 @@ fun HomeScreen(
 ) {
     EmptyState(
         icon = Icons.Default.Home,
-        title = "Home",
-        description = "Welcome to Serveit Partner. Your dashboard will appear here once you start receiving service requests.",
+        title = stringResource(R.string.nav_home),
+        description = stringResource(R.string.welcome_serveit),
         modifier = modifier
     )
 }
