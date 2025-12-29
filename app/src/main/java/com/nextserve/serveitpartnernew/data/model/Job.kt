@@ -32,7 +32,11 @@ data class Job(
     var completedAt: Timestamp? = null,
     val subServicesSelected: Map<String, Any>? = null,
     val distance: Double? = null, // Calculated distance from provider location
-    val locationName: String? = null // Location name/city for display
+    val locationName: String? = null, // Location name/city for display
+    val customerAddress: String? = null, // Full customer address
+    val notes: String? = null, // Special instructions or notes
+    val customerEmail: String? = null, // Customer email (if available)
+    val estimatedDuration: Int? = null // Estimated service duration in minutes
 ) {
     /**
      * Check if job is available (pending and provider was notified)
@@ -57,6 +61,30 @@ data class Job(
      */
     fun isCompleted(providerId: String): Boolean {
         return this.providerId == providerId && status == "completed"
+    }
+
+    /**
+     * Check if status transition is allowed
+     * Valid transitions:
+     * - pending → accepted (via acceptJob)
+     * - accepted → arrived
+     * - arrived → in_progress
+     * - in_progress → payment_pending
+     * - payment_pending → completed
+     */
+    fun canTransitionTo(newStatus: String): Boolean {
+        val currentStatus = status.lowercase()
+        val targetStatus = newStatus.lowercase()
+
+        return when (currentStatus) {
+            "pending" -> targetStatus == "accepted" // Only via acceptJob
+            "accepted" -> targetStatus == "arrived"
+            "arrived" -> targetStatus == "in_progress"
+            "in_progress" -> targetStatus == "payment_pending"
+            "payment_pending" -> targetStatus == "completed"
+            "completed" -> false // Cannot transition from completed
+            else -> false
+        }
     }
 }
 

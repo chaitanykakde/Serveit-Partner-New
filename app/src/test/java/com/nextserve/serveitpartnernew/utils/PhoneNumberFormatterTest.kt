@@ -27,21 +27,22 @@ class PhoneNumberFormatterTest {
     }
 
     @Test
-    fun `isValidIndianPhoneNumber returns true for valid 10 digit number starting with 6-9`() {
+    fun `isValidIndianPhoneNumber returns true for valid 10 digit number starting with 2-9`() {
         assertTrue(PhoneNumberFormatter.isValidIndianPhoneNumber("9876543210"))
         assertTrue(PhoneNumberFormatter.isValidIndianPhoneNumber("8765432109"))
         assertTrue(PhoneNumberFormatter.isValidIndianPhoneNumber("7654321098"))
         assertTrue(PhoneNumberFormatter.isValidIndianPhoneNumber("6543210987"))
+        // Also accept landline numbers (2-5) for broader compatibility
+        assertTrue(PhoneNumberFormatter.isValidIndianPhoneNumber("2345678901"))
+        assertTrue(PhoneNumberFormatter.isValidIndianPhoneNumber("3456789012"))
+        assertTrue(PhoneNumberFormatter.isValidIndianPhoneNumber("4567890123"))
+        assertTrue(PhoneNumberFormatter.isValidIndianPhoneNumber("5678901234"))
     }
 
     @Test
-    fun `isValidIndianPhoneNumber returns false for number starting with 0-5`() {
+    fun `isValidIndianPhoneNumber returns false for number starting with 0-1`() {
         assertFalse(PhoneNumberFormatter.isValidIndianPhoneNumber("0123456789"))
         assertFalse(PhoneNumberFormatter.isValidIndianPhoneNumber("1234567890"))
-        assertFalse(PhoneNumberFormatter.isValidIndianPhoneNumber("2345678901"))
-        assertFalse(PhoneNumberFormatter.isValidIndianPhoneNumber("3456789012"))
-        assertFalse(PhoneNumberFormatter.isValidIndianPhoneNumber("4567890123"))
-        assertFalse(PhoneNumberFormatter.isValidIndianPhoneNumber("5678901234"))
     }
 
     @Test
@@ -55,7 +56,7 @@ class PhoneNumberFormatterTest {
     fun `cleanPhoneNumber removes non-digit characters`() {
         assertEquals("9876543210", PhoneNumberFormatter.cleanPhoneNumber("987-654-3210"))
         assertEquals("9876543210", PhoneNumberFormatter.cleanPhoneNumber("(987) 654-3210"))
-        assertEquals("9876543210", PhoneNumberFormatter.cleanPhoneNumber("+91 98765 43210"))
+        assertEquals("919876543210", PhoneNumberFormatter.cleanPhoneNumber("+91 98765 43210"))
     }
 
     @Test

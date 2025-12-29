@@ -18,21 +18,23 @@ object ErrorMapper {
         return when (throwable) {
             is FirebaseAuthInvalidCredentialsException -> {
                 when (throwable.errorCode) {
-                    "ERROR_INVALID_VERIFICATION_CODE" -> "Invalid OTP. Please check and try again."
+                    "ERROR_INVALID_VERIFICATION_CODE" -> "The OTP you entered is incorrect. Please check and try again."
                     "ERROR_INVALID_PHONE_NUMBER" -> "Invalid phone number. Please enter a valid 10-digit mobile number."
-                    else -> "Invalid credentials. Please try again."
+                    "ERROR_SESSION_EXPIRED" -> "Your OTP session has expired. Please request a new OTP."
+                    else -> "Invalid credentials. Please check your details and try again."
                 }
             }
             is FirebaseAuthException -> {
-                // Check for too many requests error code
-                if (throwable.errorCode == "ERROR_TOO_MANY_REQUESTS") {
-                    "Too many requests. Please wait a few minutes before trying again."
-                } else {
-                    throwable.message ?: "Authentication error. Please try again."
+                when (throwable.errorCode) {
+                    "ERROR_TOO_MANY_REQUESTS" -> "Too many requests. Please wait a few minutes before trying again."
+                    "ERROR_QUOTA_EXCEEDED" -> "SMS quota exceeded. Please try again later or contact support."
+                    "ERROR_INVALID_APP_CREDENTIAL" -> "App configuration error. Please contact support."
+                    "ERROR_APP_NOT_AUTHORIZED" -> "App not authorized. Please update the app."
+                    else -> throwable.message ?: "Authentication error. Please try again."
                 }
             }
             is FirebaseNetworkException -> {
-                "Network error. Please check your internet connection and try again."
+                "No internet connection. Please check your network and try again."
             }
             is FirebaseException -> {
                 when (throwable.message) {

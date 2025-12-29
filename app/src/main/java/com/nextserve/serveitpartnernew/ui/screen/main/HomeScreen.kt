@@ -82,7 +82,7 @@ fun HomeScreen(
     providerId: String,
     onJobAccepted: (String) -> Unit = {},
     onViewAllJobs: () -> Unit = {},
-    onOngoingJobClick: (String) -> Unit = {},
+    onOngoingJobClick: (Job) -> Unit = {},
     viewModel: HomeViewModel = viewModel(
         factory = HomeViewModel.factory(
             providerId = providerId,
@@ -194,7 +194,7 @@ fun HomeScreen(
                 ) { job ->
                     OngoingJobCard(
                         job = job,
-                        onClick = { onOngoingJobClick(job.bookingId) },
+                        onClick = { onOngoingJobClick(job) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -218,7 +218,7 @@ fun HomeScreen(
                 ) { job ->
                     TodayJobCard(
                         job = job,
-                        onClick = { onOngoingJobClick(job.bookingId) },
+                        onClick = { onOngoingJobClick(job) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

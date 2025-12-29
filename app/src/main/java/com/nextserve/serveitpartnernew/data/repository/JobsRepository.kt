@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import com.nextserve.serveitpartnernew.data.model.Job
 import com.nextserve.serveitpartnernew.data.model.JobCoordinates
+import com.nextserve.serveitpartnernew.data.model.JobInboxEntry
 
 /**
  * Repository for managing jobs/bookings from Firestore
@@ -196,6 +197,59 @@ class JobsRepository(
     }
 
     /**
+     * Get complete job details by booking ID
+     * Fetches from Firestore and optionally from serveit_users for customer address
+     */
+    suspend fun getJobDetails(
+        bookingId: String,
+        customerPhoneNumber: String
+    ): Result<Job> {
+        return try {
+            // Query all Bookings documents to find the job
+            val snapshot = bookingsCollection.get().await()
+            
+            var foundJob: Job? = null
+            
+            snapshot.documents.forEach { document ->
+                val extractedJobs = extractJobsFromDocument(document)
+                val job = extractedJobs.find { it.bookingId == bookingId }
+                if (job != null) {
+                    foundJob = job
+                    return@forEach
+                }
+            }
+            
+            if (foundJob != null) {
+                // Try to fetch customer address from serveit_users if not in booking
+                if (foundJob!!.customerAddress.isNullOrEmpty()) {
+                    try {
+                        val customerDoc = firestore.collection("serveit_users")
+                            .document(customerPhoneNumber)
+                            .get()
+                            .await()
+                        
+                        val customerData = customerDoc.data
+                        val address = customerData?.get("address") as? String
+                            ?: customerData?.get("fullAddress") as? String
+                        
+                        if (address != null) {
+                            foundJob = foundJob!!.copy(customerAddress = address)
+                        }
+                    } catch (e: Exception) {
+                        // Silently fail - address is optional
+                    }
+                }
+                
+                Result.success(foundJob!!)
+            } else {
+                Result.failure(Exception("Job not found: $bookingId"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Extract jobs from a Bookings document
      * Handles both array format and single booking format
      */
@@ -223,6 +277,93 @@ class JobsRepository(
         }
 
         return jobs
+    }
+
+    /**
+     * Update job status in Firestore
+     * Handles both array and single booking formats
+     */
+    suspend fun updateJobStatus(
+        bookingId: String,
+        customerPhoneNumber: String,
+        newStatus: String,
+        timestampField: String?
+    ): Result<Unit> {
+        return try {
+            val documentRef = bookingsCollection.document(customerPhoneNumber)
+            
+            // Get current document
+            val snapshot = documentRef.get().await()
+            val data = snapshot.data ?: throw Exception("Document not found")
+            
+            // Check if document has bookings array (primary format)
+            val bookingsArray = data["bookings"] as? MutableList<Map<String, Any>>
+            if (bookingsArray != null) {
+                // Array format - find and update the specific booking
+                val bookingIndex = bookingsArray.indexOfFirst { 
+                    (it["bookingId"] as? String) == bookingId 
+                }
+                
+                if (bookingIndex == -1) {
+                    throw Exception("Booking not found in array")
+                }
+                
+                val booking = bookingsArray[bookingIndex].toMutableMap()
+                booking["status"] = newStatus
+                
+                // Set timestamp if provided
+                timestampField?.let { field ->
+                    booking[field] = Timestamp.now()
+                }
+                
+                bookingsArray[bookingIndex] = booking
+                documentRef.update("bookings", bookingsArray).await()
+            } else {
+                // Single booking format (legacy)
+                if ((data["bookingId"] as? String) != bookingId) {
+                    throw Exception("Booking ID mismatch")
+                }
+                
+                val updates = mutableMapOf<String, Any>("status" to newStatus)
+                timestampField?.let { field ->
+                    updates[field] = Timestamp.now()
+                }
+                
+                documentRef.update(updates).await()
+            }
+            
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Mark job as arrived
+     */
+    suspend fun markJobAsArrived(bookingId: String, customerPhoneNumber: String): Result<Unit> {
+        return updateJobStatus(bookingId, customerPhoneNumber, "arrived", "arrivedAt")
+    }
+
+    /**
+     * Mark job as in progress
+     */
+    suspend fun markJobAsInProgress(bookingId: String, customerPhoneNumber: String): Result<Unit> {
+        return updateJobStatus(bookingId, customerPhoneNumber, "in_progress", "serviceStartedAt")
+    }
+
+    /**
+     * Mark job as payment pending
+     */
+    suspend fun markJobAsPaymentPending(bookingId: String, customerPhoneNumber: String): Result<Unit> {
+        return updateJobStatus(bookingId, customerPhoneNumber, "payment_pending", null)
+    }
+
+    /**
+     * Mark job as completed
+     */
+    suspend fun markJobAsCompleted(bookingId: String, customerPhoneNumber: String): Result<Unit> {
+        return updateJobStatus(bookingId, customerPhoneNumber, "completed", "completedAt")
     }
 
     /**
@@ -279,6 +420,27 @@ class JobsRepository(
             ?: bookingData["locality"] as? String
             ?: bookingData["address"] as? String
 
+        // Extract customer address (try multiple field names)
+        val customerAddress = bookingData["customerAddress"] as? String
+            ?: bookingData["address"] as? String
+            ?: bookingData["fullAddress"] as? String
+            ?: bookingData["locationAddress"] as? String
+
+        // Extract notes/description
+        val notes = bookingData["notes"] as? String
+            ?: bookingData["description"] as? String
+            ?: bookingData["specialInstructions"] as? String
+            ?: bookingData["instructions"] as? String
+
+        // Extract customer email
+        val customerEmail = bookingData["customerEmail"] as? String
+            ?: bookingData["email"] as? String
+
+        // Extract estimated duration
+        val estimatedDuration = (bookingData["estimatedDuration"] as? Number)?.toInt()
+            ?: (bookingData["duration"] as? Number)?.toInt()
+            ?: (bookingData["estimatedTime"] as? Number)?.toInt()
+
         return Job(
             bookingId = bookingId,
             serviceName = serviceName,
@@ -298,7 +460,116 @@ class JobsRepository(
             serviceStartedAt = serviceStartedAt,
             completedAt = completedAt,
             subServicesSelected = subServicesSelected,
-            locationName = locationName
+            locationName = locationName,
+            customerAddress = customerAddress,
+            notes = notes,
+            customerEmail = customerEmail,
+            estimatedDuration = estimatedDuration
+        )
+    }
+
+    /**
+     * Listen to new jobs from inbox (for job discovery)
+     * This is the optimized way to discover jobs - reads from provider-specific inbox
+     */
+    fun listenToNewJobsFromInbox(providerId: String): Flow<List<JobInboxEntry>> = callbackFlow {
+        val listener = firestore
+            .collection("provider_job_inbox")
+            .document(providerId)
+            .collection("jobs")
+            .whereEqualTo("status", "pending")
+            .whereGreaterThan("expiresAt", Timestamp.now())
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+
+                if (snapshot == null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+
+                val inboxEntries = snapshot.documents.mapNotNull { doc ->
+                    val data = doc.data ?: return@mapNotNull null
+                    mapInboxDataToEntry(data)
+                }
+
+                trySend(inboxEntries)
+            }
+
+        awaitClose { listener.remove() }
+    }
+
+    /**
+     * Get full booking details from source of truth (Bookings collection)
+     * This is the AUTHORITATIVE source - always use this for job details
+     * 
+     * @param customerPhone Customer phone number (document ID)
+     * @param bookingIndex Index in bookings[] array
+     */
+    suspend fun getFullBookingDetails(
+        customerPhone: String,
+        bookingIndex: Int
+    ): Result<Job> {
+        return try {
+            val documentRef = bookingsCollection.document(customerPhone)
+            val snapshot = documentRef.get().await()
+            val data = snapshot.data ?: throw Exception("Document not found")
+
+            val bookingsArray = data["bookings"] as? List<Map<String, Any>>
+            if (bookingsArray != null && bookingsArray.isNotEmpty()) {
+                // Array format
+                if (bookingIndex >= bookingsArray.size) {
+                    throw Exception("Booking index out of range")
+                }
+                val bookingData = bookingsArray[bookingIndex]
+                val job = mapBookingToJob(bookingData, customerPhone)
+                if (job != null) {
+                    Result.success(job)
+                } else {
+                    Result.failure(Exception("Failed to map booking data"))
+                }
+            } else {
+                // Single booking format (legacy) - use index 0
+                val job = mapBookingToJob(data, customerPhone)
+                if (job != null) {
+                    Result.success(job)
+                } else {
+                    Result.failure(Exception("Failed to map booking data"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Map inbox document data to JobInboxEntry
+     */
+    private fun mapInboxDataToEntry(data: Map<String, Any>): JobInboxEntry? {
+        val bookingId = data["bookingId"] as? String ?: return null
+        val customerPhone = data["customerPhone"] as? String ?: return null
+        val bookingDocPath = data["bookingDocPath"] as? String ?: return null
+        val bookingIndex = (data["bookingIndex"] as? Number)?.toInt() ?: 0
+        val serviceName = data["serviceName"] as? String ?: "Unknown Service"
+        val priceSnapshot = (data["priceSnapshot"] as? Number)?.toDouble() ?: 0.0
+        val status = data["status"] as? String ?: "pending"
+        val distanceKm = (data["distanceKm"] as? Number)?.toDouble()
+        val createdAt = data["createdAt"] as? Timestamp
+        val expiresAt = data["expiresAt"] as? Timestamp
+
+        return JobInboxEntry(
+            bookingId = bookingId,
+            customerPhone = customerPhone,
+            bookingDocPath = bookingDocPath,
+            bookingIndex = bookingIndex,
+            serviceName = serviceName,
+            priceSnapshot = priceSnapshot,
+            status = status,
+            distanceKm = distanceKm,
+            createdAt = createdAt,
+            expiresAt = expiresAt
         )
     }
 }

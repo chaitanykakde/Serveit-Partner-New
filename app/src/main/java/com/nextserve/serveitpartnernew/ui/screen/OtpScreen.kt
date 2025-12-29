@@ -68,12 +68,18 @@ fun OtpScreen(
 
     LaunchedEffect(phoneNumber, verificationId) {
         viewModel.setPhoneNumber(phoneNumber)
+        viewModel.setActivity(activity) // Store activity for auto-submit
         if (verificationId.isNotEmpty()) {
             viewModel.setVerificationId(verificationId)
         }
         if (resendToken != null) {
             viewModel.setResendToken(resendToken)
         }
+    }
+    
+    // Update activity reference when it changes
+    LaunchedEffect(activity) {
+        viewModel.setActivity(activity)
     }
 
     LaunchedEffect(Unit) {
@@ -202,6 +208,19 @@ fun OtpScreen(
                         .padding(horizontal = Dimens.paddingXs),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
+                // Show retry count if applicable
+                if (uiState.retryCount > 0 && uiState.retryCount < uiState.maxRetries) {
+                    Spacer(modifier = Modifier.height(Dimens.spacingXs))
+                    Text(
+                        text = "Attempts remaining: ${uiState.maxRetries - uiState.retryCount}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimens.paddingXs),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
                 Spacer(modifier = Modifier.height(Dimens.spacingSm))
             }
 

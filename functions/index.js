@@ -434,6 +434,42 @@ async function processNewBooking(bookingData, phoneNumber) {
     }
 
     console.log(`Updated booking ${bookingId} with ${notifiedProviderIds.length} notified providers`);
+    
+    // Step 6.5: Create Inbox Entries for Qualified Providers
+    const inboxBatch = db.batch();
+    const expiresAt = admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() + 30 * 60 * 1000) // 30 min expiry
+    );
+    
+    // Get bookingIndex for array format, or -1 for single booking format
+    let bookingIndex = -1;
+    if (currentData && currentData.bookings && Array.isArray(currentData.bookings)) {
+      bookingIndex = currentData.bookings.findIndex((b) => b.bookingId === bookingId);
+    }
+    
+    for (const provider of qualifiedProviders) {
+      const inboxRef = db
+        .collection("provider_job_inbox")
+        .doc(provider.id)
+        .collection("jobs")
+        .doc(bookingId);
+      
+      inboxBatch.set(inboxRef, {
+        bookingId: bookingId,
+        customerPhone: phoneNumber,
+        bookingDocPath: `Bookings/${phoneNumber}`,
+        bookingIndex: bookingIndex >= 0 ? bookingIndex : 0, // Use 0 for single booking format
+        serviceName: serviceName,
+        priceSnapshot: bookingData.totalPrice || 0,
+        status: "pending",
+        distanceKm: provider.distance || 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: expiresAt,
+      });
+    }
+    
+    await inboxBatch.commit();
+    console.log(`Created inbox entries for ${qualifiedProviders.length} providers`);
   } catch (error) {
     console.error("Error updating booking document:", error);
     return;
@@ -515,9 +551,51 @@ exports.dispatchJobToProviders = functions.firestore
     });
 
 /**
+ * Cleanup inbox entries for other providers when job is accepted
+ * This removes pending inbox entries for the same bookingId from all other providers
+ */
+async function cleanupInboxForAcceptedJob(bookingId, acceptedProviderId) {
+  try {
+    // Get all inbox entries for this bookingId using collectionGroup query
+    const inboxSnapshot = await db
+      .collectionGroup("jobs")
+      .where("bookingId", "==", bookingId)
+      .where("status", "==", "pending")
+      .get();
+    
+    if (inboxSnapshot.empty) {
+      console.log(`No pending inbox entries to clean up for booking ${bookingId}`);
+      return;
+    }
+    
+    const batch = db.batch();
+    let deleteCount = 0;
+    
+    inboxSnapshot.docs.forEach((doc) => {
+      // Extract providerId from path: provider_job_inbox/{providerId}/jobs/{jobId}
+      const providerId = doc.ref.parent.parent.id;
+      if (providerId !== acceptedProviderId) {
+        batch.delete(doc.ref);
+        deleteCount++;
+      }
+    });
+    
+    if (deleteCount > 0) {
+      await batch.commit();
+      console.log(`Cleaned up ${deleteCount} inbox entries for booking ${bookingId}`);
+    } else {
+      console.log(`No inbox entries to clean up (all belong to accepted provider)`);
+    }
+  } catch (error) {
+    console.error(`Error cleaning up inbox for booking ${bookingId}:`, error);
+    throw error;
+  }
+}
+
+/**
  * COPIED FROM OLD PROJECT - EXISTING FUNCTION 2: Accept Job Request
  * Trigger: HTTPS Callable
- * Status: ✅ COPIED EXACTLY AS-IS - DO NOT MODIFY
+ * Status: ✅ OPTIMIZED - Uses inbox for O(1) lookup
  */
 exports.acceptJobRequest = functions.https.onCall(async (data, context) => {
   try {
@@ -544,53 +622,113 @@ exports.acceptJobRequest = functions.https.onCall(async (data, context) => {
 
     const providerData = providerDoc.data();
 
-    // Execute transaction on main Bookings collection - REFACTORED for direct query model
+    // Execute transaction - OPTIMIZED: Use inbox for O(1) lookup
     const result = await admin.firestore().runTransaction(async (transaction) => {
-      // Search for the booking across all Bookings documents
-      const bookingsSnapshot = await admin.firestore().collection("Bookings").get();
-      let bookingRef = null;
-      let bookingData = null;
-      let phoneNumber = null;
-
-      // Find the document that contains this bookingId
-      for (const doc of bookingsSnapshot.docs) {
-        const data = doc.data();
-        if (data.bookingId === bookingId) {
-          bookingRef = doc.ref;
-          bookingData = data;
-          phoneNumber = doc.id;
-          break;
+      // STEP 1: Read inbox entry (O(1) lookup)
+      const inboxRef = db
+        .collection("provider_job_inbox")
+        .doc(providerId)
+        .collection("jobs")
+        .doc(bookingId);
+      
+      const inboxDoc = await transaction.get(inboxRef);
+      
+      if (!inboxDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Job not found in your inbox");
+      }
+      
+      const inboxData = inboxDoc.data();
+      const customerPhone = inboxData.customerPhone;
+      const bookingIndex = inboxData.bookingIndex;
+      
+      // STEP 2: Read EXACT booking document (direct access)
+      const bookingRef = db.collection("Bookings").doc(customerPhone);
+      const bookingDoc = await transaction.get(bookingRef);
+      
+      if (!bookingDoc.exists) {
+        throw new functions.https.HttpsError("not-found", "Booking document not found");
+      }
+      
+      const bookingData = bookingDoc.data();
+      const bookingsArray = bookingData.bookings || [];
+      
+      // Handle both array and single booking formats
+      let targetBooking;
+      if (bookingsArray.length > 0 && Array.isArray(bookingsArray)) {
+        // Array format
+        if (bookingIndex >= bookingsArray.length) {
+          throw new functions.https.HttpsError("not-found", "Booking index out of range");
         }
+        targetBooking = bookingsArray[bookingIndex];
+      } else {
+        // Single booking format (legacy)
+        targetBooking = bookingData;
       }
-
-      if (!bookingRef || !bookingData) {
-        throw new functions.https.HttpsError("not-found", "Booking not found");
+      
+      // STEP 3: Validate (from SOURCE OF TRUTH)
+      if (targetBooking.bookingId !== bookingId) {
+        throw new functions.https.HttpsError("failed-precondition", "Booking ID mismatch");
       }
-
-      // Check if job is still available using new status field
-      if (bookingData.status !== "pending") {
+      
+      if (targetBooking.status !== "pending") {
         throw new functions.https.HttpsError("failed-precondition", "Job has already been accepted by another provider");
       }
-
-      // Verify provider was notified for this job
-      if (!bookingData.notifiedProviderIds || !bookingData.notifiedProviderIds.includes(providerId)) {
+      
+      if (!targetBooking.notifiedProviderIds || !targetBooking.notifiedProviderIds.includes(providerId)) {
         throw new functions.https.HttpsError("failed-precondition", "Provider was not notified for this job");
       }
-
-      // Update booking with provider details and new status
-      transaction.update(bookingRef, {
-        providerId: providerId,
-        providerName: providerData.personalDetails?.fullName || providerData.fullName || "Unknown Provider",
-        providerMobileNo: providerData.personalDetails?.mobileNo || providerData.mobileNo || "",
+      
+      // STEP 4: Update booking (SOURCE OF TRUTH)
+      // NOTE: Cannot use FieldValue.serverTimestamp() inside arrays, so we use Timestamp.now()
+      const acceptedAtTimestamp = admin.firestore.Timestamp.now();
+      
+      if (bookingsArray.length > 0 && Array.isArray(bookingsArray)) {
+        // Array format: Update specific booking in array
+        const updatedBookings = [...bookingsArray];
+        updatedBookings[bookingIndex] = {
+          ...targetBooking,
+          providerId: providerId,
+          providerName: providerData.personalDetails?.fullName || providerData.fullName || "Unknown Provider",
+          providerMobileNo: providerData.personalDetails?.mobileNo || providerData.mobileNo || "",
+          status: "accepted",
+          acceptedByProviderId: providerId,
+          acceptedAt: acceptedAtTimestamp, // Use Timestamp.now() instead of FieldValue.serverTimestamp()
+        };
+        
+        transaction.update(bookingRef, {
+          bookings: updatedBookings,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(), // This is OK at document level
+        });
+      } else {
+        // Single booking format (legacy)
+        transaction.update(bookingRef, {
+          providerId: providerId,
+          providerName: providerData.personalDetails?.fullName || providerData.fullName || "Unknown Provider",
+          providerMobileNo: providerData.personalDetails?.mobileNo || providerData.mobileNo || "",
+          status: "accepted",
+          acceptedByProviderId: providerId,
+          acceptedAt: admin.firestore.FieldValue.serverTimestamp(), // This is OK for single booking format
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      
+      // STEP 5: Update inbox entry
+      transaction.update(inboxRef, {
         status: "accepted",
-        acceptedByProviderId: providerId,
-        acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-
-      console.log(`Updated booking ${bookingId} in document Bookings/${phoneNumber} - accepted by provider ${providerId}`);
+      
+      console.log(`Updated booking ${bookingId} in document Bookings/${customerPhone} - accepted by provider ${providerId}`);
       return {success: true, message: "Job accepted successfully"};
     });
+    
+    // STEP 6: Cleanup inbox entries for other providers (outside transaction)
+    // This is done after transaction to avoid transaction size limits
+    try {
+      await cleanupInboxForAcceptedJob(bookingId, providerId);
+    } catch (cleanupError) {
+      console.error("Error cleaning up inbox entries:", cleanupError);
+      // Don't fail the accept operation if cleanup fails
+    }
 
     console.log(`Job ${bookingId} accepted by provider ${providerId}`);
     return result;
@@ -1068,6 +1206,58 @@ exports.notifyCustomerOnStatusChange = functions.firestore
 
       return null;
     });
+
+/**
+ * Sync inbox status when booking status changes
+ * This keeps inbox UI in sync with booking status, but Bookings remains authoritative
+ */
+exports.syncInboxStatus = functions.firestore
+  .document("Bookings/{phoneNumber}")
+  .onUpdate(async (change, context) => {
+    try {
+      const afterData = change.after.data();
+      const bookingsArray = afterData.bookings || [];
+      
+      // For each booking that has a providerId (accepted job)
+      for (let i = 0; i < bookingsArray.length; i++) {
+        const booking = bookingsArray[i];
+        if (booking.providerId && booking.bookingId) {
+          // Update inbox entry status
+          const inboxRef = db
+            .collection("provider_job_inbox")
+            .doc(booking.providerId)
+            .collection("jobs")
+            .doc(booking.bookingId);
+          
+          await inboxRef.update({
+            status: booking.status,
+          }).catch((error) => {
+            // Inbox entry might not exist (deleted/expired), ignore
+            console.log(`Inbox entry not found for booking ${booking.bookingId}, ignoring sync`);
+          });
+        }
+      }
+      
+      // Also handle single booking format (legacy)
+      if (!Array.isArray(bookingsArray) && afterData.providerId && afterData.bookingId) {
+        const inboxRef = db
+          .collection("provider_job_inbox")
+          .doc(afterData.providerId)
+          .collection("jobs")
+          .doc(afterData.bookingId);
+        
+        await inboxRef.update({
+          status: afterData.status,
+        }).catch((error) => {
+          console.log(`Inbox entry not found for booking ${afterData.bookingId}, ignoring sync`);
+        });
+      }
+    } catch (error) {
+      console.error("Error syncing inbox status:", error);
+    }
+    
+    return null;
+  });
 
 // ═══════════════════════════════════════════════════════════
 // SECTION 2: NEW PROJECT FUNCTIONS

@@ -10,10 +10,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.nextserve.serveitpartnernew.ui.components.BottomNavigationBar
 import com.nextserve.serveitpartnernew.ui.navigation.BottomNavItem
 import com.nextserve.serveitpartnernew.ui.screen.about.AboutAppScreen
@@ -23,6 +25,7 @@ import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditDocumen
 import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditPreferencesScreen
 import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditServicesScreen
 import com.nextserve.serveitpartnernew.ui.screen.support.HelpSupportScreen
+import com.nextserve.serveitpartnernew.ui.screen.main.JobDetailsScreen
 
 @Composable
 fun MainAppScreen(
@@ -62,11 +65,53 @@ fun MainAppScreen(
         ) {
             composable(BottomNavItem.Home.route) {
                 val providerId = com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.auth.currentUser?.uid ?: ""
-                HomeScreen(providerId = providerId)
+                HomeScreen(
+                    providerId = providerId,
+                    onOngoingJobClick = { job ->
+                        // Navigate to job details with full job information
+                        // For ongoing jobs, bookingIndex may not be available, so use -1
+                        val route = "jobDetails/${job.bookingId}/${job.customerPhoneNumber}/-1"
+                        navController.navigate(route)
+                    }
+                )
             }
             composable(BottomNavItem.Jobs.route) {
                 val providerId = com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.auth.currentUser?.uid ?: ""
-                JobsScreen(providerId = providerId)
+                JobsScreen(
+                    providerId = providerId,
+                    onNavigateToJobDetails = { bookingId, customerPhoneNumber, bookingIndex ->
+                        val route = if (bookingIndex != null && bookingIndex >= 0) {
+                            "jobDetails/$bookingId/$customerPhoneNumber/$bookingIndex"
+                        } else {
+                            "jobDetails/$bookingId/$customerPhoneNumber/-1"
+                        }
+                        navController.navigate(route)
+                    }
+                )
+            }
+            composable(
+                route = "jobDetails/{bookingId}/{customerPhoneNumber}/{bookingIndex}",
+                arguments = listOf(
+                    navArgument("bookingId") { type = NavType.StringType },
+                    navArgument("customerPhoneNumber") { type = NavType.StringType },
+                    navArgument("bookingIndex") { type = NavType.IntType; defaultValue = -1 }
+                )
+            ) { backStackEntry ->
+                val bookingId = backStackEntry.arguments?.getString("bookingId") ?: ""
+                val customerPhoneNumber = backStackEntry.arguments?.getString("customerPhoneNumber") ?: ""
+                val bookingIndexArg = backStackEntry.arguments?.getInt("bookingIndex") ?: -1
+                val providerId = com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.auth.currentUser?.uid ?: ""
+                val bookingIndex = if (bookingIndexArg >= 0) bookingIndexArg else null
+                
+                JobDetailsScreen(
+                    bookingId = bookingId,
+                    customerPhoneNumber = customerPhoneNumber,
+                    providerId = providerId,
+                    bookingIndex = bookingIndex,
+                    onBack = { navController.popBackStack() },
+                    onJobAccepted = { navController.popBackStack() },
+                    onJobRejected = { navController.popBackStack() }
+                )
             }
             composable(BottomNavItem.Earnings.route) {
                 EarningsScreen()

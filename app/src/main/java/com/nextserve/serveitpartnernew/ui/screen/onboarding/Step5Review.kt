@@ -19,9 +19,14 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -49,6 +54,8 @@ fun Step5Review(
     aadhaarFrontUploaded: Boolean,
     aadhaarBackUploaded: Boolean,
     isSubmitted: Boolean,
+    isLoading: Boolean = false,
+    errorMessage: String? = null,
     onEditBasicInfo: () -> Unit,
     onEditServices: () -> Unit,
     onEditLocation: () -> Unit,
@@ -58,13 +65,16 @@ fun Step5Review(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val scrollState = rememberScrollState()
+    var showConfirmationDialog by remember { mutableStateOf(false) }
 
     BottomStickyButtonContainer(
         button = {
             if (!isSubmitted) {
                 PrimaryButton(
                     text = stringResource(R.string.submit_for_verification),
-                    onClick = onSubmit,
+                    onClick = { showConfirmationDialog = true },
+                    enabled = !isLoading,
+                    isLoading = isLoading,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -225,9 +235,64 @@ fun Step5Review(
 
                     Spacer(modifier = Modifier.height(16.dp))
                 }
+                
+                // Error message display
+                if (errorMessage != null && !isSubmitted) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            text = errorMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
             }
         }
     )
+    
+    // Confirmation Dialog
+    if (showConfirmationDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmationDialog = false },
+            title = {
+                Text(
+                    text = "Submit for Verification",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to submit your profile for verification? Please make sure all information is correct.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showConfirmationDialog = false
+                        onSubmit()
+                    }
+                ) {
+                    Text("Submit")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showConfirmationDialog = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable

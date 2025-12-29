@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default rule: deny all reads/writes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Partners collection - providers can read/write their own data
+    match /partners/{partnerId} {
+      allow read, write: if request.auth != null && request.auth.uid == partnerId;
+    }
+    
+    // Provider job inbox - providers can only read their own inbox
+    match /provider_job_inbox/{providerId}/jobs/{jobId} {
+      allow read: if request.auth != null && request.auth.uid == providerId;
+      allow write: if false; // Only Cloud Functions can write
+    }
+    
+    // Bookings collection - providers can read bookings they're assigned to
+    match /Bookings/{phoneNumber} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only Cloud Functions can write
+    }
+    
+    // Serveit users - read only for authenticated users
+    match /serveit_users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}
+

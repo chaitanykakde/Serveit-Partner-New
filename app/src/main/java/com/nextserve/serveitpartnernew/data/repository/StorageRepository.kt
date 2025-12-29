@@ -160,7 +160,7 @@ class StorageRepository(
             val compressedBitmap = compressImage(imageUri)
             val byteArray = bitmapToByteArray(compressedBitmap)
             
-            val path = "providers/$uid/profile/photo.jpg"
+            val path = "providers/$uid/documents/profile_photo.jpg"
             val storageRef = storage.reference.child(path)
             
             val metadata = com.google.firebase.storage.StorageMetadata.Builder()

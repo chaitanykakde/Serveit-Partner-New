@@ -11,6 +11,7 @@ import com.nextserve.serveitpartnernew.data.repository.FirestoreRepository
 import com.nextserve.serveitpartnernew.utils.ErrorMapper
 import com.nextserve.serveitpartnernew.utils.NetworkMonitor
 import com.nextserve.serveitpartnernew.utils.PhoneNumberFormatter
+import com.nextserve.serveitpartnernew.utils.ValidationUtils
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -55,9 +56,20 @@ class OtpViewModel(
     private var timerJob: Job? = null
     private var verificationJob: Job? = null
     var onVerificationSuccess: ((String) -> Unit)? = null // UID callback
+    
+    // Store activity reference for auto-submit
+    private var currentActivity: android.app.Activity? = null
 
     private var lastResendClickTime: Long = 0
     private val RESEND_DEBOUNCE_MS = 2000L // 2 seconds debounce for resend
+    
+    /**
+     * Sets the activity reference for auto-submit functionality.
+     * @param activity The activity context
+     */
+    fun setActivity(activity: android.app.Activity?) {
+        currentActivity = activity
+    }
 
     init {
         // Monitor network connectivity if NetworkMonitor is provided
@@ -81,6 +93,7 @@ class OtpViewModel(
         timerJob?.cancel()
         verificationJob?.cancel()
         onVerificationSuccess = null
+        currentActivity = null
     }
 
     /**
@@ -89,13 +102,26 @@ class OtpViewModel(
      */
     fun updateOtp(otp: String) {
         val cleaned = otp.filter { it.isDigit() }
-        val isValid = cleaned.length == 6
+        val validationResult = ValidationUtils.validateOtp(cleaned)
         
         uiState = uiState.copy(
             otp = cleaned,
-            isOtpValid = isValid,
-            errorMessage = null
+            isOtpValid = validationResult.isValid,
+            errorMessage = if (cleaned.isNotEmpty() && !validationResult.isValid) {
+                validationResult.errorMessage
+            } else null
         )
+        
+        // Auto-submit when 6 digits are entered
+        if (cleaned.length == 6 && validationResult.isValid) {
+            // Trigger auto-verification after a short delay to allow UI to update
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(300) // Small delay for better UX
+                if (uiState.otp.length == 6 && uiState.isOtpValid && !uiState.isVerifying) {
+                    verifyOtp(currentActivity) // Use stored activity reference
+                }
+            }
+        }
     }
 
     /**

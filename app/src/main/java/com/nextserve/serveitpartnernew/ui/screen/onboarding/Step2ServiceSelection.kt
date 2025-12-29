@@ -55,6 +55,7 @@ fun Step2ServiceSelection(
     onOtherServiceChange: (String) -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    errorMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -183,9 +184,24 @@ fun Step2ServiceSelection(
                             onValueChange = onOtherServiceChange,
                             label = stringResource(R.string.specify_other_service),
                             placeholder = stringResource(R.string.enter_service_name),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            isError = errorMessage != null && otherService.isEmpty(),
+                            errorMessage = if (errorMessage != null && otherService.isEmpty()) errorMessage else null
                         )
                     }
+                }
+                
+                // Error message display
+                if (errorMessage != null && primaryServiceName != "Other Services") {
+                    Spacer(modifier = Modifier.height(Dimens.spacingSm))
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimens.paddingXs)
+                    )
                 }
             }
         }

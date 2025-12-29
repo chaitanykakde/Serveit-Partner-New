@@ -24,7 +24,8 @@ object PhoneNumberFormatter {
      * Validates if a phone number is a valid Indian mobile number.
      * Indian mobile numbers must:
      * - Be 10 digits long
-     * - Start with 6, 7, 8, or 9
+     * - Start with 6, 7, 8, or 9 (standard mobile numbers)
+     * - Also supports landline numbers starting with 2-5 (for broader validation)
      * 
      * @param phoneNumber The phone number to validate (digits only, no prefix)
      * @return true if valid, false otherwise
@@ -33,9 +34,25 @@ object PhoneNumberFormatter {
         val cleaned = phoneNumber.filter { it.isDigit() }
         if (cleaned.length != 10) return false
         
-        // Indian mobile numbers start with 6, 7, 8, or 9
+        // Indian mobile numbers typically start with 6, 7, 8, or 9
+        // But we also accept landline numbers (2-5) for broader compatibility
         val firstDigit = cleaned.firstOrNull()?.digitToIntOrNull() ?: return false
-        return firstDigit in 6..9
+        return firstDigit in 2..9 // Accept all valid Indian phone number prefixes
+    }
+    
+    /**
+     * Gets a user-friendly error message for invalid phone numbers.
+     * @param phoneNumber The phone number that failed validation
+     * @return Error message string
+     */
+    fun getPhoneNumberErrorMessage(phoneNumber: String): String {
+        val cleaned = phoneNumber.filter { it.isDigit() }
+        return when {
+            cleaned.isEmpty() -> "Please enter your phone number"
+            cleaned.length < 10 -> "Phone number must be 10 digits"
+            cleaned.length > 10 -> "Phone number must be exactly 10 digits"
+            else -> "Please enter a valid 10-digit mobile number"
+        }
     }
 
     /**

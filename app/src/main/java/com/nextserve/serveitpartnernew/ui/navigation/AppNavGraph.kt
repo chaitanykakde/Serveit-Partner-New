@@ -5,6 +5,9 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.nextserve.serveitpartnernew.ui.screen.HomeScreen
 import com.nextserve.serveitpartnernew.ui.screen.LanguageSelectionScreen
 import com.nextserve.serveitpartnernew.ui.screen.LoginScreen
@@ -106,7 +109,8 @@ fun NavGraphBuilder.appNavGraph(navController: NavController) {
         LanguageSelectionScreen(
             onNavigateToOnboarding = {
                 navController.navigate(Screen.Onboarding.route) {
-                    // Don't pop language selection, allow back navigation if needed
+                    // Pop language selection after navigating to onboarding
+                    popUpTo(Screen.LanguageSelection.route) { inclusive = true }
                 }
             }
         )

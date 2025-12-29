@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.nextserve.serveitpartnernew.data.model.Job
+import com.nextserve.serveitpartnernew.data.model.JobInboxEntry
 import com.nextserve.serveitpartnernew.data.repository.JobsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import com.nextserve.serveitpartnernew.utils.NetworkMonitor
 
@@ -21,6 +23,7 @@ import com.nextserve.serveitpartnernew.utils.NetworkMonitor
  */
 data class JobsUiState(
     val newJobs: List<Job> = emptyList(),
+    val inboxEntries: List<JobInboxEntry> = emptyList(), // Inbox entries for job discovery
     val completedJobs: List<Job> = emptyList(),
     val isLoadingNewJobs: Boolean = false,
     val isLoadingHistory: Boolean = false,
@@ -30,7 +33,8 @@ data class JobsUiState(
     val rejectedJobIds: Set<String> = emptySet(), // Local state for rejected jobs
     val acceptingJobId: String? = null, // Track which job is being accepted
     val hasMoreHistory: Boolean = true, // Pagination flag
-    val isOffline: Boolean = false // Network connectivity status
+    val isOffline: Boolean = false, // Network connectivity status
+    val useInbox: Boolean = true // Flag to use inbox for job discovery (new optimized method)
 )
 
 /**
@@ -66,31 +70,77 @@ class JobsViewModel(
     }
 
     /**
-     * Load new jobs using snapshot listener
+     * Load new jobs using inbox (optimized) or fallback to old method
      */
     fun loadNewJobs() {
         _uiState.value = _uiState.value.copy(isLoadingNewJobs = true, errorMessage = null)
 
-        jobsRepository.listenToNewJobs(providerId)
-            .distinctUntilChanged()
-            .catch { error ->
-                _uiState.value = _uiState.value.copy(
-                    isLoadingNewJobs = false,
-                    errorMessage = error.message ?: "Failed to load jobs"
-                )
-            }
-            .onEach { jobs ->
-                // Filter out rejected jobs
-                val rejectedIds = _uiState.value.rejectedJobIds
-                val filteredJobs = jobs.filter { it.bookingId !in rejectedIds }
-                
-                _uiState.value = _uiState.value.copy(
-                    newJobs = filteredJobs,
-                    isLoadingNewJobs = false,
-                    errorMessage = null
-                )
-            }
-            .launchIn(viewModelScope)
+        if (_uiState.value.useInbox) {
+            // NEW: Use inbox for efficient job discovery
+            jobsRepository.listenToNewJobsFromInbox(providerId)
+                .distinctUntilChanged()
+                .catch { error ->
+                    // Fallback to old method if inbox fails
+                    _uiState.value = _uiState.value.copy(
+                        useInbox = false,
+                        errorMessage = "Inbox unavailable, using fallback method"
+                    )
+                    loadNewJobs() // Retry with old method
+                }
+                .onEach { inboxEntries ->
+                    // Filter out rejected jobs
+                    val rejectedIds = _uiState.value.rejectedJobIds
+                    val filteredEntries = inboxEntries.filter { 
+                        it.bookingId !in rejectedIds && it.isPending()
+                    }
+                    
+                    // Convert inbox entries to Job objects for UI compatibility
+                    // Note: These are lightweight - full details fetched when opening job details
+                    val jobs = filteredEntries.map { entry ->
+                        Job(
+                            bookingId = entry.bookingId,
+                            serviceName = entry.serviceName,
+                            status = entry.status,
+                            totalPrice = entry.priceSnapshot,
+                            userName = "Customer", // Will be fetched from full details
+                            customerPhoneNumber = entry.customerPhone,
+                            distance = entry.distanceKm,
+                            locationName = null, // Will be fetched from full details
+                            createdAt = entry.createdAt
+                        )
+                    }
+                    
+                    _uiState.value = _uiState.value.copy(
+                        newJobs = jobs,
+                        inboxEntries = filteredEntries,
+                        isLoadingNewJobs = false,
+                        errorMessage = null
+                    )
+                }
+                .launchIn(viewModelScope)
+        } else {
+            // FALLBACK: Old method (query all Bookings)
+            jobsRepository.listenToNewJobs(providerId)
+                .distinctUntilChanged()
+                .catch { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingNewJobs = false,
+                        errorMessage = error.message ?: "Failed to load jobs"
+                    )
+                }
+                .onEach { jobs ->
+                    // Filter out rejected jobs
+                    val rejectedIds = _uiState.value.rejectedJobIds
+                    val filteredJobs = jobs.filter { it.bookingId !in rejectedIds }
+                    
+                    _uiState.value = _uiState.value.copy(
+                        newJobs = filteredJobs,
+                        isLoadingNewJobs = false,
+                        errorMessage = null
+                    )
+                }
+                .launchIn(viewModelScope)
+        }
     }
 
     /**
@@ -228,6 +278,12 @@ class JobsViewModel(
                         newJobs = updatedJobs,
                         acceptingJobId = null
                     )
+                    // Wait for Firestore to propagate the update
+                    delay(500)
+                    // Refresh new jobs to ensure list is up to date
+                    loadNewJobs()
+                    // Refresh ongoing job status
+                    refreshOngoingJobStatus()
                     onSuccess()
                 },
                 onFailure = { error ->

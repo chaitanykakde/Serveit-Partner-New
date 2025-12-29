@@ -142,6 +142,7 @@ fun OnboardingScreen(
                                 onEmailChange = { onboardingViewModel.updateEmail(it) },
                                 language = uiState.language,
                                 onLanguageChange = { onboardingViewModel.updateLanguage(it) },
+                                errorMessage = uiState.errorMessage,
                                 modifier = Modifier.fillMaxSize()
                             )
                             2 -> {
@@ -154,7 +155,7 @@ fun OnboardingScreen(
                                     }
                                 }
                                 Step2ServiceSelection(
-                                    primaryServiceName = uiState.primaryService,
+                                    primaryServiceName = uiState.selectedMainService.ifEmpty { uiState.primaryService },
                                     availableSubServices = uiState.availableSubServices,
                                     selectedSubServices = uiState.selectedSubServices,
                                     isSelectAllChecked = uiState.isSelectAllChecked,
@@ -165,6 +166,7 @@ fun OnboardingScreen(
                                     onOtherServiceChange = { onboardingViewModel.updateOtherService(it) },
                                     onPrevious = { onboardingViewModel.previousStep() },
                                     onNext = { onboardingViewModel.nextStep() },
+                                    errorMessage = uiState.errorMessage,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -193,6 +195,10 @@ fun OnboardingScreen(
                             4 -> Step4Verification(
                                 aadhaarFrontUploaded = uiState.aadhaarFrontUploaded,
                                 aadhaarBackUploaded = uiState.aadhaarBackUploaded,
+                                aadhaarFrontUrl = uiState.aadhaarFrontUrl,
+                                aadhaarBackUrl = uiState.aadhaarBackUrl,
+                                profilePhotoUploaded = uiState.profilePhotoUploaded,
+                                profilePhotoUrl = uiState.profilePhotoUrl,
                                 isUploading = uiState.isUploading,
                                 uploadProgress = uiState.uploadProgress,
                                 errorMessage = uiState.errorMessage,
@@ -201,6 +207,18 @@ fun OnboardingScreen(
                                 },
                                 onAadhaarBackUpload = { imageUri ->
                                     onboardingViewModel.uploadAadhaarBack(imageUri)
+                                },
+                                onProfilePhotoUpload = { imageUri ->
+                                    onboardingViewModel.uploadProfilePhoto(imageUri)
+                                },
+                                onAadhaarFrontDelete = {
+                                    onboardingViewModel.deleteAadhaarFront()
+                                },
+                                onAadhaarBackDelete = {
+                                    onboardingViewModel.deleteAadhaarBack()
+                                },
+                                onProfilePhotoDelete = {
+                                    onboardingViewModel.deleteProfilePhoto()
                                 },
                                 onPrevious = { onboardingViewModel.previousStep() },
                                 onNext = { onboardingViewModel.nextStep() },
@@ -228,6 +246,8 @@ fun OnboardingScreen(
                                 onEditLocation = { onboardingViewModel.navigateToStep(3) },
                                 onEditDocuments = { onboardingViewModel.navigateToStep(4) },
                                 onSubmit = { onboardingViewModel.submitOnboarding() },
+                                isLoading = uiState.isLoading,
+                                errorMessage = uiState.errorMessage,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

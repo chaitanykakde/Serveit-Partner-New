@@ -17,6 +17,7 @@ import com.nextserve.serveitpartnernew.data.repository.FirestoreRepository
 import com.nextserve.serveitpartnernew.data.repository.LocationRepository
 import com.nextserve.serveitpartnernew.data.repository.StorageRepository
 import com.nextserve.serveitpartnernew.utils.LanguageManager
+import com.nextserve.serveitpartnernew.utils.ValidationUtils
 import kotlinx.coroutines.launch
 
 data class OnboardingUiState(
@@ -54,6 +55,8 @@ data class OnboardingUiState(
     val aadhaarBackUrl: String = "",
     val aadhaarFrontUploaded: Boolean = false,
     val aadhaarBackUploaded: Boolean = false,
+    val profilePhotoUrl: String = "",
+    val profilePhotoUploaded: Boolean = false,
     val uploadProgress: Float = 0f,
     val isUploading: Boolean = false,
     // Step 5 data
@@ -123,6 +126,8 @@ class OnboardingViewModel(
                         aadhaarBackUrl = providerData.aadhaarBackUrl,
                         aadhaarFrontUploaded = providerData.aadhaarFrontUrl.isNotEmpty(),
                         aadhaarBackUploaded = providerData.aadhaarBackUrl.isNotEmpty(),
+                        profilePhotoUrl = providerData.profilePhotoUrl,
+                        profilePhotoUploaded = providerData.profilePhotoUrl.isNotEmpty(),
                         isSubmitted = onboardingStatus == "SUBMITTED"
                     )
                     
@@ -147,9 +152,89 @@ class OnboardingViewModel(
 
     fun nextStep() {
         if (uiState.currentStep < 5) {
+            // Validate current step before proceeding
+            val validationError = validateCurrentStep()
+            if (validationError != null) {
+                uiState = uiState.copy(errorMessage = validationError)
+                return
+            }
+            
             val newStep = uiState.currentStep + 1
-            uiState = uiState.copy(currentStep = newStep)
+            uiState = uiState.copy(currentStep = newStep, errorMessage = null)
             saveCurrentStep(newStep)
+        }
+    }
+    
+    /**
+     * Validates the current step before allowing navigation.
+     * @return Error message if validation fails, null if valid
+     */
+    private fun validateCurrentStep(): String? {
+        return when (uiState.currentStep) {
+            1 -> {
+                val nameValidation = ValidationUtils.validateName(uiState.fullName)
+                if (!nameValidation.isValid) return nameValidation.errorMessage
+                
+                if (uiState.gender.isEmpty()) {
+                    return "Please select your gender"
+                }
+                
+                if (uiState.primaryService.isEmpty()) {
+                    return "Please select a primary service"
+                }
+                
+                val emailValidation = ValidationUtils.validateEmail(uiState.email)
+                if (!emailValidation.isValid) return emailValidation.errorMessage
+                
+                null
+            }
+            2 -> {
+                if (uiState.selectedMainService == "Other Services") {
+                    if (uiState.otherService.isEmpty()) {
+                        return "Please specify your service"
+                    }
+                } else {
+                    if (uiState.selectedSubServices.isEmpty()) {
+                        return "Please select at least one sub-service"
+                    }
+                }
+                null
+            }
+            3 -> {
+                val addressValidation = ValidationUtils.validateAddress(
+                    uiState.state,
+                    uiState.city,
+                    uiState.address
+                )
+                if (!addressValidation.isValid) return addressValidation.errorMessage
+                
+                val pincodeValidation = ValidationUtils.validatePincode(uiState.locationPincode)
+                if (!pincodeValidation.isValid) return pincodeValidation.errorMessage
+                
+                val coordinateValidation = ValidationUtils.validateCoordinates(
+                    uiState.latitude,
+                    uiState.longitude
+                )
+                if (!coordinateValidation.isValid) return coordinateValidation.errorMessage
+                
+                val radiusValidation = ValidationUtils.validateServiceRadius(uiState.serviceRadius)
+                if (!radiusValidation.isValid) return radiusValidation.errorMessage
+                
+                null
+            }
+            4 -> {
+                if (!uiState.aadhaarFrontUploaded) {
+                    return "Please upload Aadhaar front side"
+                }
+                if (!uiState.aadhaarBackUploaded) {
+                    return "Please upload Aadhaar back side"
+                }
+                if (!uiState.profilePhotoUploaded) {
+                    return "Please upload profile photo"
+                }
+                null
+            }
+            else -> null
         }
     }
 
@@ -177,8 +262,14 @@ class OnboardingViewModel(
 
     // Step 1 functions
     fun updateFullName(name: String) {
-        uiState = uiState.copy(fullName = name)
-        saveStep1Data()
+        val validationResult = ValidationUtils.validateName(name)
+        uiState = uiState.copy(
+            fullName = name,
+            errorMessage = if (!validationResult.isValid) validationResult.errorMessage else null
+        )
+        if (validationResult.isValid || name.isEmpty()) {
+            saveStep1Data()
+        }
     }
 
     fun updateGender(gender: String) {
@@ -258,7 +349,12 @@ class OnboardingViewModel(
     }
 
     fun updateEmail(email: String) {
-        uiState = uiState.copy(email = email)
+        val validationResult = ValidationUtils.validateEmail(email)
+        uiState = uiState.copy(
+            email = email,
+            errorMessage = if (!validationResult.isValid) validationResult.errorMessage else null
+        )
+        // Email is optional, so save even if empty
         saveStep1Data()
     }
 
@@ -292,10 +388,14 @@ class OnboardingViewModel(
         } else {
             current.add(subService)
         }
-        val allSelected = current.size == uiState.availableSubServices.size
+        // Fix: Calculate isSelectAllChecked based on current selection and available services
+        val allSelected = current.size == uiState.availableSubServices.size && 
+                          uiState.availableSubServices.isNotEmpty() &&
+                          current.containsAll(uiState.availableSubServices.map { it.name })
         uiState = uiState.copy(
             selectedSubServices = current,
-            isSelectAllChecked = allSelected
+            isSelectAllChecked = allSelected,
+            errorMessage = null // Clear error when user makes selection
         )
         saveStep2Data()
     }
@@ -304,20 +404,27 @@ class OnboardingViewModel(
         if (uiState.isSelectAllChecked) {
             uiState = uiState.copy(
                 selectedSubServices = emptySet(),
-                isSelectAllChecked = false
+                isSelectAllChecked = false,
+                errorMessage = null
             )
         } else {
             val allSubServiceNames = uiState.availableSubServices.map { it.name }.toSet()
             uiState = uiState.copy(
                 selectedSubServices = allSubServiceNames,
-                isSelectAllChecked = true
+                isSelectAllChecked = true,
+                errorMessage = null
             )
         }
         saveStep2Data()
     }
 
     fun updateOtherService(service: String) {
-        uiState = uiState.copy(otherService = service)
+        uiState = uiState.copy(
+            otherService = service,
+            errorMessage = if (service.isEmpty() && uiState.selectedMainService == "Other Services") {
+                "Please specify your service"
+            } else null
+        )
         saveStep2Data()
     }
 
@@ -337,17 +444,26 @@ class OnboardingViewModel(
 
     // Step 3 functions
     fun updateCity(city: String) {
-        uiState = uiState.copy(city = city)
+        uiState = uiState.copy(
+            city = city,
+            errorMessage = null // Clear error when user types
+        )
         saveStep3Data()
     }
 
     fun updateState(state: String) {
-        uiState = uiState.copy(state = state)
+        uiState = uiState.copy(
+            state = state,
+            errorMessage = null // Clear error when user types
+        )
         saveStep3Data()
     }
 
     fun updateAddress(address: String) {
-        uiState = uiState.copy(address = address)
+        uiState = uiState.copy(
+            address = address,
+            errorMessage = null // Clear error when user types
+        )
         saveStep3Data()
     }
 
@@ -358,12 +474,24 @@ class OnboardingViewModel(
 
     fun updateLocationPincode(pincode: String) {
         val filtered = pincode.filter { it.isDigit() }.take(6)
-        uiState = uiState.copy(locationPincode = filtered)
+        val validationResult = ValidationUtils.validatePincode(filtered)
+        uiState = uiState.copy(
+            locationPincode = filtered,
+            errorMessage = if (filtered.isNotEmpty() && !validationResult.isValid) {
+                validationResult.errorMessage
+            } else null
+        )
         saveStep3Data()
     }
 
     fun updateServiceRadius(radius: Float) {
-        uiState = uiState.copy(serviceRadius = radius)
+        val validationResult = ValidationUtils.validateServiceRadius(radius)
+        uiState = uiState.copy(
+            serviceRadius = radius,
+            errorMessage = if (!validationResult.isValid) {
+                validationResult.errorMessage
+            } else null
+        )
         saveStep3Data()
     }
 
@@ -378,6 +506,12 @@ class OnboardingViewModel(
             try {
                 val locationResult = locationRepository.getCurrentLocationWithAddress()
                 locationResult.onSuccess { locationData ->
+                    // Validate coordinates after getting location
+                    val coordinateValidation = ValidationUtils.validateCoordinates(
+                        locationData.latitude,
+                        locationData.longitude
+                    )
+                    
                     uiState = uiState.copy(
                         isLocationLoading = false,
                         state = locationData.state,
@@ -386,7 +520,10 @@ class OnboardingViewModel(
                         fullAddress = locationData.fullAddress,
                         locationPincode = locationData.pincode,
                         latitude = locationData.latitude,
-                        longitude = locationData.longitude
+                        longitude = locationData.longitude,
+                        errorMessage = if (!coordinateValidation.isValid) {
+                            coordinateValidation.errorMessage
+                        } else null
                     )
                     saveStep3Data()
                 }.onFailure { exception ->
@@ -432,6 +569,13 @@ class OnboardingViewModel(
             return
         }
         
+        // Validate image before upload
+        val validationError = validateImage(imageUri)
+        if (validationError != null) {
+            uiState = uiState.copy(errorMessage = validationError)
+            return
+        }
+        
         uiState = uiState.copy(isUploading = true, uploadProgress = 0f, errorMessage = null)
         viewModelScope.launch {
             val result = storageRepository.uploadAadhaarDocument(
@@ -472,6 +616,13 @@ class OnboardingViewModel(
             return
         }
         
+        // Validate image before upload
+        val validationError = validateImage(imageUri)
+        if (validationError != null) {
+            uiState = uiState.copy(errorMessage = validationError)
+            return
+        }
+        
         uiState = uiState.copy(isUploading = true, uploadProgress = 0f, errorMessage = null)
         viewModelScope.launch {
             val result = storageRepository.uploadAadhaarDocument(
@@ -501,6 +652,125 @@ class OnboardingViewModel(
             }
         }
     }
+    
+    /**
+     * Deletes the front Aadhaar image and allows re-upload.
+     */
+    fun deleteAadhaarFront() {
+        uiState = uiState.copy(
+            aadhaarFrontUrl = "",
+            aadhaarFrontUploaded = false,
+            errorMessage = null
+        )
+        // Optionally delete from Firestore
+        viewModelScope.launch {
+            firestoreRepository.saveDocumentUrls(uid, "", uiState.aadhaarBackUrl)
+        }
+    }
+    
+    /**
+     * Deletes the back Aadhaar image and allows re-upload.
+     */
+    fun deleteAadhaarBack() {
+        uiState = uiState.copy(
+            aadhaarBackUrl = "",
+            aadhaarBackUploaded = false,
+            errorMessage = null
+        )
+        // Optionally delete from Firestore
+        viewModelScope.launch {
+            firestoreRepository.saveDocumentUrls(uid, uiState.aadhaarFrontUrl, "")
+        }
+    }
+    
+    /**
+     * Validates image before upload.
+     * Checks format and file size.
+     * @param imageUri The image URI to validate
+     * @return Error message if validation fails, null if valid
+     */
+    private fun validateImage(imageUri: Uri): String? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(imageUri)
+                ?: return "Cannot open image file. Please select a valid image."
+            
+            // Check file size (max 10MB before compression)
+            val fileSize = inputStream.available().toLong()
+            inputStream.close()
+            
+            if (fileSize > 10 * 1024 * 1024) { // 10MB
+                return "Image file is too large. Maximum size is 10MB. Please select a smaller image."
+            }
+            
+            // Check MIME type
+            val mimeType = context.contentResolver.getType(imageUri)
+            if (mimeType == null || !mimeType.startsWith("image/")) {
+                return "Please select a valid image file (JPG, PNG, etc.)"
+            }
+            
+            null // Valid
+        } catch (e: Exception) {
+            "Error validating image: ${e.message ?: "Unknown error"}"
+        }
+    }
+
+    fun uploadProfilePhoto(imageUri: Uri) {
+        // Verify user is authenticated
+        val currentUid = FirebaseProvider.auth.currentUser?.uid
+        if (currentUid == null || currentUid != uid) {
+            uiState = uiState.copy(
+                errorMessage = "User not authenticated. Please login again."
+            )
+            return
+        }
+        
+        // Validate image before upload
+        val validationError = validateImage(imageUri)
+        if (validationError != null) {
+            uiState = uiState.copy(errorMessage = validationError)
+            return
+        }
+        
+        uiState = uiState.copy(isUploading = true, uploadProgress = 0f, errorMessage = null)
+        viewModelScope.launch {
+            val result = storageRepository.uploadProfilePhoto(
+                uid = uid,
+                imageUri = imageUri,
+                onProgress = { progress ->
+                    uiState = uiState.copy(uploadProgress = progress.toFloat())
+                }
+            )
+            
+            result.onSuccess { url ->
+                uiState = uiState.copy(
+                    profilePhotoUrl = url,
+                    profilePhotoUploaded = true,
+                    isUploading = false,
+                    uploadProgress = 0f,
+                    errorMessage = null
+                )
+                saveDocumentUrls()
+            }.onFailure { exception ->
+                uiState = uiState.copy(
+                    isUploading = false,
+                    uploadProgress = 0f,
+                    errorMessage = exception.message ?: "Upload failed. Please try again."
+                )
+            }
+        }
+    }
+    
+    fun deleteProfilePhoto() {
+        uiState = uiState.copy(
+            profilePhotoUrl = "",
+            profilePhotoUploaded = false,
+            errorMessage = null
+        )
+        // Update Firestore
+        viewModelScope.launch {
+            firestoreRepository.updateProviderData(uid, mapOf("profilePhotoUrl" to ""))
+        }
+    }
 
     private fun saveDocumentUrls() {
         viewModelScope.launch {
@@ -509,27 +779,89 @@ class OnboardingViewModel(
                 uiState.aadhaarFrontUrl,
                 uiState.aadhaarBackUrl
             )
+            // Also save profile photo URL
+            firestoreRepository.updateProviderData(uid, mapOf("profilePhotoUrl" to uiState.profilePhotoUrl))
         }
     }
 
     // Step 5 functions
+    private var isSubmitting = false // Prevent multiple submissions
+    
     fun submitOnboarding() {
-        // Allow resubmission if rejected
-        if (uiState.onboardingStatus == "SUBMITTED" && uiState.approvalStatus != "REJECTED") return
-        
-        // VALIDATION: Ensure required fields for Cloud Functions are present
-        // Cloud Function dispatchJobToProviders requires location and services
-        val validationErrors = mutableListOf<String>()
-        
-        // Validate location (required for job dispatch)
-        if (uiState.latitude == null || uiState.longitude == null) {
-            validationErrors.add("Location is required. Please complete Step 3 and set your service location.")
+        // Prevent multiple submissions
+        if (isSubmitting || uiState.isLoading) {
+            return
         }
         
-        // Validate services (required for job dispatch)
-        val hasServices = uiState.primaryService.isNotEmpty() || uiState.selectedSubServices.isNotEmpty()
-        if (!hasServices) {
-            validationErrors.add("At least one service must be selected. Please complete Step 2 and select services.")
+        // Allow resubmission if rejected
+        if (uiState.onboardingStatus == "SUBMITTED" && uiState.approvalStatus != "REJECTED") {
+            return
+        }
+        
+        // VALIDATION: Comprehensive validation before submission
+        val validationErrors = mutableListOf<String>()
+        
+        // Step 1 validation
+        val nameValidation = ValidationUtils.validateName(uiState.fullName)
+        if (!nameValidation.isValid) {
+            validationErrors.add("Step 1: ${nameValidation.errorMessage}")
+        }
+        if (uiState.gender.isEmpty()) {
+            validationErrors.add("Step 1: Please select your gender")
+        }
+        if (uiState.primaryService.isEmpty()) {
+            validationErrors.add("Step 1: Please select a primary service")
+        }
+        val emailValidation = ValidationUtils.validateEmail(uiState.email)
+        if (!emailValidation.isValid) {
+            validationErrors.add("Step 1: ${emailValidation.errorMessage}")
+        }
+        
+        // Step 2 validation
+        if (uiState.selectedMainService == "Other Services") {
+            if (uiState.otherService.isEmpty()) {
+                validationErrors.add("Step 2: Please specify your service")
+            }
+        } else {
+            if (uiState.selectedSubServices.isEmpty()) {
+                validationErrors.add("Step 2: Please select at least one sub-service")
+            }
+        }
+        
+        // Step 3 validation
+        val addressValidation = ValidationUtils.validateAddress(
+            uiState.state,
+            uiState.city,
+            uiState.address
+        )
+        if (!addressValidation.isValid) {
+            validationErrors.add("Step 3: ${addressValidation.errorMessage}")
+        }
+        val pincodeValidation = ValidationUtils.validatePincode(uiState.locationPincode)
+        if (!pincodeValidation.isValid) {
+            validationErrors.add("Step 3: ${pincodeValidation.errorMessage}")
+        }
+        val coordinateValidation = ValidationUtils.validateCoordinates(
+            uiState.latitude,
+            uiState.longitude
+        )
+        if (!coordinateValidation.isValid) {
+            validationErrors.add("Step 3: ${coordinateValidation.errorMessage}")
+        }
+        val radiusValidation = ValidationUtils.validateServiceRadius(uiState.serviceRadius)
+        if (!radiusValidation.isValid) {
+            validationErrors.add("Step 3: ${radiusValidation.errorMessage}")
+        }
+        
+        // Step 4 validation
+        if (!uiState.aadhaarFrontUploaded) {
+            validationErrors.add("Step 4: Please upload Aadhaar front side")
+        }
+        if (!uiState.aadhaarBackUploaded) {
+            validationErrors.add("Step 4: Please upload Aadhaar back side")
+        }
+        if (!uiState.profilePhotoUploaded) {
+            validationErrors.add("Step 4: Please upload profile photo")
         }
         
         // If validation fails, show error and block submission
@@ -540,6 +872,8 @@ class OnboardingViewModel(
             return
         }
         
+        // Set submitting flag
+        isSubmitting = true
         uiState = uiState.copy(isLoading = true, errorMessage = null)
         viewModelScope.launch {
             // Reset approval status when resubmitting after rejection
@@ -560,13 +894,22 @@ class OnboardingViewModel(
                     onboardingStatus = "SUBMITTED",
                     approvalStatus = "PENDING"
                 )
+                isSubmitting = false // Reset flag on success
                 // Note: FCM notification "Your profile is under review" will be sent by backend
             }.onFailure { exception ->
                 uiState = uiState.copy(
                     isLoading = false,
                     errorMessage = exception.message ?: "Submission failed. Please try again."
                 )
+                isSubmitting = false // Reset flag on failure
             }
         }
+    }
+    
+    /**
+     * Resets the submission flag (called when user cancels confirmation dialog)
+     */
+    fun resetSubmissionFlag() {
+        isSubmitting = false
     }
 }

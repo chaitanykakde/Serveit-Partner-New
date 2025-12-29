@@ -3,6 +3,7 @@ package com.nextserve.serveitpartnernew.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nextserve.serveitpartnernew.data.model.Job
+import com.nextserve.serveitpartnernew.data.model.JobInboxEntry
 import com.nextserve.serveitpartnernew.data.repository.JobsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -176,6 +177,10 @@ class HomeViewModel(
                         highlightedJob = null,
                         acceptingJobId = null
                     )
+                    // Wait for Firestore to propagate the update
+                    delay(500)
+                    // Refresh ongoing jobs to pick up the newly accepted job
+                    refreshOngoingJobs()
                     onSuccess()
                 },
                 onFailure = { error ->
@@ -244,6 +249,16 @@ class HomeViewModel(
     fun refresh() {
         loadHomeData()
         loadTodayStats()
+    }
+
+    /**
+     * Manually refresh ongoing jobs
+     * Used after accepting a job to ensure it appears immediately
+     */
+    fun refreshOngoingJobs() {
+        // The ongoing jobs flow will automatically update via the listener
+        // This function can be used to trigger a manual refresh if needed
+        loadHomeData()
     }
 
     companion object {

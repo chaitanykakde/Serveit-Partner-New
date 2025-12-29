@@ -41,6 +41,7 @@ fun Step1BasicInfo(
     onEmailChange: (String) -> Unit,
     language: String = "en",
     onLanguageChange: (String) -> Unit = {},
+    errorMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -147,6 +148,19 @@ fun Step1BasicInfo(
             keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
             modifier = Modifier.fillMaxWidth()
         )
+        
+        // Error message display
+        if (errorMessage != null) {
+            Spacer(modifier = Modifier.height(Dimens.spacingSm))
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimens.paddingXs)
+            )
+        }
 
         Spacer(modifier = Modifier.height(Dimens.spacingXl))
     }

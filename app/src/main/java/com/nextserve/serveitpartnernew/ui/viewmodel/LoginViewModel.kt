@@ -81,7 +81,7 @@ class LoginViewModel(
             phoneNumber = cleaned,
             isPhoneNumberValid = isValid,
             errorMessage = if (cleaned.isNotEmpty() && !isValid) {
-                "Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9"
+                PhoneNumberFormatter.getPhoneNumberErrorMessage(cleaned)
             } else null
         )
     }
@@ -188,8 +188,17 @@ class LoginViewModel(
                         // FCM token save failure is not critical, continue anyway
                     }
                     
-                    uiState = uiState.copy(isSendingOtp = false)
-                    onAutoVerified?.invoke(uid)
+                    // Check if language is already set
+                    val languageCheck = firestoreRepository.getProviderData(uid)
+                    languageCheck.onSuccess { providerData ->
+                        val language = providerData?.language?.ifEmpty { null }
+                        uiState = uiState.copy(isSendingOtp = false)
+                        // Pass language info to callback so navigation can decide
+                        onAutoVerified?.invoke(uid)
+                    }.onFailure {
+                        uiState = uiState.copy(isSendingOtp = false)
+                        onAutoVerified?.invoke(uid)
+                    }
                 }.onFailure { exception ->
                     val friendlyError = ErrorMapper.getErrorMessage(exception)
                     uiState = uiState.copy(
