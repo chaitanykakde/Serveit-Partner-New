@@ -22,7 +22,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -39,6 +43,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nextserve.serveitpartnernew.R
+import com.nextserve.serveitpartnernew.ui.components.ErrorDisplay
+import com.nextserve.serveitpartnernew.ui.components.OfflineIndicator
 import com.nextserve.serveitpartnernew.ui.components.OTPInputField
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
 import com.nextserve.serveitpartnernew.ui.screen.otp.OtpComponents
@@ -47,44 +53,109 @@ import com.nextserve.serveitpartnernew.ui.util.Dimens
 import com.nextserve.serveitpartnernew.ui.viewmodel.OtpViewModel
 import com.nextserve.serveitpartnernew.utils.NetworkMonitor
 
+/**
+ * UI state for OTP screen to maintain compatibility.
+ */
+data class OtpUiState(
+    val otp: String = "",
+    val isOtpValid: Boolean = false,
+    val phoneNumber: String = "",
+    val verificationId: String? = null,
+    val resendToken: com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken? = null,
+    val timeRemaining: Int = 60,
+    val canResend: Boolean = false,
+    val isVerifying: Boolean = false,
+    val errorMessage: String? = null,
+    val retryCount: Int = 0,
+    val maxRetries: Int = 3,
+    val isOffline: Boolean = false
+)
+
 @Composable
 fun OtpScreen(
     phoneNumber: String,
     verificationId: String,
-    resendToken: com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken? = null,
-    onNavigateToOnboarding: (String) -> Unit,
-    onNavigateBack: () -> Unit,
-    viewModel: OtpViewModel = viewModel()
+    authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel,
+    onNavigateBack: () -> Unit
 ) {
-    val uiState = viewModel.uiState
+    val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? android.app.Activity
-    
-    val networkMonitor = remember { NetworkMonitor(context) }
+
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val isTablet = screenWidth >= 600.dp
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(phoneNumber, verificationId) {
-        viewModel.setPhoneNumber(phoneNumber)
-        viewModel.setActivity(activity) // Store activity for auto-submit
-        if (verificationId.isNotEmpty()) {
-            viewModel.setVerificationId(verificationId)
+    // Local OTP state
+    var localOtp by remember { mutableStateOf("") }
+
+    // Handle successful OTP verification navigation
+    LaunchedEffect(authState) {
+        when (authState) {
+            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Authenticated,
+            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Onboarding,
+            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.PendingApproval,
+            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Rejected,
+            com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Approved -> {
+                // OTP verification successful - navigation will be handled by MainActivity
+                // Just show success feedback here if needed
+            }
+            else -> {
+                // Handle other states
+            }
         }
-        if (resendToken != null) {
-            viewModel.setResendToken(resendToken)
-        }
-    }
-    
-    // Update activity reference when it changes
-    LaunchedEffect(activity) {
-        viewModel.setActivity(activity)
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.onVerificationSuccess = { uid ->
-            onNavigateToOnboarding(uid)
+    // Create OtpUiState from AuthState for compatibility
+    val uiState = remember(authState, localOtp) {
+        val isOtpValid = localOtp.length == 6 && localOtp.all { it.isDigit() }
+        when (authState) {
+            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.OtpSent -> OtpUiState(
+                otp = localOtp,
+                isOtpValid = isOtpValid,
+                phoneNumber = phoneNumber,
+                verificationId = verificationId,
+                timeRemaining = authViewModel.getResendCooldownSeconds(),
+                canResend = authViewModel.canResendOtp()
+            )
+            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Loading -> OtpUiState(
+                otp = localOtp,
+                isOtpValid = isOtpValid,
+                phoneNumber = phoneNumber,
+                verificationId = verificationId,
+                isVerifying = true,
+                timeRemaining = authViewModel.getResendCooldownSeconds(),
+                canResend = authViewModel.canResendOtp()
+            )
+            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Error -> {
+                val errorState = authState as com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Error
+                OtpUiState(
+                    otp = localOtp,
+                    isOtpValid = isOtpValid,
+                    phoneNumber = phoneNumber,
+                    verificationId = verificationId,
+                    errorMessage = errorState.message,
+                    timeRemaining = authViewModel.getResendCooldownSeconds(),
+                    canResend = authViewModel.canResendOtp()
+                )
+            }
+            else -> OtpUiState(
+                otp = localOtp,
+                isOtpValid = isOtpValid,
+                phoneNumber = phoneNumber,
+                verificationId = verificationId,
+                timeRemaining = authViewModel.getResendCooldownSeconds(),
+                canResend = authViewModel.canResendOtp()
+            )
+        }
+    }
+
+    // Auto-submit when 6 digits are entered
+    LaunchedEffect(localOtp) {
+        if (localOtp.length == 6 && localOtp.all { it.isDigit() } &&
+            authState !is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Loading) {
+            authViewModel.verifyOtp(localOtp)
         }
     }
 
@@ -127,6 +198,13 @@ fun OtpScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(if (isTablet) 60.dp else 48.dp))
+
+            // Offline indicator (show when offline)
+            val offlineCheckState = authState
+            if (offlineCheckState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Error &&
+                offlineCheckState.message.contains("internet", ignoreCase = true)) {
+                OfflineIndicator(modifier = Modifier.padding(bottom = 16.dp))
+            }
 
             // Logo
             OtpComponents.ServeitLogo()
@@ -190,14 +268,32 @@ fun OtpScreen(
             OTPInputField(
                 otpLength = 6,
                 onOtpChange = { otp ->
-                    viewModel.updateOtp(otp)
+                    localOtp = otp
+                    // Auto-submit when OTP is complete (6 digits)
+                    if (otp.length == 6 && otp.all { it.isDigit() } && !uiState.isVerifying) {
+                        authViewModel.verifyOtp(otp)
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(Dimens.spacingXl))
 
-            // Error message
+            // Error display for AuthState errors
+            val errorDisplayState = authState
+            if (errorDisplayState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Error) {
+                ErrorDisplay(
+                    error = com.nextserve.serveitpartnernew.ui.viewmodel.UiError(
+                        message = errorDisplayState.message,
+                        canRetry = errorDisplayState.canRetry
+                    ),
+                    onRetry = { authViewModel.clearError() },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(Dimens.spacingSm))
+            }
+
+            // Legacy error message display (for compatibility)
             if (uiState.errorMessage != null) {
                 Text(
                     text = uiState.errorMessage!!,
@@ -228,11 +324,12 @@ fun OtpScreen(
             PrimaryButton(
                 text = if (uiState.isVerifying) stringResource(R.string.verifying) else stringResource(R.string.verify),
                 onClick = {
-                    if (uiState.isOtpValid && !uiState.isVerifying) {
-                        viewModel.verifyOtp(activity)
+                    // Allow manual verification even if not 6 digits (for testing)
+                    if (localOtp.isNotEmpty() && localOtp.all { it.isDigit() } && !uiState.isVerifying) {
+                        authViewModel.verifyOtp(localOtp)
                     }
                 },
-                enabled = uiState.isOtpValid && !uiState.isVerifying,
+                enabled = localOtp.isNotEmpty() && localOtp.all { it.isDigit() } && !uiState.isVerifying,
                 isLoading = uiState.isVerifying,
                 modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
@@ -262,7 +359,7 @@ fun OtpScreen(
                 
                 if (uiState.canResend) {
                     TextButton(
-                        onClick = { viewModel.resendOtp(activity) },
+                        onClick = { authViewModel.resendOtp(activity) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(

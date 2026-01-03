@@ -306,7 +306,8 @@ object ProviderFirestoreMapper {
 
         // Extract nested verificationDetails and convert to approvalStatus string
         val verificationDetails = data["verificationDetails"] as? Map<*, *>
-        val isVerified = verificationDetails?.get("verified") as? Boolean ?: false
+        // Check root level isVerified first (Cloud Functions primary), then nested
+        val isVerified = (data["isVerified"] as? Boolean) ?: (verificationDetails?.get("verified") as? Boolean) ?: false
         val isRejected = verificationDetails?.get("rejected") as? Boolean ?: false
         val rejectionReason = verificationDetails?.get("rejectionReason") as? String
         
@@ -316,6 +317,9 @@ object ProviderFirestoreMapper {
             isRejected -> "REJECTED"
             else -> "PENDING"
         }
+        
+        // Extract isOnline from root level (Cloud Functions requirement)
+        val isOnline = data["isOnline"] as? Boolean ?: false
 
         return ProviderData(
             uid = uid,
@@ -350,7 +354,9 @@ object ProviderFirestoreMapper {
             reviewedBy = data["reviewedBy"] as? String,
             fcmToken = data["fcmToken"] as? String ?: "",
             language = data["language"] as? String ?: "en",
-            profilePhotoUrl = data["profilePhotoUrl"] as? String ?: ""
+            profilePhotoUrl = data["profilePhotoUrl"] as? String ?: "",
+            isVerified = isVerified,
+            isOnline = isOnline
         )
     }
 }

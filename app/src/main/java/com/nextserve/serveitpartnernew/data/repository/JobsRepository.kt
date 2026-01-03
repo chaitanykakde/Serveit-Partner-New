@@ -10,6 +10,8 @@ import kotlinx.coroutines.tasks.await
 import com.nextserve.serveitpartnernew.data.model.Job
 import com.nextserve.serveitpartnernew.data.model.JobCoordinates
 import com.nextserve.serveitpartnernew.data.model.JobInboxEntry
+import android.content.Context
+import android.content.SharedPreferences
 
 /**
  * Repository for managing jobs/bookings from Firestore
@@ -17,8 +19,12 @@ import com.nextserve.serveitpartnernew.data.model.JobInboxEntry
  */
 class JobsRepository(
     private val firestore: FirebaseFirestore,
-    private val functions: FirebaseFunctions
+    private val functions: FirebaseFunctions,
+    private val context: Context? = null
 ) {
+    private val prefs: SharedPreferences? = context?.getSharedPreferences("jobs_cache", Context.MODE_PRIVATE)
+    private val CACHE_KEY_LAST_JOBS = "last_jobs_cache"
+    private val CACHE_KEY_LAST_UPDATE = "last_update_time"
     private val bookingsCollection = firestore.collection("Bookings")
 
     /**
@@ -441,6 +447,9 @@ class JobsRepository(
             ?: (bookingData["duration"] as? Number)?.toInt()
             ?: (bookingData["estimatedTime"] as? Number)?.toInt()
 
+        // Extract expiresAt (if available from inbox entry)
+        val expiresAt = bookingData["expiresAt"] as? Timestamp
+
         return Job(
             bookingId = bookingId,
             serviceName = serviceName,
@@ -464,7 +473,8 @@ class JobsRepository(
             customerAddress = customerAddress,
             notes = notes,
             customerEmail = customerEmail,
-            estimatedDuration = estimatedDuration
+            estimatedDuration = estimatedDuration,
+            expiresAt = expiresAt
         )
     }
 

@@ -27,25 +27,9 @@ import com.nextserve.serveitpartnernew.ui.util.Dimens
 import kotlinx.coroutines.delay
 
 @Composable
-fun SplashScreen(
-    onNavigateToWelcome: () -> Unit,
-    onNavigateToLogin: () -> Unit
-) {
-    val context = LocalContext.current
-    
-    LaunchedEffect(Unit) {
-        delay(2000) // Show splash for 2 seconds
-        
-        // Check if user has seen welcome screen
-        val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
-        val hasSeenWelcome = prefs.getBoolean("has_seen_welcome", false)
-        
-        if (hasSeenWelcome) {
-            onNavigateToLogin()
-        } else {
-            onNavigateToWelcome()
-        }
-    }
+fun SplashScreen() {
+    // Splash screen just shows loading - navigation is handled by MainActivity based on auth state
+    // No LaunchedEffect with navigation logic here
     
     Box(
         modifier = Modifier

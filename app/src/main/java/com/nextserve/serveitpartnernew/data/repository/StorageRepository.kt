@@ -28,7 +28,7 @@ class StorageRepository(
             val compressedBitmap = compressImage(imageUri)
             val byteArray = bitmapToByteArray(compressedBitmap)
             
-            val path = "providers/$uid/documents/aadhaar_$documentType.jpg"
+            val path = "partners/$uid/documents/aadhaar_$documentType.jpg"
             val storageRef = storage.reference.child(path)
             
             // Set metadata for better security
@@ -75,13 +75,26 @@ class StorageRepository(
     }
 
     private suspend fun compressImage(uri: Uri): Bitmap {
-        // Load image
+        // Load image with memory optimization
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+
+        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            BitmapFactory.decodeStream(inputStream, null, options)
+        } ?: throw Exception("Cannot open image file")
+
+        // Calculate optimal sample size for memory efficiency
+        options.inSampleSize = calculateInSampleSize(options, 1920, 1920)
+        options.inJustDecodeBounds = false
+        options.inPreferredConfig = Bitmap.Config.RGB_565 // Use less memory than ARGB_8888
+
         val inputStream = context.contentResolver.openInputStream(uri)
             ?: throw Exception("Cannot open image file")
-        
-        val originalBitmap = BitmapFactory.decodeStream(inputStream)
+
+        val originalBitmap = BitmapFactory.decodeStream(inputStream, null, options)
             ?: throw Exception("Cannot decode image")
-        
+
         inputStream.close()
 
         // Resize if too large (max 1920x1920)
@@ -115,6 +128,26 @@ class StorageRepository(
         return scaledBitmap
     }
 
+    /**
+     * Calculate optimal inSampleSize for BitmapFactory to reduce memory usage
+     */
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight = height / 2
+            val halfWidth = width / 2
+
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+
+        return inSampleSize
+    }
+
     private fun bitmapToByteArray(bitmap: Bitmap): ByteArray {
         val outputStream = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
@@ -128,7 +161,7 @@ class StorageRepository(
         onProgress: (Double) -> Unit
     ): Result<String> {
         return try {
-            val path = "providers/$uid/documents/aadhaar_$documentType.jpg"
+            val path = "partners/$uid/documents/aadhaar_$documentType.jpg"
             val storageRef = storage.reference.child(path)
             
             val uploadTask = storageRef.putFile(Uri.fromFile(file))
@@ -160,7 +193,7 @@ class StorageRepository(
             val compressedBitmap = compressImage(imageUri)
             val byteArray = bitmapToByteArray(compressedBitmap)
             
-            val path = "providers/$uid/documents/profile_photo.jpg"
+            val path = "partners/$uid/documents/profile_photo.jpg"
             val storageRef = storage.reference.child(path)
             
             val metadata = com.google.firebase.storage.StorageMetadata.Builder()

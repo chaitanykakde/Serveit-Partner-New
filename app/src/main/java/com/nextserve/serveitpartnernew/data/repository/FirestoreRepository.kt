@@ -26,7 +26,8 @@ class FirestoreRepository(
                 Result.success(null)
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)
+            Result.failure(Exception("Failed to load profile data. Please check your connection and try again."))
         }
     }
 
@@ -58,7 +59,8 @@ class FirestoreRepository(
             
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)
+            Result.failure(Exception("Failed to load profile data. Please check your connection and try again."))
         }
     }
 
@@ -69,7 +71,24 @@ class FirestoreRepository(
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)
+            Result.failure(Exception("Failed to load profile data. Please check your connection and try again."))
+        }
+    }
+
+    /**
+     * Update provider's online status
+     * Required by Cloud Functions for job dispatch
+     */
+    suspend fun updateOnlineStatus(uid: String, isOnline: Boolean): Result<Unit> {
+        return try {
+            partnersCollection.document(uid)
+                .update("isOnline", isOnline)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)
+            Result.failure(Exception("Failed to load profile data. Please check your connection and try again."))
         }
     }
 
@@ -82,7 +101,8 @@ class FirestoreRepository(
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)
+            Result.failure(Exception("Failed to load profile data. Please check your connection and try again."))
         }
     }
 
@@ -101,7 +121,8 @@ class FirestoreRepository(
             
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)
+            Result.failure(Exception("Failed to load profile data. Please check your connection and try again."))
         }
     }
 
@@ -117,7 +138,8 @@ class FirestoreRepository(
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)
+            Result.failure(Exception("Failed to load profile data. Please check your connection and try again."))
         }
     }
 
@@ -139,7 +161,8 @@ class FirestoreRepository(
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)
+            Result.failure(Exception("Failed to load profile data. Please check your connection and try again."))
         }
     }
 
@@ -164,7 +187,8 @@ class FirestoreRepository(
             // The notification will be received via ServeitFirebaseMessagingService
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)
+            Result.failure(Exception("Failed to load profile data. Please check your connection and try again."))
         }
     }
 
@@ -194,7 +218,8 @@ class FirestoreRepository(
 
             Result.success(services)
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FirestoreRepository", "Failed to get main services for gender: $gender", e)
+            Result.failure(Exception("Failed to load services. Please check your connection and try again."))
         }
     }
 
@@ -251,7 +276,8 @@ class FirestoreRepository(
 
             Result.success(subServicesList)
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FirestoreRepository", "Failed to get sub services for mainService: $mainServiceName", e)
+            Result.failure(Exception("Failed to load sub-services. Please check your connection and try again."))
         }
     }
 }

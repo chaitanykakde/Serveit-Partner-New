@@ -26,7 +26,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,8 +48,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nextserve.serveitpartnernew.R
+import com.nextserve.serveitpartnernew.ui.components.ErrorDisplay
+import com.nextserve.serveitpartnernew.ui.components.OfflineIndicator
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
 import com.nextserve.serveitpartnernew.ui.screen.login.LoginComponents
 import com.nextserve.serveitpartnernew.ui.theme.OrangeAccent
@@ -55,37 +60,67 @@ import com.nextserve.serveitpartnernew.ui.util.Dimens
 import com.nextserve.serveitpartnernew.ui.viewmodel.LoginViewModel
 import com.nextserve.serveitpartnernew.utils.NetworkMonitor
 
+/**
+ * UI state for Login screen to maintain compatibility with existing UI.
+ */
+data class LoginUiState(
+    val phoneNumber: String = "",
+    val isPhoneNumberValid: Boolean = false,
+    val errorMessage: String? = null,
+    val isSendingOtp: Boolean = false,
+    val verificationId: String? = null,
+    val resendToken: com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken? = null,
+    val isOffline: Boolean = false
+)
+
 @Composable
 fun LoginScreen(
-    onNavigateToOtp: (String, String, com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken?) -> Unit,
-    onNavigateToOnboarding: (String) -> Unit,
-    viewModel: LoginViewModel = viewModel()
+    authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel
 ) {
-    val uiState = viewModel.uiState
+    val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? android.app.Activity
-    
-    val networkMonitor = remember { NetworkMonitor(context) }
+
     val focusRequester = remember { FocusRequester() }
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val isTablet = screenWidth >= 600.dp
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
+    // Local phone number state for immediate UI updates
+    var phoneNumber by remember { mutableStateOf(authViewModel.getCurrentPhoneNumber()) }
+    var isSendingOtp by remember { mutableStateOf(false) }
+
+    // Derive error and loading states from authState
+    val errorMessage = remember(authState) {
+        when (val currentState = authState) {
+            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Error -> currentState.message
+            else -> null
+        }
+    }
+
+    val isLoading = remember(authState) {
+        authState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Loading
+    }
+
+    // Update local state when auth state changes
+    LaunchedEffect(authState) {
+        when (authState) {
+            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Loading -> {
+                isSendingOtp = true
+            }
+            else -> {
+                isSendingOtp = false
+            }
+        }
+    }
+
+    val isPhoneNumberValid = remember(phoneNumber) {
+        com.nextserve.serveitpartnernew.utils.PhoneNumberFormatter.isValidIndianPhoneNumber(phoneNumber)
     }
 
     LaunchedEffect(Unit) {
-        viewModel.onOtpSent = { phoneNumber, verificationId, resendToken ->
-            onNavigateToOtp(phoneNumber, verificationId, resendToken)
-        }
-        viewModel.onAutoVerified = { uid ->
-            onNavigateToOnboarding(uid)
-        }
-        viewModel.onError = { error ->
-            // Error shown in UI state
-        }
+        focusRequester.requestFocus()
     }
 
     // Background with image and gradient overlay
@@ -128,6 +163,13 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.height(if (isTablet) 60.dp else 48.dp))
 
+            // Offline indicator (show when offline)
+            val offlineCheckState = authState
+            if (offlineCheckState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Error &&
+                offlineCheckState.message.contains("internet", ignoreCase = true)) {
+                OfflineIndicator(modifier = Modifier.padding(bottom = 16.dp))
+            }
+
             // Logo
             LoginComponents.ServeitLogo()
 
@@ -159,15 +201,16 @@ fun LoginScreen(
 
             // Phone Number Input with +91 prefix
             LoginComponents.PhoneNumberInput(
-                phoneNumber = uiState.phoneNumber,
+                phoneNumber = phoneNumber,
                 onPhoneNumberChange = { newValue ->
-                    viewModel.updatePhoneNumber(newValue)
-                    if (uiState.errorMessage != null) {
-                        viewModel.clearError()
+                    phoneNumber = newValue.filter { it.isDigit() }.take(10) // Only allow digits, max 10
+                    authViewModel.updatePhoneNumber(newValue)
+                    if (authState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Error) {
+                        authViewModel.clearError()
                     }
                 },
-                isError = uiState.errorMessage != null,
-                errorMessage = uiState.errorMessage,
+                isError = errorMessage != null,
+                errorMessage = errorMessage,
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester)
@@ -177,14 +220,14 @@ fun LoginScreen(
 
             // Send OTP Button
             PrimaryButton(
-                text = if (uiState.isSendingOtp) stringResource(R.string.sending) else stringResource(R.string.send_otp),
+                text = if (isSendingOtp) stringResource(R.string.sending) else stringResource(R.string.send_otp),
                 onClick = {
-                    if (uiState.isPhoneNumberValid && !uiState.isSendingOtp) {
-                        viewModel.sendOtp(activity)
+                    if (isPhoneNumberValid && !isSendingOtp) {
+                        authViewModel.sendOtp(activity)
                     }
                 },
-                enabled = uiState.isPhoneNumberValid && !uiState.isSendingOtp,
-                isLoading = uiState.isSendingOtp,
+                enabled = isPhoneNumberValid && !isSendingOtp,
+                isLoading = isSendingOtp,
                 modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
                     androidx.compose.material3.Icon(
@@ -207,17 +250,16 @@ fun LoginScreen(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            // Error message
-            if (uiState.errorMessage != null) {
+            // Error display for AuthState errors
+            if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(Dimens.spacingSm))
-                Text(
-                    text = uiState.errorMessage!!,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Dimens.paddingXs),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                ErrorDisplay(
+                    error = com.nextserve.serveitpartnernew.ui.viewmodel.UiError(
+                        message = errorMessage,
+                        canRetry = true
+                    ),
+                    onRetry = { authViewModel.clearError() },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 

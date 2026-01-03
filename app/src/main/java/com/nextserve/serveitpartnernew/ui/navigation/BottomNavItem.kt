@@ -29,14 +29,20 @@ sealed class BottomNavItem(
         titleResId = com.nextserve.serveitpartnernew.R.string.nav_earnings,
         icon = Icons.Default.Star
     )
-    
+
+    object Payouts : BottomNavItem(
+        route = "payouts",
+        titleResId = com.nextserve.serveitpartnernew.R.string.nav_payouts,
+        icon = Icons.Default.Star
+    )
+
     object Profile : BottomNavItem(
         route = "profile",
         titleResId = com.nextserve.serveitpartnernew.R.string.nav_profile,
         icon = Icons.Default.Person
     )
-    
+
     companion object {
-        val items = listOf(Home, Jobs, Earnings, Profile)
+        val items = listOf(Home, Jobs, Earnings, Payouts, Profile)
     }
 }

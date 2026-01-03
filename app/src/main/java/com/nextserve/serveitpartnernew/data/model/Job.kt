@@ -35,8 +35,10 @@ data class Job(
     val locationName: String? = null, // Location name/city for display
     val customerAddress: String? = null, // Full customer address
     val notes: String? = null, // Special instructions or notes
+    val priority: String? = null, // "high", "medium", "low" - for job prioritization
     val customerEmail: String? = null, // Customer email (if available)
-    val estimatedDuration: Int? = null // Estimated service duration in minutes
+    val estimatedDuration: Int? = null, // Estimated service duration in minutes
+    val expiresAt: Timestamp? = null // Job expiry timestamp (30 min from creation)
 ) {
     /**
      * Check if job is available (pending and provider was notified)
@@ -61,6 +63,27 @@ data class Job(
      */
     fun isCompleted(providerId: String): Boolean {
         return this.providerId == providerId && status == "completed"
+    }
+
+    /**
+     * Check if job has expired (for pending jobs)
+     */
+    fun isExpired(): Boolean {
+        if (status != "pending") return false
+        expiresAt?.let { expiry ->
+            return expiry.compareTo(com.google.firebase.Timestamp.now()) <= 0
+        }
+        return false
+    }
+
+    /**
+     * Get time remaining until expiry in minutes
+     */
+    fun getTimeRemainingMinutes(): Int? {
+        if (status != "pending" || expiresAt == null) return null
+        val now = com.google.firebase.Timestamp.now()
+        val diff = expiresAt.toDate().time - now.toDate().time
+        return if (diff > 0) (diff / (1000 * 60)).toInt() else 0
     }
 
     /**

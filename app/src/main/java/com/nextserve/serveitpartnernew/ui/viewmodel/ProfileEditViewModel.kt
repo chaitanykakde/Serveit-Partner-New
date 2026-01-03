@@ -8,12 +8,13 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.location.LocationServices
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
+import com.nextserve.serveitpartnernew.data.model.LocationData
 import com.nextserve.serveitpartnernew.data.model.MainServiceModel
 import com.nextserve.serveitpartnernew.data.model.ProviderData
 import com.nextserve.serveitpartnernew.data.model.SubServiceModel
 import com.nextserve.serveitpartnernew.data.repository.FirestoreRepository
-import com.nextserve.serveitpartnernew.data.repository.LocationData
 import com.nextserve.serveitpartnernew.data.repository.LocationRepository
 import com.nextserve.serveitpartnernew.data.repository.StorageRepository
 import kotlinx.coroutines.launch
@@ -273,9 +274,30 @@ class ProfileEditViewModel(
 
     fun useCurrentLocation(onResult: (Result<LocationData>) -> Unit) {
         viewModelScope.launch {
-            val result = locationRepository.getCurrentLocationWithAddress()
-            result.onSuccess { onResult(Result.success(it)) }
-                .onFailure { onResult(Result.failure(it)) }
+            val locationResult = locationRepository.getCurrentLocation()
+            locationResult.onSuccess { location ->
+                val addressResult = locationRepository.getAddressFromLocation(
+                    location.latitude,
+                    location.longitude
+                )
+                addressResult.onSuccess { address ->
+                    val locationData = LocationData(
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                        fullAddress = address
+                    )
+                    onResult(Result.success(locationData))
+                }.onFailure { exception ->
+                    // If address lookup fails, return location data without address
+                    val locationData = LocationData(
+                        latitude = location.latitude,
+                        longitude = location.longitude
+                    )
+                    onResult(Result.success(locationData))
+                }
+            }.onFailure { exception ->
+                onResult(Result.failure(exception))
+            }
         }
     }
 
@@ -305,7 +327,7 @@ class ProfileEditViewModel(
                     if (modelClass.isAssignableFrom(ProfileEditViewModel::class.java)) {
                         val firestoreRepo = FirestoreRepository(FirebaseProvider.firestore)
                         val storageRepo = StorageRepository(FirebaseProvider.storage, context.applicationContext)
-                        val locationRepo = LocationRepository(context.applicationContext)
+                        val locationRepo = LocationRepository(context.applicationContext, LocationServices.getFusedLocationProviderClient(context.applicationContext))
                         @Suppress("UNCHECKED_CAST")
                         return ProfileEditViewModel(uid, firestoreRepo, storageRepo, locationRepo) as T
                     }

@@ -17,12 +17,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import com.nextserve.serveitpartnernew.utils.NetworkMonitor
+import java.util.Date
 
 /**
  * UI State for Jobs Fragment
  */
 data class JobsUiState(
     val newJobs: List<Job> = emptyList(),
+    val filteredJobs: List<Job> = emptyList(), // Filtered and sorted jobs for display
     val inboxEntries: List<JobInboxEntry> = emptyList(), // Inbox entries for job discovery
     val completedJobs: List<Job> = emptyList(),
     val isLoadingNewJobs: Boolean = false,
@@ -34,7 +36,15 @@ data class JobsUiState(
     val acceptingJobId: String? = null, // Track which job is being accepted
     val hasMoreHistory: Boolean = true, // Pagination flag
     val isOffline: Boolean = false, // Network connectivity status
-    val useInbox: Boolean = true // Flag to use inbox for job discovery (new optimized method)
+    val useInbox: Boolean = false, // Flag to use inbox for job discovery (new optimized method) - DISABLED UNTIL INBOX IS POPULATED
+    // Filter and sort state
+    val selectedServiceFilter: String? = null, // Filter by service type
+    val maxDistanceFilter: Double? = null, // Filter by maximum distance in km
+    val minPriceFilter: Double? = null, // Filter by minimum price
+    val maxPriceFilter: Double? = null, // Filter by maximum price
+    val sortBy: String = "distance", // "distance", "price", "time" (newest first)
+    val searchQuery: String = "", // Search by service name, location, or booking ID
+    val acceptanceRate: Double? = null // Provider's job acceptance rate percentage
 )
 
 /**
@@ -48,6 +58,9 @@ class JobsViewModel(
 
     private val _uiState = MutableStateFlow(JobsUiState())
     val uiState: StateFlow<JobsUiState> = _uiState.asStateFlow()
+
+    private var totalJobsOffered = 0
+    private var totalJobsAccepted = 0
 
     private var lastHistoryDocument: com.google.firebase.firestore.DocumentSnapshot? = null
 
@@ -106,9 +119,17 @@ class JobsViewModel(
                             customerPhoneNumber = entry.customerPhone,
                             distance = entry.distanceKm,
                             locationName = null, // Will be fetched from full details
-                            createdAt = entry.createdAt
+                            createdAt = entry.createdAt,
+                            expiresAt = entry.expiresAt, // Include expiry for UI display
+                            // Add priority based on service type or urgency
+                            notes = if (entry.serviceName.contains("Emergency", ignoreCase = true) ||
+                                       entry.serviceName.contains("Urgent", ignoreCase = true))
+                                "High Priority" else null
                         )
                     }
+
+                    // Update acceptance rate calculation
+                    totalJobsOffered += jobs.size
                     
                     _uiState.value = _uiState.value.copy(
                         newJobs = jobs,
@@ -116,6 +137,7 @@ class JobsViewModel(
                         isLoadingNewJobs = false,
                         errorMessage = null
                     )
+                    applyFiltersAndSort()
                 }
                 .launchIn(viewModelScope)
         } else {
@@ -138,6 +160,7 @@ class JobsViewModel(
                         isLoadingNewJobs = false,
                         errorMessage = null
                     )
+                    applyFiltersAndSort()
                 }
                 .launchIn(viewModelScope)
         }
@@ -188,9 +211,16 @@ class JobsViewModel(
                     )
                 },
                 onFailure = { error ->
+                    android.util.Log.e("JobsViewModel", "Failed to load job history", error)
                     _uiState.value = _uiState.value.copy(
                         isLoadingHistory = false,
-                        errorMessage = error.message ?: "Failed to load history"
+                        errorMessage = when {
+                            error.message?.contains("network", ignoreCase = true) == true ->
+                                "Network connection failed. Please check your internet connection and try again."
+                            error.message?.contains("permission", ignoreCase = true) == true ->
+                                "Permission denied. Please check your permissions and try again."
+                            else -> "Unable to load job history. Please try again later."
+                        }
                     )
                 }
             )
@@ -248,6 +278,8 @@ class JobsViewModel(
      * Accept a job
      */
     fun acceptJob(job: Job, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        totalJobsAccepted += 1 // Track accepted jobs for rate calculation
+        updateAcceptanceRate()
         if (_uiState.value.hasOngoingJob) {
             onError("Complete ongoing job to accept new requests")
             return
@@ -322,6 +354,139 @@ class JobsViewModel(
      */
     fun refreshOngoingJobStatus() {
         checkOngoingJob()
+    }
+
+    /**
+     * Apply filters and sorting to new jobs
+     */
+    private fun applyFiltersAndSort() {
+        var filtered = _uiState.value.newJobs
+
+        // Apply service filter
+        _uiState.value.selectedServiceFilter?.let { service ->
+            if (service.isNotEmpty()) {
+                filtered = filtered.filter { 
+                    it.serviceName.contains(service, ignoreCase = true) 
+                }
+            }
+        }
+
+        // Apply distance filter
+        _uiState.value.maxDistanceFilter?.let { maxDistance ->
+            filtered = filtered.filter { 
+                it.distance == null || it.distance <= maxDistance 
+            }
+        }
+
+        // Apply price filters
+        _uiState.value.minPriceFilter?.let { minPrice ->
+            filtered = filtered.filter { it.totalPrice >= minPrice }
+        }
+        _uiState.value.maxPriceFilter?.let { maxPrice ->
+            filtered = filtered.filter { it.totalPrice <= maxPrice }
+        }
+
+        // Apply search query
+        if (_uiState.value.searchQuery.isNotEmpty()) {
+            val query = _uiState.value.searchQuery.lowercase()
+            filtered = filtered.filter { job ->
+                job.serviceName.lowercase().contains(query) ||
+                job.locationName?.lowercase()?.contains(query) == true ||
+                job.bookingId.lowercase().contains(query) ||
+                job.userName.lowercase().contains(query)
+            }
+        }
+
+        // Apply sorting
+        filtered = when (_uiState.value.sortBy) {
+            "distance" -> filtered.sortedBy { it.distance ?: Double.MAX_VALUE }
+            "price" -> filtered.sortedByDescending { it.totalPrice }
+            "time" -> filtered.sortedByDescending { it.createdAt?.toDate() ?: Date(0) }
+            else -> filtered
+        }
+
+        _uiState.value = _uiState.value.copy(filteredJobs = filtered)
+    }
+
+    /**
+     * Set service filter
+     */
+    fun setServiceFilter(service: String?) {
+        _uiState.value = _uiState.value.copy(selectedServiceFilter = service)
+        applyFiltersAndSort()
+    }
+
+    /**
+     * Set distance filter
+     */
+    fun setDistanceFilter(maxDistance: Double?) {
+        _uiState.value = _uiState.value.copy(maxDistanceFilter = maxDistance)
+        applyFiltersAndSort()
+    }
+
+    /**
+     * Set price filter
+     */
+    fun setPriceFilter(minPrice: Double?, maxPrice: Double?) {
+        _uiState.value = _uiState.value.copy(
+            minPriceFilter = minPrice,
+            maxPriceFilter = maxPrice
+        )
+        applyFiltersAndSort()
+    }
+
+    /**
+     * Set sort option
+     */
+    fun setSortBy(sortBy: String) {
+        _uiState.value = _uiState.value.copy(sortBy = sortBy)
+        applyFiltersAndSort()
+    }
+
+    /**
+     * Set search query
+     */
+    fun setSearchQuery(query: String) {
+        // Sanitize input - trim whitespace and limit length
+        val sanitizedQuery = query.trim().take(100) // Limit to 100 characters for security
+        _uiState.value = _uiState.value.copy(searchQuery = sanitizedQuery)
+        applyFiltersAndSort()
+    }
+
+    /**
+     * Clear all filters
+     */
+    fun clearFilters() {
+        _uiState.value = _uiState.value.copy(
+            selectedServiceFilter = null,
+            maxDistanceFilter = null,
+            minPriceFilter = null,
+            maxPriceFilter = null,
+            searchQuery = "",
+            sortBy = "distance"
+        )
+        applyFiltersAndSort()
+    }
+
+    /**
+     * Calculate and update acceptance rate
+     */
+    private fun updateAcceptanceRate() {
+        val rate = if (totalJobsOffered > 0) {
+            (totalJobsAccepted.toDouble() / totalJobsOffered.toDouble()) * 100.0
+        } else {
+            null
+        }
+        _uiState.value = _uiState.value.copy(acceptanceRate = rate)
+    }
+
+    /**
+     * Reject job with reason tracking
+     */
+    fun rejectJobWithReason(job: Job, reason: String) {
+        // Store rejection reason (could be saved to Firestore in future)
+        rejectJob(job)
+        // TODO: Track rejection reasons for analytics
     }
 
     companion object {

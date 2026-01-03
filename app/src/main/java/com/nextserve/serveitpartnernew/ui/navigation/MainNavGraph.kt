@@ -5,7 +5,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.nextserve.serveitpartnernew.ui.screen.main.EarningsScreen
+import com.nextserve.serveitpartnernew.ui.screen.earnings.EarningsScreen
 import com.nextserve.serveitpartnernew.ui.screen.main.HomeScreen
 import com.nextserve.serveitpartnernew.ui.screen.main.JobDetailsScreen
 import com.nextserve.serveitpartnernew.ui.screen.main.JobsScreen

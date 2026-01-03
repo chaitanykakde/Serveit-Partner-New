@@ -1479,3 +1479,1122 @@ exports.sendCustomNotification = functions.https.onCall(
         throw new functions.https.HttpsError("internal", error.message);
       }
     });
+
+/**
+ * PAYOUT SYSTEM - MONTHLY SETTLEMENT AGGREGATION
+ * Scheduled function to calculate monthly earnings summaries
+ * Runs automatically on the 1st of each month at 2 AM IST
+ */
+exports.aggregateMonthlySettlements = functions
+  .runWith({
+    timeoutSeconds: 540, // 9 minutes (max allowed)
+    memory: '1GB'
+  })
+  .pubsub.schedule('0 2 1 * *') // Run at 2 AM on the 1st of every month
+  .timeZone('Asia/Kolkata')
+  .onRun(async (context) => {
+    const db = admin.firestore();
+    const batch = db.batch();
+
+    try {
+      // Calculate target month (previous month)
+      const now = new Date();
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const yearMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+
+      console.log(`Starting monthly settlement aggregation for ${yearMonth}`);
+
+      // Get all completed bookings for the target month
+      const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+      const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
+
+      const bookingsQuery = db.collection('bookings')
+        .where('status', '==', 'COMPLETED')
+        .where('completedAt', '>=', admin.firestore.Timestamp.fromDate(startOfMonth))
+        .where('completedAt', '<=', admin.firestore.Timestamp.fromDate(endOfMonth));
+
+      const bookingsSnapshot = await bookingsQuery.get();
+
+      if (bookingsSnapshot.empty) {
+        console.log(`No completed bookings found for ${yearMonth}`);
+        return null;
+      }
+
+      // Group bookings by partner
+      const partnerBookings = new Map();
+
+      bookingsSnapshot.forEach(doc => {
+        const booking = { bookingId: doc.id, ...doc.data() };
+        const partnerId = booking.partnerId;
+
+        if (!partnerBookings.has(partnerId)) {
+          partnerBookings.set(partnerId, []);
+        }
+        partnerBookings.get(partnerId).push(booking);
+      });
+
+      console.log(`Processing settlements for ${partnerBookings.size} partners`);
+
+      // Process each partner's bookings
+      const settlementPromises = Array.from(partnerBookings.entries()).map(async ([partnerId, bookings]) => {
+        try {
+          await processPartnerSettlement(partnerId, bookings, yearMonth, batch);
+        } catch (error) {
+          console.error(`Error processing settlement for partner ${partnerId}:`, error);
+        }
+      });
+
+      await Promise.all(settlementPromises);
+
+      // Commit all batch writes
+      await batch.commit();
+
+      console.log(`Successfully processed monthly settlements for ${yearMonth}`);
+      return { success: true, partnersProcessed: partnerBookings.size, yearMonth };
+
+    } catch (error) {
+      console.error('Error in monthly settlement aggregation:', error);
+      throw error;
+    }
+  });
+
+/**
+ * Process settlement for a single partner
+ */
+async function processPartnerSettlement(partnerId, bookings, yearMonth, batch) {
+  const db = admin.firestore();
+
+  // Calculate settlement totals
+  const totalEarnings = bookings.reduce((sum, booking) => sum + booking.amount, 0);
+  const platformFees = bookings.reduce((sum, booking) => sum + (booking.platformFee || 0), 0);
+  const partnerShare = bookings.reduce((sum, booking) => {
+    // Use partnerEarning if available, otherwise calculate from amount - platformFee
+    return sum + (booking.partnerEarning || (booking.amount - (booking.platformFee || 0)));
+  }, 0);
+
+  const completedJobs = bookings.length;
+
+  // Check if settlement already exists
+  const existingSettlementQuery = db.collection('monthlySettlements')
+    .where('partnerId', '==', partnerId)
+    .where('yearMonth', '==', yearMonth)
+    .limit(1);
+
+  const existingSettlementSnapshot = await existingSettlementQuery.get();
+
+  const settlementData = {
+    partnerId,
+    yearMonth,
+    totalEarnings,
+    platformFees,
+    partnerShare,
+    completedJobs,
+    paidAmount: 0, // Initially 0, updated when payouts are made
+    pendingAmount: partnerShare, // Initially equals partner share
+    settlementStatus: 'READY', // Ready for payout requests
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+
+  if (!existingSettlementSnapshot.empty) {
+    // Update existing settlement
+    const existingDoc = existingSettlementSnapshot.docs[0];
+    const existingData = existingDoc.data();
+
+    // Preserve paidAmount and pendingAmount from existing settlement
+    const updatedData = {
+      ...settlementData,
+      paidAmount: existingData.paidAmount,
+      pendingAmount: settlementData.partnerShare - existingData.paidAmount,
+      settlementStatus: existingData.settlementStatus, // Preserve status
+      createdAt: existingData.createdAt // Preserve original creation date
+    };
+
+    batch.update(existingDoc.ref, updatedData);
+    console.log(`Updated settlement for partner ${partnerId} (${yearMonth}): ₹${partnerShare}`);
+  } else {
+    // Create new settlement
+    const newSettlementRef = db.collection('monthlySettlements').doc();
+    batch.set(newSettlementRef, {
+      settlementId: newSettlementRef.id,
+      ...settlementData
+    });
+    console.log(`Created settlement for partner ${partnerId} (${yearMonth}): ₹${partnerShare}`);
+  }
+}
+
+/**
+ * Manual trigger function for testing/admin purposes
+ * Can be called via HTTP to recalculate settlements for specific periods
+ */
+exports.recalculateSettlements = functions.https.onCall(async (data, context) => {
+  // For now, allow any authenticated user (implement admin role check)
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const db = admin.firestore();
+  const { yearMonth, partnerId } = data || {};
+
+  try {
+    if (partnerId && yearMonth) {
+      // Recalculate for specific partner and month
+      await recalculatePartnerSettlement(partnerId, yearMonth);
+      return { success: true, message: `Recalculated settlement for partner ${partnerId} (${yearMonth})` };
+    } else if (yearMonth) {
+      // Recalculate for all partners in specific month
+      await aggregateMonthlySettlementsForMonth(yearMonth);
+      return { success: true, message: `Recalculated settlements for ${yearMonth}` };
+    } else {
+      throw new functions.https.HttpsError('invalid-argument', 'Specify yearMonth and optionally partnerId');
+    }
+  } catch (error) {
+    console.error('Error recalculating settlements:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to recalculate settlements');
+  }
+});
+
+/**
+ * Recalculate settlement for a specific partner and month
+ */
+async function recalculatePartnerSettlement(partnerId, yearMonth) {
+  const db = admin.firestore();
+
+  // Parse yearMonth (format: "2024-01")
+  const [year, month] = yearMonth.split('-').map(Number);
+  const startOfMonth = new Date(year, month - 1, 1);
+  const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+
+  // Get all completed bookings for this partner in the month
+  const bookingsQuery = db.collection('bookings')
+    .where('partnerId', '==', partnerId)
+    .where('status', '==', 'COMPLETED')
+    .where('completedAt', '>=', admin.firestore.Timestamp.fromDate(startOfMonth))
+    .where('completedAt', '<=', admin.firestore.Timestamp.fromDate(endOfMonth));
+
+  const bookingsSnapshot = await bookingsQuery.get();
+  const bookings = bookingsSnapshot.docs.map(doc => ({
+    bookingId: doc.id,
+    ...doc.data()
+  }));
+
+  if (bookings.length > 0) {
+    const batch = db.batch();
+    await processPartnerSettlement(partnerId, bookings, yearMonth, batch);
+    await batch.commit();
+  }
+}
+
+/**
+ * Aggregate settlements for all partners in a specific month
+ */
+async function aggregateMonthlySettlementsForMonth(yearMonth) {
+  const db = admin.firestore();
+
+  // Parse yearMonth
+  const [year, month] = yearMonth.split('-').map(Number);
+  const startOfMonth = new Date(year, month - 1, 1);
+  const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+
+  // Get all completed bookings for the month
+  const bookingsQuery = db.collection('bookings')
+    .where('status', '==', 'COMPLETED')
+    .where('completedAt', '>=', admin.firestore.Timestamp.fromDate(startOfMonth))
+    .where('completedAt', '<=', admin.firestore.Timestamp.fromDate(endOfMonth));
+
+  const bookingsSnapshot = await bookingsQuery.get();
+  const batch = db.batch();
+
+  // Group by partner and process
+  const partnerBookings = new Map();
+
+  bookingsSnapshot.forEach(doc => {
+    const booking = { bookingId: doc.id, ...doc.data() };
+    const partnerId = booking.partnerId;
+
+    if (!partnerBookings.has(partnerId)) {
+      partnerBookings.set(partnerId, []);
+    }
+    partnerBookings.get(partnerId).push(booking);
+  });
+
+  const settlementPromises = Array.from(partnerBookings.entries()).map(async ([partnerId, bookings]) => {
+    await processPartnerSettlement(partnerId, bookings, yearMonth, batch);
+  });
+
+  await Promise.all(settlementPromises);
+  await batch.commit();
+}
+
+/**
+ * ADMIN PAYOUT DASHBOARD API - Get Payout Requests
+ * HTTPS Callable function for admin dashboard to fetch payout requests
+ */
+exports.getPayoutRequests = functions.https.onCall(async (data, context) => {
+  // TODO: Implement admin role verification
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const db = admin.firestore();
+  const { status, limit = 50, offset } = data || {};
+
+  try {
+    let query = db.collection('payoutRequests')
+      .orderBy('requestedAt', 'desc')
+      .limit(limit);
+
+    if (status) {
+      query = query.where('requestStatus', '==', status);
+    }
+
+    if (offset) {
+      // For pagination, you'd typically use a document ID as offset
+      query = query.startAfter(offset);
+    }
+
+    const snapshot = await query.get();
+    const requests = [];
+
+    for (const doc of snapshot.docs) {
+      const requestData = doc.data();
+
+      // Get bank account details
+      let bankAccount = null;
+      if (requestData.bankAccountId) {
+        try {
+          const bankAccountDoc = await db.collection('bankAccounts')
+            .doc(requestData.bankAccountId)
+            .get();
+          if (bankAccountDoc.exists) {
+            bankAccount = { id: bankAccountDoc.id, ...bankAccountDoc.data() };
+          }
+        } catch (error) {
+          console.error('Error fetching bank account:', error);
+        }
+      }
+
+      // Get settlement details
+      let settlement = null;
+      if (requestData.settlementId) {
+        try {
+          const settlementDoc = await db.collection('monthlySettlements')
+            .doc(requestData.settlementId)
+            .get();
+          if (settlementDoc.exists) {
+            settlement = { id: settlementDoc.id, ...settlementDoc.data() };
+          }
+        } catch (error) {
+          console.error('Error fetching settlement:', error);
+        }
+      }
+
+      // Get partner details
+      let partner = null;
+      try {
+        const partnerDoc = await db.collection('partners')
+          .doc(requestData.partnerId)
+          .get();
+        if (partnerDoc.exists) {
+          const partnerData = partnerDoc.data();
+          partner = {
+            id: partnerDoc.id,
+            fullName: partnerData.personalDetails?.fullName || partnerData.fullName || 'Unknown',
+            mobileNo: partnerData.personalDetails?.mobileNo || partnerData.mobileNo || '',
+            email: partnerData.email || ''
+          };
+        }
+      } catch (error) {
+        console.error('Error fetching partner:', error);
+      }
+
+      requests.push({
+        id: doc.id,
+        ...requestData,
+        bankAccount,
+        settlement,
+        partner,
+        requestedAt: requestData.requestedAt?.toDate?.() || requestData.requestedAt,
+        processedAt: requestData.processedAt?.toDate?.() || requestData.processedAt
+      });
+    }
+
+    return {
+      success: true,
+      requests,
+      total: requests.length
+    };
+  } catch (error) {
+    console.error('Error fetching payout requests:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to fetch payout requests');
+  }
+});
+
+/**
+ * ADMIN PAYOUT DASHBOARD API - Approve Payout Request
+ * HTTPS Callable function for admin to approve payout requests
+ */
+exports.approvePayoutRequest = functions.https.onCall(async (data, context) => {
+  // TODO: Implement admin role verification
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const db = admin.firestore();
+  const { requestId, notes } = data;
+
+  if (!requestId) {
+    throw new functions.https.HttpsError('invalid-argument', 'requestId is required');
+  }
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      // Get the payout request
+      const requestRef = db.collection('payoutRequests').doc(requestId);
+      const requestDoc = await transaction.get(requestRef);
+
+      if (!requestDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Payout request not found');
+      }
+
+      const requestData = requestDoc.data();
+
+      if (requestData.requestStatus !== 'PENDING') {
+        throw new functions.https.HttpsError('failed-precondition', 'Request is not in PENDING status');
+      }
+
+      // Update payout request status
+      transaction.update(requestRef, {
+        requestStatus: 'APPROVED',
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        notes: notes || '',
+        processedBy: context.auth.uid
+      });
+
+      // Update settlement paid amount
+      if (requestData.settlementId) {
+        const settlementRef = db.collection('monthlySettlements').doc(requestData.settlementId);
+        const settlementDoc = await transaction.get(settlementRef);
+
+        if (settlementDoc.exists) {
+          const settlementData = settlementDoc.data();
+          const newPaidAmount = (settlementData.paidAmount || 0) + requestData.requestedAmount;
+          const newPendingAmount = settlementData.partnerShare - newPaidAmount;
+
+          transaction.update(settlementRef, {
+            paidAmount: newPaidAmount,
+            pendingAmount: newPendingAmount,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      }
+
+      // Create payout transaction record
+      const transactionRef = db.collection('payoutTransactions').doc();
+      transaction.set(transactionRef, {
+        transactionId: transactionRef.id,
+        partnerId: requestData.partnerId,
+        payoutRequestId: requestId,
+        amount: requestData.requestedAmount,
+        bankAccountId: requestData.bankAccountId,
+        paymentMethod: 'BANK_TRANSFER',
+        status: 'PENDING', // Will be updated by payment processor
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        fees: 0, // Bank transfer fees
+        notes: notes || 'Approved by admin'
+      });
+    });
+
+    // Send notification to partner
+    await sendPayoutStatusNotification(requestId, 'APPROVED');
+
+    return { success: true, message: 'Payout request approved successfully' };
+  } catch (error) {
+    console.error('Error approving payout request:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Failed to approve payout request');
+  }
+});
+
+/**
+ * ADMIN PAYOUT DASHBOARD API - Reject Payout Request
+ * HTTPS Callable function for admin to reject payout requests
+ */
+exports.rejectPayoutRequest = functions.https.onCall(async (data, context) => {
+  // TODO: Implement admin role verification
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const db = admin.firestore();
+  const { requestId, reason, notes } = data;
+
+  if (!requestId) {
+    throw new functions.https.HttpsError('invalid-argument', 'requestId is required');
+  }
+
+  if (!reason) {
+    throw new functions.https.HttpsError('invalid-argument', 'reason is required');
+  }
+
+  try {
+    // Update payout request status
+    await db.collection('payoutRequests').doc(requestId).update({
+      requestStatus: 'REJECTED',
+      processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      failureReason: reason,
+      notes: notes || '',
+      processedBy: context.auth.uid
+    });
+
+    // Send notification to partner
+    await sendPayoutStatusNotification(requestId, 'REJECTED', reason);
+
+    return { success: true, message: 'Payout request rejected successfully' };
+  } catch (error) {
+    console.error('Error rejecting payout request:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to reject payout request');
+  }
+});
+
+/**
+ * ADMIN PAYOUT DASHBOARD API - Get Payout Statistics
+ * HTTPS Callable function for admin dashboard statistics
+ */
+exports.getPayoutStatistics = functions.https.onCall(async (data, context) => {
+  // TODO: Implement admin role verification
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const db = admin.firestore();
+
+  try {
+    // Get counts by status
+    const statusCounts = {};
+    const statusSnapshot = await db.collection('payoutRequests')
+      .select('requestStatus')
+      .get();
+
+    statusSnapshot.forEach(doc => {
+      const status = doc.data().requestStatus;
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+
+    // Get total amounts by status
+    const amountStats = {};
+    const amountSnapshot = await db.collection('payoutRequests').get();
+
+    amountSnapshot.forEach(doc => {
+      const data = doc.data();
+      const status = data.requestStatus;
+      const amount = data.requestedAmount || 0;
+
+      if (!amountStats[status]) {
+        amountStats[status] = { count: 0, total: 0 };
+      }
+      amountStats[status].count += 1;
+      amountStats[status].total += amount;
+    });
+
+    // Get recent activity (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentSnapshot = await db.collection('payoutRequests')
+      .where('requestedAt', '>=', admin.firestore.Timestamp.fromDate(thirtyDaysAgo))
+      .orderBy('requestedAt', 'desc')
+      .limit(10)
+      .get();
+
+    const recentActivity = recentSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      requestedAt: doc.data().requestedAt?.toDate?.() || doc.data().requestedAt
+    }));
+
+    return {
+      success: true,
+      statistics: {
+        statusCounts,
+        amountStats,
+        recentActivity,
+        totalRequests: amountSnapshot.size
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching payout statistics:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to fetch payout statistics');
+  }
+});
+
+/**
+ * Send payout status notification to partner
+ */
+async function sendPayoutStatusNotification(requestId, status, reason = '', transactionId = null) {
+  try {
+    const db = admin.firestore();
+
+    let requestData = null;
+    let partnerId = null;
+
+    if (transactionId) {
+      // Get data from transaction
+      const transactionDoc = await db.collection('payoutTransactions').doc(transactionId).get();
+      if (transactionDoc.exists) {
+        const transactionData = transactionDoc.data();
+        partnerId = transactionData.partnerId;
+        requestData = { amount: transactionData.amount };
+      }
+    } else if (requestId) {
+      // Get data from payout request
+      const requestDoc = await db.collection('payoutRequests').doc(requestId).get();
+      if (requestDoc.exists) {
+        requestData = requestDoc.data();
+        partnerId = requestData.partnerId;
+      }
+    }
+
+    if (!partnerId) return;
+
+    // Get partner FCM token
+    const partnerDoc = await db.collection('partners').doc(partnerId).get();
+    if (!partnerDoc.exists) return;
+
+    const partnerData = partnerDoc.data();
+    const fcmToken = partnerData.fcmToken;
+    if (!fcmToken) return;
+
+    let title = '';
+    let body = '';
+
+    const amount = requestData?.requestedAmount || requestData?.amount || 0;
+
+    switch (status) {
+      case 'APPROVED':
+        title = '💰 Payout Approved!';
+        body = `Your payout request for ₹${amount} has been approved. Payment will be processed within 3-5 business days.`;
+        break;
+      case 'REJECTED':
+        title = '❌ Payout Rejected';
+        body = `Your payout request has been rejected. Reason: ${reason}`;
+        break;
+      case 'COMPLETED':
+        title = '✅ Payment Completed!';
+        body = `Your payout of ₹${amount} has been completed successfully. Cash payment processed.`;
+        break;
+      case 'FAILED':
+        title = '⚠️ Payment Failed';
+        body = `There was an issue processing your payout. Reason: ${reason}`;
+        break;
+    }
+
+    // Send FCM notification
+    const message = {
+      notification: {
+        title: title,
+        body: body
+      },
+        data: {
+          type: 'payout_status_update',
+          requestId: requestId,
+          transactionId: transactionId,
+          status: status,
+          amount: (requestData?.requestedAmount || requestData?.amount || 0).toString()
+        },
+      token: fcmToken,
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'payout_notifications',
+          priority: 'high'
+        }
+      }
+    };
+
+    await admin.messaging().send(message);
+
+    // Store notification in Firestore
+    await db.collection('partners').doc(partnerId)
+      .collection('notifications').add({
+        title: title,
+        message: body,
+        type: 'PAYOUT_STATUS_UPDATE',
+        timestamp: Date.now(),
+        isRead: false,
+            relatedData: {
+              requestId: requestId,
+              transactionId: transactionId,
+              status: status,
+              amount: requestData?.requestedAmount || requestData?.amount || 0
+            }
+      });
+
+    console.log(`Payout notification sent to partner ${partnerId}: ${status}`);
+  } catch (error) {
+    console.error('Error sending payout notification:', error);
+  }
+}
+
+/**
+ * ADMIN PAYOUT DASHBOARD API - Complete Payout Transaction
+ * HTTPS Callable function for admin to mark payout as completed (cash paid)
+ */
+exports.completePayout = functions.https.onCall(async (data, context) => {
+  // TODO: Implement admin role verification
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const db = admin.firestore();
+  const { transactionId, paymentMethod = 'CASH', notes } = data;
+
+  if (!transactionId) {
+    throw new functions.https.HttpsError('invalid-argument', 'transactionId is required');
+  }
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      // Get the payout transaction
+      const transactionRef = db.collection('payoutTransactions').doc(transactionId);
+      const transactionDoc = await transaction.get(transactionRef);
+
+      if (!transactionDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Transaction not found');
+      }
+
+      const transactionData = transactionDoc.data();
+
+      if (transactionData.status === 'COMPLETED') {
+        throw new functions.https.HttpsError('failed-precondition', 'Transaction is already completed');
+      }
+
+      // Update transaction status
+      transaction.update(transactionRef, {
+        status: 'COMPLETED',
+        paymentMethod: paymentMethod,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        completedBy: context.auth.uid,
+        notes: notes || 'Payment completed successfully'
+      });
+
+      // Update payout request status if exists
+      if (transactionData.payoutRequestId) {
+        const requestRef = db.collection('payoutRequests').doc(transactionData.payoutRequestId);
+        transaction.update(requestRef, {
+          requestStatus: 'COMPLETED',
+          processedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      // Update settlement paid amount
+      if (transactionData.settlementId) {
+        const settlementRef = db.collection('monthlySettlements').doc(transactionData.settlementId);
+        const settlementDoc = await transaction.get(settlementRef);
+
+        if (settlementDoc.exists) {
+          const settlementData = settlementDoc.data();
+          const newPaidAmount = (settlementData.paidAmount || 0) + transactionData.amount;
+          const newPendingAmount = settlementData.partnerShare - newPaidAmount;
+
+          transaction.update(settlementRef, {
+            paidAmount: newPaidAmount,
+            pendingAmount: newPendingAmount,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      }
+    });
+
+    // Generate receipt automatically
+    try {
+      await generatePaymentReceipt({
+        transactionId: transactionId,
+        partnerId: context.auth.uid
+      });
+    } catch (receiptError) {
+      console.error('Error generating receipt:', receiptError);
+      // Don't fail the payout completion if receipt generation fails
+    }
+
+    // Send notification to partner
+    await sendPayoutStatusNotification(null, 'COMPLETED', '', transactionId);
+
+    return {
+      success: true,
+      message: 'Payout completed successfully',
+      transactionId: transactionId
+    };
+
+  } catch (error) {
+    console.error('Error completing payout:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Failed to complete payout');
+  }
+});
+
+/**
+ * ADMIN PAYOUT DASHBOARD API - Get Pending Payout Transactions
+ * HTTPS Callable function to get transactions that need completion
+ */
+exports.getPendingPayoutTransactions = functions.https.onCall(async (data, context) => {
+  // TODO: Implement admin role verification
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const db = admin.firestore();
+  const { limit = 50, status = 'PENDING' } = data || {};
+
+  try {
+    const transactionsRef = db.collection('payoutTransactions')
+      .where('status', '==', status)
+      .orderBy('processedAt', 'desc')
+      .limit(limit);
+
+    const snapshot = await transactionsRef.get();
+    const transactions = [];
+
+    for (const doc of snapshot.docs) {
+      const transactionData = doc.data();
+
+      // Get related data
+      let partner = null;
+      let payoutRequest = null;
+
+      try {
+        // Get partner details
+        const partnerDoc = await db.collection('partners').doc(transactionData.partnerId).get();
+        if (partnerDoc.exists) {
+          const partnerData = partnerDoc.data();
+          partner = {
+            id: partnerDoc.id,
+            fullName: partnerData.personalDetails?.fullName || partnerData.fullName || 'Unknown',
+            mobileNo: partnerData.personalDetails?.mobileNo || partnerData.mobileNo || '',
+            email: partnerData.email || ''
+          };
+        }
+
+        // Get payout request details if exists
+        if (transactionData.payoutRequestId) {
+          const requestDoc = await db.collection('payoutRequests').doc(transactionData.payoutRequestId).get();
+          if (requestDoc.exists) {
+            payoutRequest = {
+              id: requestDoc.id,
+              ...requestDoc.data(),
+              requestedAt: requestDoc.data().requestedAt?.toDate?.() || requestDoc.data().requestedAt
+            };
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching related data:', error);
+      }
+
+      transactions.push({
+        id: doc.id,
+        ...transactionData,
+        partner,
+        payoutRequest,
+        processedAt: transactionData.processedAt?.toDate?.() || transactionData.processedAt,
+        completedAt: transactionData.completedAt?.toDate?.() || transactionData.completedAt
+      });
+    }
+
+    return {
+      success: true,
+      transactions,
+      total: transactions.length
+    };
+
+  } catch (error) {
+    console.error('Error fetching pending transactions:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to fetch pending transactions');
+  }
+});
+
+/**
+ * PAYMENT RECEIPT GENERATION - Generate PDF Receipt
+ * HTTPS Callable function to generate and download payment receipts
+ */
+exports.generatePaymentReceipt = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const { transactionId } = data;
+
+  if (!transactionId) {
+    throw new functions.https.HttpsError('invalid-argument', 'transactionId is required');
+  }
+
+  try {
+    const db = admin.firestore();
+
+    // Get transaction details
+    const transactionDoc = await db.collection('payoutTransactions').doc(transactionId).get();
+    if (!transactionDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Transaction not found');
+    }
+
+    const transactionData = transactionDoc.data();
+
+    // Verify ownership (user can only access their own transactions)
+    if (transactionData.partnerId !== context.auth.uid) {
+      throw new functions.https.HttpsError('permission-denied', 'Access denied');
+    }
+
+    // Get related data
+    const [payoutRequestDoc, bankAccountDoc, partnerDoc] = await Promise.all([
+      db.collection('payoutRequests').doc(transactionData.payoutRequestId).get(),
+      db.collection('bankAccounts').doc(transactionData.bankAccountId).get(),
+      db.collection('partners').doc(transactionData.partnerId).get()
+    ]);
+
+    const payoutRequest = payoutRequestDoc.exists ? payoutRequestDoc.data() : null;
+    const bankAccount = bankAccountDoc.exists ? bankAccountDoc.data() : null;
+    const partner = partnerDoc.exists ? partnerDoc.data() : null;
+
+    // Generate PDF receipt
+    const pdfBuffer = await generateReceiptPDF({
+      transaction: { id: transactionDoc.id, ...transactionData },
+      payoutRequest: payoutRequest ? { id: payoutRequestDoc.id, ...payoutRequest } : null,
+      bankAccount: bankAccount ? { id: bankAccountDoc.id, ...bankAccount } : null,
+      partner: partner ? { id: partnerDoc.id, ...partner } : null
+    });
+
+    // Upload to Cloud Storage
+    const bucket = admin.storage().bucket();
+    const fileName = `receipts/${transactionData.partnerId}/${transactionId}.pdf`;
+    const file = bucket.file(fileName);
+
+    await file.save(pdfBuffer, {
+      metadata: {
+        contentType: 'application/pdf',
+        metadata: {
+          transactionId: transactionId,
+          partnerId: transactionData.partnerId,
+          amount: transactionData.amount.toString(),
+          generatedAt: new Date().toISOString()
+        }
+      }
+    });
+
+    // Make file publicly accessible for download
+    await file.makePublic();
+
+    // Get download URL
+    const [url] = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + (365 * 24 * 60 * 60 * 1000) // 1 year
+    });
+
+    // Update transaction with receipt URL
+    await db.collection('payoutTransactions').doc(transactionId).update({
+      receiptUrl: url,
+      receiptGeneratedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return {
+      success: true,
+      receiptUrl: url,
+      fileName: `${transactionId}.pdf`
+    };
+
+  } catch (error) {
+    console.error('Error generating receipt:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Failed to generate receipt');
+  }
+});
+
+/**
+ * Generate PDF receipt using HTML template
+ */
+async function generateReceiptPDF(data) {
+  const { PDFDocument, rgb } = require('pdf-lib');
+
+  // Create a new PDF document
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage();
+  const { width, height } = page.getSize();
+
+  // Set up fonts and colors
+  const fontSize = 12;
+  const titleFontSize = 18;
+  const blueColor = rgb(0.1, 0.4, 0.8);
+  const grayColor = rgb(0.5, 0.5, 0.5);
+
+  // Helper function to draw text
+  let yPosition = height - 50;
+
+  function drawText(text, x = 50, size = fontSize, color = rgb(0, 0, 0)) {
+    page.drawText(text, { x, y: yPosition, size, color });
+    yPosition -= size + 5;
+  }
+
+  function drawTitle(text) {
+    drawText(text, 50, titleFontSize, blueColor);
+    yPosition -= 10;
+  }
+
+  function drawSection(text) {
+    drawText(text, 50, 14, blueColor);
+    yPosition -= 5;
+  }
+
+  // Header
+  drawTitle('💰 Payment Receipt');
+  drawText(`Transaction ID: ${data.transaction.id}`, 50, 10, grayColor);
+  drawText(`Date: ${new Date(data.transaction.processedAt?.toDate?.() || data.transaction.processedAt).toLocaleDateString('en-IN')}`, 50, 10, grayColor);
+  yPosition -= 20;
+
+  // Partner Information
+  drawSection('Partner Information');
+  drawText(`Name: ${data.partner?.personalDetails?.fullName || data.partner?.fullName || 'N/A'}`);
+  drawText(`Partner ID: ${data.partner?.id}`);
+  drawText(`Mobile: ${data.partner?.personalDetails?.mobileNo || data.partner?.mobileNo || 'N/A'}`);
+  yPosition -= 15;
+
+  // Payment Details
+  drawSection('Payment Details');
+  drawText(`Amount Paid: ₹${data.transaction.amount?.toLocaleString('en-IN') || '0'}`);
+  drawText(`Payment Method: ${data.transaction.paymentMethod || 'Bank Transfer'}`);
+  drawText(`Transaction Status: ${data.transaction.status || 'Completed'}`);
+  drawText(`Processing Fees: ₹${data.transaction.fees?.toLocaleString('en-IN') || '0'}`);
+
+  if (data.transaction.transactionRef) {
+    drawText(`Reference Number: ${data.transaction.transactionRef}`);
+  }
+  yPosition -= 15;
+
+  // Bank Account Details
+  if (data.bankAccount) {
+    drawSection('Bank Account Details');
+    drawText(`Account Holder: ${data.bankAccount.accountHolderName}`);
+    drawText(`Bank Name: ${data.bankAccount.bankName}`);
+    drawText(`Account Number: ****${data.bankAccount.accountNumber?.slice(-4) || '****'}`);
+    drawText(`IFSC Code: ${data.bankAccount.ifscCode}`);
+  }
+  yPosition -= 15;
+
+  // Settlement Information
+  if (data.payoutRequest) {
+    drawSection('Settlement Information');
+    drawText(`Settlement Period: ${data.payoutRequest.settlementId || 'N/A'}`);
+    drawText(`Requested Amount: ₹${data.payoutRequest.requestedAmount?.toLocaleString('en-IN') || '0'}`);
+    drawText(`Request Date: ${new Date(data.payoutRequest.requestedAt?.toDate?.() || data.payoutRequest.requestedAt).toLocaleDateString('en-IN')}`);
+
+    if (data.payoutRequest.processedAt) {
+      drawText(`Processed Date: ${new Date(data.payoutRequest.processedAt?.toDate?.() || data.payoutRequest.processedAt).toLocaleDateString('en-IN')}`);
+    }
+  }
+  yPosition -= 30;
+
+  // Footer
+  drawText('Thank you for your service!', 50, 10, grayColor);
+  drawText('Generated by Serveit Partner App', 50, 8, grayColor);
+  drawText(`Generated on: ${new Date().toLocaleString('en-IN')}`, 50, 8, grayColor);
+
+  // Add border
+  page.drawRectangle({
+    x: 20,
+    y: 20,
+    width: width - 40,
+    height: height - 40,
+    borderColor: grayColor,
+    borderWidth: 1
+  });
+
+  // Serialize the PDF
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
+}
+
+/**
+ * PAYMENT RECEIPT GENERATION - Get Transaction Details
+ * HTTPS Callable function to get transaction details for receipt generation
+ */
+exports.getTransactionDetails = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const { transactionId } = data;
+
+  if (!transactionId) {
+    throw new functions.https.HttpsError('invalid-argument', 'transactionId is required');
+  }
+
+  try {
+    const db = admin.firestore();
+
+    // Get transaction details
+    const transactionDoc = await db.collection('payoutTransactions').doc(transactionId).get();
+    if (!transactionDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Transaction not found');
+    }
+
+    const transactionData = transactionDoc.data();
+
+    // Verify ownership
+    if (transactionData.partnerId !== context.auth.uid) {
+      throw new functions.https.HttpsError('permission-denied', 'Access denied');
+    }
+
+    // Get related data
+    const [payoutRequestDoc, bankAccountDoc, partnerDoc] = await Promise.all([
+      transactionData.payoutRequestId ? db.collection('payoutRequests').doc(transactionData.payoutRequestId).get() : Promise.resolve(null),
+      transactionData.bankAccountId ? db.collection('bankAccounts').doc(transactionData.bankAccountId).get() : Promise.resolve(null),
+      db.collection('partners').doc(transactionData.partnerId).get()
+    ]);
+
+    const result = {
+      transaction: {
+        id: transactionDoc.id,
+        ...transactionData,
+        processedAt: transactionData.processedAt?.toDate?.() || transactionData.processedAt
+      }
+    };
+
+    if (payoutRequestDoc?.exists) {
+      result.payoutRequest = {
+        id: payoutRequestDoc.id,
+        ...payoutRequestDoc.data(),
+        requestedAt: payoutRequestDoc.data().requestedAt?.toDate?.() || payoutRequestDoc.data().requestedAt,
+        processedAt: payoutRequestDoc.data().processedAt?.toDate?.() || payoutRequestDoc.data().processedAt
+      };
+    }
+
+    if (bankAccountDoc?.exists) {
+      result.bankAccount = {
+        id: bankAccountDoc.id,
+        ...bankAccountDoc.data()
+      };
+    }
+
+    if (partnerDoc?.exists) {
+      const partnerData = partnerDoc.data();
+      result.partner = {
+        id: partnerDoc.id,
+        fullName: partnerData.personalDetails?.fullName || partnerData.fullName || 'Unknown',
+        mobileNo: partnerData.personalDetails?.mobileNo || partnerData.mobileNo || '',
+        email: partnerData.email || ''
+      };
+    }
+
+    return result;
+
+  } catch (error) {
+    console.error('Error getting transaction details:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Failed to get transaction details');
+  }
+});

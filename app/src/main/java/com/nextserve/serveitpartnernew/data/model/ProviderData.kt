@@ -61,6 +61,10 @@ data class ProviderData(
     val language: String = "en", // en, hi, mr
     
     // Profile Photo
-    val profilePhotoUrl: String = ""
+    val profilePhotoUrl: String = "",
+    
+    // Cloud Functions Required Fields
+    val isVerified: Boolean = false, // Required by Cloud Functions at root level
+    val isOnline: Boolean = false // Required by Cloud Functions at root level
 )
 

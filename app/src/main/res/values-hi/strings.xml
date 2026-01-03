@@ -149,6 +149,7 @@
     <string name="nav_home">होम</string>
     <string name="nav_jobs">नौकरियां</string>
     <string name="nav_earnings">कमाई</string>
+    <string name="nav_payouts">भुगतान</string>
     <string name="nav_profile">प्रोफ़ाइल</string>
     
     <!-- Home -->

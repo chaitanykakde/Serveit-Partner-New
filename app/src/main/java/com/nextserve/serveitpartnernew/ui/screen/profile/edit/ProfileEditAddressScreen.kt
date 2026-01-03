@@ -108,14 +108,14 @@ fun ProfileEditAddressScreen(navController: NavController) {
                 },
                 onClick = {
                     viewModel.useCurrentLocation { result ->
-                        result.onSuccess { loc ->
-                            stateText = loc.state
-                            city = loc.city
-                            address = loc.address
-                            fullAddress = loc.fullAddress
-                            pincode = loc.pincode
-                            latitude = loc.latitude
-                            longitude = loc.longitude
+                        result.onSuccess { locationData ->
+                            stateText = locationData.state ?: ""
+                            city = locationData.city ?: ""
+                            address = locationData.address ?: ""
+                            fullAddress = locationData.fullAddress ?: ""
+                            pincode = locationData.pincode ?: ""
+                            latitude = locationData.latitude
+                            longitude = locationData.longitude
                         }
                     }.also {
                         if (!hasLocationPermission) requestLocationPermission()

@@ -1,43 +1,107 @@
 {
   "indexes": [
     {
-      "collectionGroup": "partners",
+      "collectionGroup": "bookings",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "isVerified",
+          "fieldPath": "partnerId",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "latitude",
+          "fieldPath": "status",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
+          "fieldPath": "completedAt",
+          "order": "DESCENDING"
         }
-      ],
-      "density": "SPARSE_ALL"
+      ]
     },
     {
-      "collectionGroup": "jobs",
-      "queryScope": "COLLECTION_GROUP",
+      "collectionGroup": "payoutRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "partnerId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "requestedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "monthlySettlements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "partnerId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "yearMonth",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "payoutRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "requestStatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "requestedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "monthlySettlements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "settlementStatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
       "fields": [
         {
           "fieldPath": "status",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "expiresAt",
+          "fieldPath": "completedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "payoutTransactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "partnerId",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
+          "fieldPath": "processedAt",
+          "order": "DESCENDING"
         }
       ]
     }
   ],
   "fieldOverrides": []
 }
-

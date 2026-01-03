@@ -68,17 +68,17 @@ fun ProfileHeader(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        tonalElevation = 6.dp,
-        shadowElevation = 2.dp
+        shape = RoundedCornerShape(24.dp),
+        tonalElevation = 8.dp,
+        shadowElevation = 4.dp
     ) {
         Box(
             modifier = Modifier
                 .background(gradient)
-                .padding(horizontal = 20.dp, vertical = 18.dp)
+                .padding(horizontal = 24.dp, vertical = 24.dp)
         ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -86,10 +86,12 @@ fun ProfileHeader(
                 ) {
                     Surface(
                         modifier = Modifier
-                            .size(82.dp)
+                            .size(88.dp)
                             .clip(CircleShape)
                             .then(if (onProfilePhotoClick != null) Modifier.clickable(onClick = onProfilePhotoClick) else Modifier),
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f)
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f),
+                        tonalElevation = 2.dp,
+                        shadowElevation = 4.dp
                     ) {
                         Box(
                             modifier = Modifier.fillMaxWidth(),
@@ -160,33 +162,50 @@ fun ProfileHeader(
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                // Enhanced Progress Section
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = stringResource(R.string.profile_completion),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
-                        )
-                        Text(
-                            text = "$progressPercent%",
-                            style = MaterialTheme.typography.labelLarge,
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.profile_completion),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                                fontWeight = FontWeight.Medium
+                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = "$progressPercent%",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(10.dp)
+                                .clip(RoundedCornerShape(50)),
                             color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.SemiBold
+                            trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
                         )
                     }
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(50)),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        trackColor = Color.White.copy(alpha = 0.25f)
-                    )
                 }
             }
         }

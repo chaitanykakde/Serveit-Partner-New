@@ -36,18 +36,7 @@ sealed class Screen(val route: String) {
 
 fun NavGraphBuilder.appNavGraph(navController: NavController) {
     composable(Screen.Splash.route) {
-        SplashScreen(
-            onNavigateToWelcome = {
-                navController.navigate(Screen.Welcome.route) {
-                    popUpTo(Screen.Splash.route) { inclusive = true }
-                }
-            },
-            onNavigateToLogin = {
-                navController.navigate(Screen.Login.route) {
-                    popUpTo(Screen.Splash.route) { inclusive = true }
-                }
-            }
-        )
+        SplashScreen()
     }
     
     composable(Screen.Welcome.route) {
@@ -61,19 +50,8 @@ fun NavGraphBuilder.appNavGraph(navController: NavController) {
     }
     
     composable(Screen.Login.route) {
-        LoginScreen(
-            onNavigateToOtp = { phoneNumber, verificationId, _ ->
-                // resendToken is not serializable, so we pass null
-                // It will be handled by AuthRepository when resending
-                navController.navigate(Screen.Otp.createRoute(phoneNumber, verificationId))
-            },
-            onNavigateToOnboarding = { uid ->
-                // Navigate to language selection first
-                navController.navigate(Screen.LanguageSelection.route) {
-                    popUpTo(Screen.Login.route) { inclusive = true }
-                }
-            }
-        )
+        val authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+        LoginScreen(authViewModel = authViewModel)
     }
 
     composable(
@@ -89,16 +67,11 @@ fun NavGraphBuilder.appNavGraph(navController: NavController) {
     ) { backStackEntry ->
         val phoneNumber = backStackEntry.arguments?.getString("phoneNumber") ?: ""
         val verificationId = backStackEntry.arguments?.getString("verificationId") ?: ""
+        val authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
         OtpScreen(
             phoneNumber = phoneNumber,
             verificationId = verificationId,
-            resendToken = null, // resendToken not serializable, handled by repository
-            onNavigateToOnboarding = { uid ->
-                // Navigate to language selection first
-                navController.navigate(Screen.LanguageSelection.route) {
-                    popUpTo(Screen.Login.route) { inclusive = true }
-                }
-            },
+            authViewModel = authViewModel,
             onNavigateBack = {
                 navController.popBackStack()
             }
@@ -117,7 +90,10 @@ fun NavGraphBuilder.appNavGraph(navController: NavController) {
     }
 
     composable(Screen.Onboarding.route) {
-        OnboardingScreen()
+        val authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+        OnboardingScreen(
+            authViewModel = authViewModel
+        )
     }
 
     composable(Screen.Waiting.route) {

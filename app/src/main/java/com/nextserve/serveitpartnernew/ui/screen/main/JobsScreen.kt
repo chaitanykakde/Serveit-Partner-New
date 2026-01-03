@@ -2,6 +2,7 @@ package com.nextserve.serveitpartnernew.ui.screen.main
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +39,25 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Warning
+// Temporarily disabled problematic icons
+// import androidx.compose.material.icons.filled.FilterList
+// import androidx.compose.material.icons.filled.Search
+// import androidx.compose.material.icons.filled.Sort
+// import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetState
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -103,6 +131,9 @@ fun JobsScreen(
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var showAcceptDialog by remember { mutableStateOf<Job?>(null) }
+    var showRejectDialog by remember { mutableStateOf<Job?>(null) }
+    var showSearch by remember { mutableStateOf(false) }
+    var showFilters by remember { mutableStateOf(false) }
 
     // Sync pager with tab selection
     LaunchedEffect(selectedTabIndex) {
@@ -132,12 +163,89 @@ fun JobsScreen(
     Scaffold(
         topBar = {
             Column {
-                Text(
-                    text = "Jobs",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(16.dp)
-                )
+                // Enhanced Header with gradient background
+                androidx.compose.material3.Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                    tonalElevation = 4.dp,
+                    shadowElevation = 2.dp
+                ) {
+                    val gradient = androidx.compose.ui.graphics.Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                        )
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .background(gradient)
+                            .padding(horizontal = 20.dp, vertical = 16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Available Jobs",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                androidx.compose.material3.FilledTonalIconButton(
+                                    onClick = { showSearch = true },
+                                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
+                                    )
+                                ) {
+                                    Text(
+                                        text = "🔍",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                                androidx.compose.material3.FilledTonalIconButton(
+                                    onClick = { showFilters = true },
+                                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
+                                    )
+                                ) {
+                                    Text(
+                                        text = "⚙️",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                                androidx.compose.material3.FilledTonalIconButton(
+                                    onClick = {
+                                        // Cycle through sort options
+                                        val nextSort = when (uiState.sortBy) {
+                                            "distance" -> "price"
+                                            "price" -> "time"
+                                            else -> "distance"
+                                        }
+                                        viewModel.setSortBy(nextSort)
+                                    },
+                                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
+                                    )
+                                ) {
+                                    Text(
+                                        text = "⇅",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 TabRow(selectedTabIndex = selectedTabIndex) {
                     Tab(
                         selected = selectedTabIndex == 0,
@@ -168,6 +276,28 @@ fun JobsScreen(
                 )
             }
         },
+        floatingActionButton = {
+            // Enhanced floating action button for filter management
+            if (uiState.selectedServiceFilter != null ||
+                uiState.maxDistanceFilter != null ||
+                uiState.minPriceFilter != null ||
+                uiState.maxPriceFilter != null ||
+                uiState.searchQuery.isNotEmpty()) {
+
+                androidx.compose.material3.ExtendedFloatingActionButton(
+                    onClick = { viewModel.clearFilters() },
+                    icon = {
+                    Text(
+                        text = "❌",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    },
+                    text = { Text("Clear Filters") },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        },
         modifier = modifier
     ) { paddingValues ->
         HorizontalPager(
@@ -179,7 +309,8 @@ fun JobsScreen(
         ) { page ->
             when (page) {
                 0 -> NewJobsTab(
-                    jobs = uiState.newJobs,
+                        jobs = uiState.filteredJobs.ifEmpty { uiState.newJobs },
+                        searchQuery = uiState.searchQuery,
                     isLoading = uiState.isLoadingNewJobs,
                     hasOngoingJob = uiState.hasOngoingJob,
                     acceptingJobId = uiState.acceptingJobId,
@@ -201,6 +332,8 @@ fun JobsScreen(
                     onRejectClick = { job ->
                         viewModel.rejectJob(job)
                     },
+                    uiState = uiState,
+                    viewModel = viewModel,
                     modifier = Modifier.fillMaxSize()
                 )
                 1 -> HistoryTab(
@@ -254,9 +387,11 @@ fun JobsScreen(
 /**
  * New Jobs Tab - Shows available jobs
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewJobsTab(
     jobs: List<Job>,
+    searchQuery: String = "",
     isLoading: Boolean,
     hasOngoingJob: Boolean,
     acceptingJobId: String?,
@@ -265,6 +400,8 @@ private fun NewJobsTab(
     onJobClick: (Job) -> Unit = {},
     onAcceptClick: (Job) -> Unit,
     onRejectClick: (Job) -> Unit,
+    uiState: com.nextserve.serveitpartnernew.ui.viewmodel.JobsUiState,
+    viewModel: JobsViewModel,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier) {
@@ -303,23 +440,63 @@ private fun NewJobsTab(
                         )
                     }
 
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    PullToRefreshBox(
+                        isRefreshing = isLoading,
+                        onRefresh = { onRetry() }
                     ) {
-                        items(
-                            items = jobs,
-                            key = { it.bookingId }
-                        ) { job ->
-                            NewJobCard(
-                                job = job,
-                                isAccepting = acceptingJobId == job.bookingId,
-                                isAcceptDisabled = hasOngoingJob,
-                                onJobClick = { onJobClick(job) },
-                                onAcceptClick = { onAcceptClick(job) },
-                                onRejectClick = { onRejectClick(job) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Show active filters indicator
+                            if (searchQuery.isNotEmpty() ||
+                                uiState.selectedServiceFilter != null ||
+                                uiState.maxDistanceFilter != null ||
+                                uiState.minPriceFilter != null ||
+                                uiState.maxPriceFilter != null) {
+                                item {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Filters applied",
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                            Text(
+                                                text = "Clear",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.clickable { viewModel.clearFilters() }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            items(
+                                items = jobs,
+                                key = { it.bookingId }
+                            ) { job ->
+                                NewJobCard(
+                                    job = job,
+                                    isAccepting = acceptingJobId == job.bookingId,
+                                    isAcceptDisabled = hasOngoingJob,
+                                    onJobClick = { onJobClick(job) },
+                                    onAcceptClick = { onAcceptClick(job) },
+                                    onRejectClick = { onRejectClick(job) },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
                 }
@@ -490,11 +667,104 @@ private fun NewJobCard(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        // Status badge
-                        StatusBadge(
-                            status = job.status,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+                        // Enhanced Status badge with better design
+                        androidx.compose.material3.Surface(
+                            modifier = Modifier.padding(top = 6.dp),
+                            color = when (job.status.lowercase()) {
+                                "pending" -> MaterialTheme.colorScheme.secondaryContainer
+                                "accepted" -> MaterialTheme.colorScheme.primaryContainer
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            tonalElevation = 1.dp
+                        ) {
+                            Text(
+                                text = when (job.status.lowercase()) {
+                                    "pending" -> "Available"
+                                    "accepted" -> "Accepted"
+                                    else -> job.status.capitalize()
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = when (job.status.lowercase()) {
+                                    "pending" -> MaterialTheme.colorScheme.onSecondaryContainer
+                                    "accepted" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        // Priority badge for high-priority jobs
+                        if (job.notes == "High Priority") {
+                            Row(
+                                modifier = Modifier.padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp),
+                                    tint = Color(0xFFFF5722)
+                                )
+                                Text(
+                                    text = "High Priority",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFFF5722),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        // Expiry indicator for pending jobs
+                        job.expiresAt?.let { expiry ->
+                            if (job.status == "pending") {
+                                val timeRemaining = job.getTimeRemainingMinutes()
+                                if (timeRemaining != null && timeRemaining > 0) {
+                                    Row(
+                                        modifier = Modifier.padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(12.dp),
+                                            tint = if (timeRemaining <= 5) Color(0xFFFF5722) else Color(0xFFFF9800)
+                                        )
+                                        Text(
+                                            text = if (timeRemaining <= 5) {
+                                                "Expires in $timeRemaining min"
+                                            } else {
+                                                "$timeRemaining min left"
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (timeRemaining <= 5) Color(0xFFFF5722) else Color(0xFFFF9800),
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                } else if (job.isExpired()) {
+                                    Row(
+                                        modifier = Modifier.padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(12.dp),
+                                            tint = Color(0xFFFF5722)
+                                        )
+                                        Text(
+                                            text = "Expired",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFFF5722),
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 // Price

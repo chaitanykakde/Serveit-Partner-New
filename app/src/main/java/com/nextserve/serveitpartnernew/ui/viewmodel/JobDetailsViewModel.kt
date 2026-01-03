@@ -7,7 +7,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.nextserve.serveitpartnernew.data.model.Job
+import com.nextserve.serveitpartnernew.data.model.JobTimer
+import com.nextserve.serveitpartnernew.data.model.JobNote
+import com.nextserve.serveitpartnernew.data.model.JobCompletionChecklist
 import com.nextserve.serveitpartnernew.data.repository.JobsRepository
+import com.nextserve.serveitpartnernew.data.repository.JobManagementRepository
 import com.nextserve.serveitpartnernew.utils.NetworkMonitor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +31,13 @@ data class JobDetailsUiState(
     val isAccepting: Boolean = false,
     val isRejecting: Boolean = false,
     val isUpdatingStatus: Boolean = false,
-    val updatingStatusType: String? = null // "arrived", "in_progress", "payment_pending", "completed"
+    val updatingStatusType: String? = null, // "arrived", "in_progress", "payment_pending", "completed"
+    // Job management features
+    val jobTimer: JobTimer? = null,
+    val jobNotes: List<JobNote> = emptyList(),
+    val completionChecklist: JobCompletionChecklist? = null,
+    val isTimerLoading: Boolean = false,
+    val isAddingNote: Boolean = false
 )
 
 /**
@@ -45,8 +55,41 @@ class JobDetailsViewModel(
     private val _uiState = MutableStateFlow(JobDetailsUiState())
     val uiState: StateFlow<JobDetailsUiState> = _uiState.asStateFlow()
 
+    // Job management features
+    private val jobManagementRepository = JobManagementRepository(
+        com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.firestore,
+        com.google.firebase.storage.FirebaseStorage.getInstance()
+    )
+
     init {
         loadJobDetails()
+        loadJobManagementData()
+    }
+
+    private fun loadJobManagementData() {
+        // Listen to job timer
+        viewModelScope.launch {
+            jobManagementRepository.listenToJobTimer(bookingId, providerId)
+                .collect { timer ->
+                    _uiState.value = _uiState.value.copy(jobTimer = timer)
+                }
+        }
+
+        // Listen to job notes
+        viewModelScope.launch {
+            jobManagementRepository.listenToJobNotes(bookingId, providerId)
+                .collect { notes ->
+                    _uiState.value = _uiState.value.copy(jobNotes = notes)
+                }
+        }
+
+        // Listen to completion checklist
+        viewModelScope.launch {
+            jobManagementRepository.listenToCompletionChecklist(bookingId, providerId)
+                .collect { checklist ->
+                    _uiState.value = _uiState.value.copy(completionChecklist = checklist)
+                }
+        }
     }
 
     /**

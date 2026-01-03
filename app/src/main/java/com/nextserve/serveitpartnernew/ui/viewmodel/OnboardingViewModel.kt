@@ -2,6 +2,7 @@ package com.nextserve.serveitpartnernew.ui.viewmodel
 
 import android.content.Context
 import android.net.Uri
+import com.google.android.gms.location.LocationServices
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
+import com.nextserve.serveitpartnernew.data.model.LocationData
 import com.nextserve.serveitpartnernew.data.model.MainServiceModel
 import com.nextserve.serveitpartnernew.data.model.ProviderData
 import com.nextserve.serveitpartnernew.data.model.SubServiceModel
@@ -68,7 +70,7 @@ class OnboardingViewModel(
     private val uid: String,
     private val context: Context,
     private val firestoreRepository: FirestoreRepository = FirestoreRepository(FirebaseProvider.firestore),
-    private val locationRepository: LocationRepository = LocationRepository(context),
+    private val locationRepository: LocationRepository = LocationRepository(context, LocationServices.getFusedLocationProviderClient(context)),
     private val storageRepository: StorageRepository = StorageRepository(FirebaseProvider.storage, context)
 ) : ViewModel() {
     var uiState by mutableStateOf(OnboardingUiState())
@@ -504,28 +506,53 @@ class OnboardingViewModel(
         uiState = uiState.copy(isLocationLoading = true, errorMessage = null)
         viewModelScope.launch {
             try {
-                val locationResult = locationRepository.getCurrentLocationWithAddress()
-                locationResult.onSuccess { locationData ->
-                    // Validate coordinates after getting location
-                    val coordinateValidation = ValidationUtils.validateCoordinates(
-                        locationData.latitude,
-                        locationData.longitude
+                val locationResult = locationRepository.getCurrentLocation()
+                locationResult.onSuccess { location ->
+                    // Get address from coordinates
+                    val addressResult = locationRepository.getAddressFromLocation(
+                        location.latitude,
+                        location.longitude
                     )
-                    
-                    uiState = uiState.copy(
-                        isLocationLoading = false,
-                        state = locationData.state,
-                        city = locationData.city,
-                        address = locationData.address,
-                        fullAddress = locationData.fullAddress,
-                        locationPincode = locationData.pincode,
-                        latitude = locationData.latitude,
-                        longitude = locationData.longitude,
-                        errorMessage = if (!coordinateValidation.isValid) {
-                            coordinateValidation.errorMessage
-                        } else null
-                    )
-                    saveStep3Data()
+                    addressResult.onSuccess { address ->
+                        // Create LocationData object
+                        val locationData = LocationData(
+                            latitude = location.latitude,
+                            longitude = location.longitude,
+                            fullAddress = address
+                        )
+
+                        // Validate coordinates after getting location
+                        val coordinateValidation = ValidationUtils.validateCoordinates(
+                            locationData.latitude,
+                            locationData.longitude
+                        )
+
+                        uiState = uiState.copy(
+                            isLocationLoading = false,
+                            fullAddress = locationData.fullAddress ?: "",
+                            latitude = locationData.latitude,
+                            longitude = locationData.longitude,
+                            errorMessage = if (!coordinateValidation.isValid) {
+                                coordinateValidation.errorMessage
+                            } else null
+                        )
+                        saveStep3Data()
+                    }.onFailure {
+                        // If address lookup fails, just use coordinates
+                        val coordinateValidation = ValidationUtils.validateCoordinates(
+                            location.latitude,
+                            location.longitude
+                        )
+                        uiState = uiState.copy(
+                            isLocationLoading = false,
+                            latitude = location.latitude,
+                            longitude = location.longitude,
+                            errorMessage = if (!coordinateValidation.isValid) {
+                                coordinateValidation.errorMessage
+                            } else null
+                        )
+                        saveStep3Data()
+                    }
                 }.onFailure { exception ->
                     uiState = uiState.copy(
                         isLocationLoading = false,

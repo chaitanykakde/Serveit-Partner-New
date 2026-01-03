@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
@@ -74,7 +75,7 @@ import com.nextserve.serveitpartnernew.utils.NetworkMonitor
 import kotlinx.coroutines.launch
 
 /**
- * Home Screen - Modern, minimalist design matching screenshot
+ * Home Screen - Enhanced modern design with improved UX
  */
 @Composable
 fun HomeScreen(
@@ -94,9 +95,21 @@ fun HomeScreen(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val firestoreRepo = remember { FirestoreRepository(FirebaseProvider.firestore) }
-    
+
     var providerName by remember { mutableStateOf("") }
     var showAcceptDialog by remember { mutableStateOf<Job?>(null) }
+
+    // Load provider name
+    LaunchedEffect(providerId) {
+        try {
+            val result = firestoreRepo.getProviderData(providerId)
+            result.onSuccess { data ->
+                providerName = data?.fullName ?: ""
+            }
+        } catch (e: Exception) {
+            // Silently handle error
+        }
+    }
 
     // Load provider name
     LaunchedEffect(providerId) {
@@ -127,14 +140,27 @@ fun HomeScreen(
         },
         modifier = modifier
     ) { paddingValues ->
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-            modifier = Modifier.fillMaxSize()
+        val backgroundGradient = androidx.compose.ui.graphics.Brush.verticalGradient(
+            colors = listOf(
+                MaterialTheme.colorScheme.background,
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                MaterialTheme.colorScheme.background
+            )
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(backgroundGradient)
         ) {
-            // Header with icon and greeting
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+            // Enhanced Header with modern design
             item {
-                HomeHeader(providerName = providerName)
+                EnhancedHomeHeader(providerName = providerName)
             }
 
             // Highlighted New Job Card
@@ -271,6 +297,7 @@ fun HomeScreen(
                 }
             }
         }
+        }
     }
 
     // Accept job dialog
@@ -376,17 +403,29 @@ private fun HighlightedJobCard(
 ) {
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFF5F5F5) // Light gray background
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
-        Column(
+        val gradient = androidx.compose.ui.graphics.Brush.linearGradient(
+            colors = listOf(
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.05f)
+            )
+        )
+
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .background(gradient)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
             // Bell icon + "New Job Available"
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -529,6 +568,7 @@ private fun HighlightedJobCard(
                     }
                 }
             }
+        }
         }
     }
 }
@@ -815,4 +855,76 @@ private fun AcceptJobDialog(
             }
         }
     )
+}
+
+/**
+ * Enhanced Home Header with modern gradient design
+ */
+@Composable
+private fun EnhancedHomeHeader(providerName: String) {
+    val gradient = androidx.compose.ui.graphics.Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.95f),
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f),
+            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f)
+        )
+    )
+
+    androidx.compose.material3.Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp),
+        shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp),
+        tonalElevation = 8.dp,
+        shadowElevation = 4.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .background(gradient)
+                .padding(horizontal = 24.dp, vertical = 20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = when {
+                            providerName.isNotEmpty() -> "Welcome back, ${providerName.split(" ").firstOrNull() ?: providerName}!"
+                            else -> "Welcome to Serveit Partner!"
+                        },
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 32.sp
+                    )
+                    Text(
+                        text = "Ready to earn today?",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Decorative icon
+                androidx.compose.material3.Surface(
+                    modifier = Modifier.size(56.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Build,
+                            contentDescription = null,
+                            modifier = Modifier.size(28.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

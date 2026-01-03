@@ -41,28 +41,30 @@ import com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingViewModel
 @Composable
 fun OnboardingScreen(
     uid: String? = null,
-    viewModel: OnboardingViewModel? = null
+    authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel
 ) {
-    val context = LocalContext.current
     val currentUid = uid ?: FirebaseProvider.auth.currentUser?.uid
-    
-    val onboardingViewModel = viewModel ?: remember(currentUid) {
-        if (currentUid != null) {
-            OnboardingViewModel(
-                uid = currentUid,
-                context = context
-            )
-        } else {
-            null
-        }
-    }
-    
-    if (onboardingViewModel == null || currentUid == null) {
-        // Show error or loading state
+    val context = LocalContext.current
+
+    if (currentUid == null) {
+        // Show error state
         return
     }
-    
+
+    // Use the existing OnboardingViewModel with AuthViewModel coordination
+    val onboardingViewModel: OnboardingViewModel = remember(currentUid) {
+        OnboardingViewModel(
+            uid = currentUid,
+            context = context
+        )
+    }
+
     val uiState = onboardingViewModel.uiState
+
+    // Sync onboarding step changes with AuthViewModel
+    LaunchedEffect(uiState.currentStep) {
+        authViewModel.updateOnboardingStep(currentUid, uiState.currentStep)
+    }
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val isTablet = screenWidth >= 600.dp
@@ -245,7 +247,11 @@ fun OnboardingScreen(
                                 onEditServices = { onboardingViewModel.navigateToStep(2) },
                                 onEditLocation = { onboardingViewModel.navigateToStep(3) },
                                 onEditDocuments = { onboardingViewModel.navigateToStep(4) },
-                                onSubmit = { onboardingViewModel.submitOnboarding() },
+                                onSubmit = {
+                                    onboardingViewModel.submitOnboarding()
+                                    // Update AuthState after successful submission
+                                    authViewModel.completeOnboarding(currentUid)
+                                },
                                 isLoading = uiState.isLoading,
                                 errorMessage = uiState.errorMessage,
                                 modifier = Modifier.fillMaxSize()

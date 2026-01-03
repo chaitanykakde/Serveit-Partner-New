@@ -41,6 +41,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -619,7 +622,10 @@ private fun JobHeaderSection(job: Job, viewModel: JobDetailsViewModel) {
                     text = "₹${job.totalPrice.toInt()}",
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    // modifier = Modifier.semantics {
+                    //     contentDescription = AccessibilityUtils.JOB_PRICE_DESCRIPTION
+                    // } // Temporarily disabled
                 )
             }
 
@@ -1333,9 +1339,9 @@ private fun SmartActionButtons(
                             contentColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Reject",
+                        Text(
+                            text = "✕",
+                            style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1355,9 +1361,9 @@ private fun SmartActionButtons(
                                 strokeWidth = 2.dp
                             )
                         } else {
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = "Accept",
+                            Text(
+                                text = "✓",
+                                style = MaterialTheme.typography.bodyLarge,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
