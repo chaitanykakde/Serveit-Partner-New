@@ -1,6 +1,7 @@
 package com.nextserve.serveitpartnernew.ui.viewmodel
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import com.google.android.gms.location.LocationServices
 import androidx.compose.runtime.getValue
@@ -12,9 +13,8 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
 import com.nextserve.serveitpartnernew.data.model.LocationData
-import com.nextserve.serveitpartnernew.data.model.MainServiceModel
+import com.nextserve.serveitpartnernew.data.model.MainService
 import com.nextserve.serveitpartnernew.data.model.ProviderData
-import com.nextserve.serveitpartnernew.data.model.SubServiceModel
 import com.nextserve.serveitpartnernew.data.repository.FirestoreRepository
 import com.nextserve.serveitpartnernew.data.repository.LocationRepository
 import com.nextserve.serveitpartnernew.data.repository.StorageRepository
@@ -37,7 +37,7 @@ data class OnboardingUiState(
     // Step 2 data
     val selectedMainService: String = "",
     val isInSubServiceView: Boolean = false,
-    val availableSubServices: List<SubServiceModel> = emptyList(),
+    val availableSubServices: List<String> = emptyList(),
     val selectedSubServices: Set<String> = emptySet(),
     val isSelectAllChecked: Boolean = true,
     val otherService: String = "",
@@ -77,8 +77,8 @@ class OnboardingViewModel(
         private set
 
     // Main services loaded from Firestore
-    private val _mainServices = mutableStateOf<List<MainServiceModel>>(emptyList())
-    val mainServices: State<List<MainServiceModel>> = _mainServices
+    private val _mainServices = mutableStateOf<List<MainService>>(emptyList())
+    val mainServices: State<List<MainService>> = _mainServices
 
     init {
         // Load saved language and apply it
@@ -134,10 +134,9 @@ class OnboardingViewModel(
                     )
                     
                     // Load sub-services if primary service is set
-                    // Always select all by default when loading from Firestore (user can customize later)
                     if (providerData.primaryService.isNotEmpty() && providerData.gender.isNotEmpty()) {
-                        // Clear any existing selections to ensure all are selected by default
-                        uiState = uiState.copy(selectedSubServices = emptySet(), selectedMainService = "")
+                        // Set the main service first, then load subservices
+                        uiState = uiState.copy(selectedMainService = providerData.primaryService)
                         loadSubServices(providerData.gender, providerData.primaryService)
                     }
                 } else {
@@ -282,18 +281,23 @@ class OnboardingViewModel(
     
     fun loadMainServices(gender: String) {
         if (gender.isEmpty()) return
-        
+
         uiState = uiState.copy(isLoadingServices = true, errorMessage = null)
         viewModelScope.launch {
             val result = firestoreRepository.getMainServices(gender)
             result.onSuccess { services ->
                 _mainServices.value = services
                 uiState = uiState.copy(isLoadingServices = false)
+                android.util.Log.d("OnboardingViewModel", "Successfully loaded ${services.size} services for gender: $gender")
             }.onFailure { exception ->
+                // Repository now returns empty list for missing data, so this should rarely happen
+                // Only real Firestore errors (not missing collections) will reach here
+                _mainServices.value = emptyList()
                 uiState = uiState.copy(
                     isLoadingServices = false,
-                    errorMessage = "Failed to load services: ${exception.message}"
+                    errorMessage = "Unable to load services. Please check your connection."
                 )
+                android.util.Log.e("OnboardingViewModel", "Failed to load services for gender: $gender", exception)
             }
         }
     }
@@ -319,22 +323,24 @@ class OnboardingViewModel(
         uiState = uiState.copy(isLoadingSubServices = true, errorMessage = null)
         viewModelScope.launch {
             val result = firestoreRepository.getSubServices(gender, mainServiceName)
-            result.onSuccess { subServices ->
+            result.onSuccess { subServiceNames ->
                 // Always select all sub-services by default when loading a new service
                 // Only preserve selections if it's the same service and we have existing selections
                 val isSameService = uiState.selectedMainService == mainServiceName
                 val currentSelected = if (isSameService && uiState.selectedSubServices.isNotEmpty()) {
-                    // Same service - preserve existing selections
-                    uiState.selectedSubServices
+                    // Same service - preserve existing selections, but filter out names that no longer exist
+                    uiState.selectedSubServices.filter { selectedName ->
+                        selectedName in subServiceNames
+                    }.toSet()
                 } else {
                     // New service or no existing selections - select all by default
-                    subServices.map { it.name }.toSet()
+                    subServiceNames.toSet()
                 }
-                
-                val allSelected = currentSelected.size == subServices.size && subServices.isNotEmpty()
-                
+
+                val allSelected = currentSelected.size == subServiceNames.size && subServiceNames.isNotEmpty()
+
                 uiState = uiState.copy(
-                    availableSubServices = subServices,
+                    availableSubServices = subServiceNames,
                     selectedSubServices = currentSelected,
                     isSelectAllChecked = allSelected,
                     selectedMainService = mainServiceName,
@@ -391,9 +397,9 @@ class OnboardingViewModel(
             current.add(subService)
         }
         // Fix: Calculate isSelectAllChecked based on current selection and available services
-        val allSelected = current.size == uiState.availableSubServices.size && 
+        val allSelected = current.size == uiState.availableSubServices.size &&
                           uiState.availableSubServices.isNotEmpty() &&
-                          current.containsAll(uiState.availableSubServices.map { it.name })
+                          current.containsAll(uiState.availableSubServices)
         uiState = uiState.copy(
             selectedSubServices = current,
             isSelectAllChecked = allSelected,
@@ -410,7 +416,7 @@ class OnboardingViewModel(
                 errorMessage = null
             )
         } else {
-            val allSubServiceNames = uiState.availableSubServices.map { it.name }.toSet()
+            val allSubServiceNames = uiState.availableSubServices.toSet()
             uiState = uiState.copy(
                 selectedSubServices = allSubServiceNames,
                 isSelectAllChecked = true,
@@ -508,50 +514,99 @@ class OnboardingViewModel(
             try {
                 val locationResult = locationRepository.getCurrentLocation()
                 locationResult.onSuccess { location ->
-                    // Get address from coordinates
-                    val addressResult = locationRepository.getAddressFromLocation(
+                    // Get detailed address components from coordinates
+                    val addressResult = locationRepository.getDetailedAddressFromLocation(
                         location.latitude,
                         location.longitude
                     )
                     addressResult.onSuccess { address ->
-                        // Create LocationData object
-                        val locationData = LocationData(
-                            latitude = location.latitude,
-                            longitude = location.longitude,
-                            fullAddress = address
-                        )
+                        // Debug: Log all address components
+                        android.util.Log.d("OnboardingViewModel", "Address components:")
+                        android.util.Log.d("OnboardingViewModel", "  Locality: ${address.locality}")
+                        android.util.Log.d("OnboardingViewModel", "  AdminArea: ${address.adminArea}")
+                        android.util.Log.d("OnboardingViewModel", "  SubAdminArea: ${address.subAdminArea}")
+                        android.util.Log.d("OnboardingViewModel", "  PostalCode: ${address.postalCode}")
+                        android.util.Log.d("OnboardingViewModel", "  CountryName: ${address.countryName}")
+                        android.util.Log.d("OnboardingViewModel", "  AddressLine(0): ${address.getAddressLine(0)}")
+                        android.util.Log.d("OnboardingViewModel", "  FeatureName: ${address.featureName}")
+                        android.util.Log.d("OnboardingViewModel", "  Thoroughfare: ${address.thoroughfare}")
+
+                        // Extract individual address components with fallbacks
+                        var city = address.locality ?: address.subAdminArea ?: ""
+                        var state = address.adminArea ?: ""
+                        var pincode = address.postalCode ?: ""
+                        val fullAddress = address.getAddressLine(0) ?: ""
+
+                        // Extract landmark/area information (building, street, area name)
+                        val landmark = extractLandmarkInfo(address, fullAddress)
+
+                        // If individual components are missing, try to parse from full address
+                        if (city.isEmpty() || state.isEmpty() || pincode.isEmpty()) {
+                            val parsedComponents = parseAddressComponents(fullAddress)
+                            if (city.isEmpty()) city = parsedComponents.city
+                            if (state.isEmpty()) state = parsedComponents.state
+                            if (pincode.isEmpty()) pincode = parsedComponents.pincode
+                        }
+
+                        android.util.Log.d("OnboardingViewModel", "Final - City: '$city', State: '$state', Pincode: '$pincode', Landmark: '$landmark', FullAddress: '$fullAddress'")
 
                         // Validate coordinates after getting location
                         val coordinateValidation = ValidationUtils.validateCoordinates(
-                            locationData.latitude,
-                            locationData.longitude
+                            location.latitude,
+                            location.longitude
                         )
 
                         uiState = uiState.copy(
                             isLocationLoading = false,
-                            fullAddress = locationData.fullAddress ?: "",
-                            latitude = locationData.latitude,
-                            longitude = locationData.longitude,
+                            fullAddress = fullAddress,
+                            address = landmark,  // ← Populate the landmark field
+                            city = city,
+                            state = state,
+                            locationPincode = pincode,
+                            latitude = location.latitude,
+                            longitude = location.longitude,
                             errorMessage = if (!coordinateValidation.isValid) {
                                 coordinateValidation.errorMessage
                             } else null
                         )
                         saveStep3Data()
                     }.onFailure {
-                        // If address lookup fails, just use coordinates
-                        val coordinateValidation = ValidationUtils.validateCoordinates(
+                        // If detailed address lookup fails, try basic address lookup
+                        val basicAddressResult = locationRepository.getAddressFromLocation(
                             location.latitude,
                             location.longitude
                         )
-                        uiState = uiState.copy(
-                            isLocationLoading = false,
-                            latitude = location.latitude,
-                            longitude = location.longitude,
-                            errorMessage = if (!coordinateValidation.isValid) {
-                                coordinateValidation.errorMessage
-                            } else null
-                        )
-                        saveStep3Data()
+                        basicAddressResult.onSuccess { basicAddress ->
+                            val coordinateValidation = ValidationUtils.validateCoordinates(
+                                location.latitude,
+                                location.longitude
+                            )
+                            uiState = uiState.copy(
+                                isLocationLoading = false,
+                                fullAddress = basicAddress,
+                                latitude = location.latitude,
+                                longitude = location.longitude,
+                                errorMessage = if (!coordinateValidation.isValid) {
+                                    coordinateValidation.errorMessage
+                                } else null
+                            )
+                            saveStep3Data()
+                        }.onFailure {
+                            // If both lookups fail, just use coordinates
+                            val coordinateValidation = ValidationUtils.validateCoordinates(
+                                location.latitude,
+                                location.longitude
+                            )
+                            uiState = uiState.copy(
+                                isLocationLoading = false,
+                                latitude = location.latitude,
+                                longitude = location.longitude,
+                                errorMessage = if (!coordinateValidation.isValid) {
+                                    coordinateValidation.errorMessage
+                                } else null
+                            )
+                            saveStep3Data()
+                        }
                     }
                 }.onFailure { exception ->
                     uiState = uiState.copy(
@@ -595,40 +650,61 @@ class OnboardingViewModel(
             )
             return
         }
-        
+
         // Validate image before upload
         val validationError = validateImage(imageUri)
         if (validationError != null) {
             uiState = uiState.copy(errorMessage = validationError)
             return
         }
-        
+
+        // Copy image to temp file for reliable access
+        val tempFileResult = copyImageToTempFile(imageUri)
+        if (tempFileResult.isFailure) {
+            uiState = uiState.copy(
+                errorMessage = "Failed to prepare image for upload. Please try again."
+            )
+            return
+        }
+
+        val tempFile = tempFileResult.getOrNull() ?: return
+
         uiState = uiState.copy(isUploading = true, uploadProgress = 0f, errorMessage = null)
         viewModelScope.launch {
-            val result = storageRepository.uploadAadhaarDocument(
-                uid = uid,
-                documentType = "front",
-                imageUri = imageUri,
-                onProgress = { progress ->
-                    uiState = uiState.copy(uploadProgress = progress.toFloat())
+            try {
+                val result = storageRepository.uploadAadhaarDocumentFromFile(
+                    uid = uid,
+                    documentType = "front",
+                    imageFile = tempFile,
+                    onProgress = { progress ->
+                        uiState = uiState.copy(uploadProgress = progress.toFloat())
+                    }
+                )
+
+                result.onSuccess { url ->
+                    uiState = uiState.copy(
+                        aadhaarFrontUrl = url,
+                        aadhaarFrontUploaded = true,
+                        isUploading = false,
+                        uploadProgress = 0f,
+                        errorMessage = null
+                    )
+                    saveDocumentUrls()
+                }.onFailure { exception ->
+                    uiState = uiState.copy(
+                        isUploading = false,
+                        uploadProgress = 0f,
+                        errorMessage = exception.message ?: "Upload failed. Please try again."
+                    )
                 }
-            )
-            
-            result.onSuccess { url ->
-                uiState = uiState.copy(
-                    aadhaarFrontUrl = url,
-                    aadhaarFrontUploaded = true,
-                    isUploading = false,
-                    uploadProgress = 0f,
-                    errorMessage = null
-                )
-                saveDocumentUrls()
-            }.onFailure { exception ->
-                uiState = uiState.copy(
-                    isUploading = false,
-                    uploadProgress = 0f,
-                    errorMessage = exception.message ?: "Upload failed. Please try again."
-                )
+            } finally {
+                // Clean up temp file
+                try {
+                    tempFile.delete()
+                    android.util.Log.d("OnboardingViewModel", "Cleaned up temp file: ${tempFile.absolutePath}")
+                } catch (e: Exception) {
+                    android.util.Log.w("OnboardingViewModel", "Failed to clean up temp file: ${e.message}")
+                }
             }
         }
     }
@@ -642,40 +718,61 @@ class OnboardingViewModel(
             )
             return
         }
-        
+
         // Validate image before upload
         val validationError = validateImage(imageUri)
         if (validationError != null) {
             uiState = uiState.copy(errorMessage = validationError)
             return
         }
-        
+
+        // Copy image to temp file for reliable access
+        val tempFileResult = copyImageToTempFile(imageUri)
+        if (tempFileResult.isFailure) {
+            uiState = uiState.copy(
+                errorMessage = "Failed to prepare image for upload. Please try again."
+            )
+            return
+        }
+
+        val tempFile = tempFileResult.getOrNull() ?: return
+
         uiState = uiState.copy(isUploading = true, uploadProgress = 0f, errorMessage = null)
         viewModelScope.launch {
-            val result = storageRepository.uploadAadhaarDocument(
-                uid = uid,
-                documentType = "back",
-                imageUri = imageUri,
-                onProgress = { progress ->
-                    uiState = uiState.copy(uploadProgress = progress.toFloat())
+            try {
+                val result = storageRepository.uploadAadhaarDocumentFromFile(
+                    uid = uid,
+                    documentType = "back",
+                    imageFile = tempFile,
+                    onProgress = { progress ->
+                        uiState = uiState.copy(uploadProgress = progress.toFloat())
+                    }
+                )
+
+                result.onSuccess { url ->
+                    uiState = uiState.copy(
+                        aadhaarBackUrl = url,
+                        aadhaarBackUploaded = true,
+                        isUploading = false,
+                        uploadProgress = 0f,
+                        errorMessage = null
+                    )
+                    saveDocumentUrls()
+                }.onFailure { exception ->
+                    uiState = uiState.copy(
+                        isUploading = false,
+                        uploadProgress = 0f,
+                        errorMessage = exception.message ?: "Upload failed. Please try again."
+                    )
                 }
-            )
-            
-            result.onSuccess { url ->
-                uiState = uiState.copy(
-                    aadhaarBackUrl = url,
-                    aadhaarBackUploaded = true,
-                    isUploading = false,
-                    uploadProgress = 0f,
-                    errorMessage = null
-                )
-                saveDocumentUrls()
-            }.onFailure { exception ->
-                uiState = uiState.copy(
-                    isUploading = false,
-                    uploadProgress = 0f,
-                    errorMessage = exception.message ?: "Upload failed. Please try again."
-                )
+            } finally {
+                // Clean up temp file
+                try {
+                    tempFile.delete()
+                    android.util.Log.d("OnboardingViewModel", "Cleaned up temp file: ${tempFile.absolutePath}")
+                } catch (e: Exception) {
+                    android.util.Log.w("OnboardingViewModel", "Failed to clean up temp file: ${e.message}")
+                }
             }
         }
     }
@@ -718,26 +815,79 @@ class OnboardingViewModel(
      */
     private fun validateImage(imageUri: Uri): String? {
         return try {
+            android.util.Log.d("OnboardingViewModel", "Validating image URI: $imageUri")
+
+            // Check if URI is valid
+            if (imageUri.toString().isEmpty()) {
+                return "Invalid image URI. Please select an image again."
+            }
+
+            // Try to take persistable URI permission if possible
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    imageUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                android.util.Log.d("OnboardingViewModel", "Took persistable URI permission")
+            } catch (e: Exception) {
+                android.util.Log.d("OnboardingViewModel", "Could not take persistable permission: ${e.message}")
+                // This is okay, not all URIs support persistable permissions
+            }
+
             val inputStream = context.contentResolver.openInputStream(imageUri)
-                ?: return "Cannot open image file. Please select a valid image."
-            
+                ?: return "Cannot open image file. The selected image may not be accessible. Please try selecting the image again from your gallery."
+
+            android.util.Log.d("OnboardingViewModel", "Successfully opened input stream")
+
             // Check file size (max 10MB before compression)
             val fileSize = inputStream.available().toLong()
             inputStream.close()
-            
+
+            android.util.Log.d("OnboardingViewModel", "Image file size: ${fileSize / 1024}KB")
+
             if (fileSize > 10 * 1024 * 1024) { // 10MB
                 return "Image file is too large. Maximum size is 10MB. Please select a smaller image."
             }
-            
+
             // Check MIME type
             val mimeType = context.contentResolver.getType(imageUri)
+            android.util.Log.d("OnboardingViewModel", "Image MIME type: $mimeType")
+
             if (mimeType == null || !mimeType.startsWith("image/")) {
                 return "Please select a valid image file (JPG, PNG, etc.)"
             }
-            
+
+            android.util.Log.d("OnboardingViewModel", "Image validation passed")
             null // Valid
         } catch (e: Exception) {
-            "Error validating image: ${e.message ?: "Unknown error"}"
+            android.util.Log.e("OnboardingViewModel", "Image validation error: ${e.message}", e)
+            "Error accessing image: ${e.message ?: "Unknown error"}. Please try selecting the image again."
+        }
+    }
+
+    /**
+     * Copy image data to a temporary file to ensure reliable access during upload
+     */
+    private fun copyImageToTempFile(imageUri: Uri): Result<java.io.File> {
+        return try {
+            android.util.Log.d("OnboardingViewModel", "Copying image to temp file: $imageUri")
+
+            val inputStream = context.contentResolver.openInputStream(imageUri)
+                ?: return Result.failure(Exception("Cannot open image file for copying"))
+
+            val tempFile = java.io.File(context.cacheDir, "temp_upload_${System.currentTimeMillis()}.jpg")
+
+            inputStream.use { input ->
+                tempFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+
+            android.util.Log.d("OnboardingViewModel", "Image copied to temp file: ${tempFile.absolutePath}")
+            Result.success(tempFile)
+        } catch (e: Exception) {
+            android.util.Log.e("OnboardingViewModel", "Failed to copy image to temp file: ${e.message}", e)
+            Result.failure(e)
         }
     }
 
@@ -750,39 +900,60 @@ class OnboardingViewModel(
             )
             return
         }
-        
+
         // Validate image before upload
         val validationError = validateImage(imageUri)
         if (validationError != null) {
             uiState = uiState.copy(errorMessage = validationError)
             return
         }
-        
+
+        // Copy image to temp file for reliable access
+        val tempFileResult = copyImageToTempFile(imageUri)
+        if (tempFileResult.isFailure) {
+            uiState = uiState.copy(
+                errorMessage = "Failed to prepare image for upload. Please try again."
+            )
+            return
+        }
+
+        val tempFile = tempFileResult.getOrNull() ?: return
+
         uiState = uiState.copy(isUploading = true, uploadProgress = 0f, errorMessage = null)
         viewModelScope.launch {
-            val result = storageRepository.uploadProfilePhoto(
-                uid = uid,
-                imageUri = imageUri,
-                onProgress = { progress ->
-                    uiState = uiState.copy(uploadProgress = progress.toFloat())
+            try {
+                val result = storageRepository.uploadProfilePhotoFromFile(
+                    uid = uid,
+                    imageFile = tempFile,
+                    onProgress = { progress ->
+                        uiState = uiState.copy(uploadProgress = progress.toFloat())
+                    }
+                )
+
+                result.onSuccess { url ->
+                    uiState = uiState.copy(
+                        profilePhotoUrl = url,
+                        profilePhotoUploaded = true,
+                        isUploading = false,
+                        uploadProgress = 0f,
+                        errorMessage = null
+                    )
+                    saveDocumentUrls()
+                }.onFailure { exception ->
+                    uiState = uiState.copy(
+                        isUploading = false,
+                        uploadProgress = 0f,
+                        errorMessage = exception.message ?: "Upload failed. Please try again."
+                    )
                 }
-            )
-            
-            result.onSuccess { url ->
-                uiState = uiState.copy(
-                    profilePhotoUrl = url,
-                    profilePhotoUploaded = true,
-                    isUploading = false,
-                    uploadProgress = 0f,
-                    errorMessage = null
-                )
-                saveDocumentUrls()
-            }.onFailure { exception ->
-                uiState = uiState.copy(
-                    isUploading = false,
-                    uploadProgress = 0f,
-                    errorMessage = exception.message ?: "Upload failed. Please try again."
-                )
+            } finally {
+                // Clean up temp file
+                try {
+                    tempFile.delete()
+                    android.util.Log.d("OnboardingViewModel", "Cleaned up temp file: ${tempFile.absolutePath}")
+                } catch (e: Exception) {
+                    android.util.Log.w("OnboardingViewModel", "Failed to clean up temp file: ${e.message}")
+                }
             }
         }
     }
@@ -939,4 +1110,124 @@ class OnboardingViewModel(
     fun resetSubmissionFlag() {
         isSubmitting = false
     }
+
+    /**
+     * Parse address components from a full address string
+     */
+    private fun parseAddressComponents(fullAddress: String): AddressComponents {
+        val parts = fullAddress.split(",").map { it.trim() }
+
+        var city = ""
+        var state = ""
+        var pincode = ""
+
+        // Common patterns for Indian addresses:
+        // Format: "Building/Area, City, State, Pincode, Country"
+
+        parts.forEachIndexed { index, part ->
+            // Look for pincode (6 digits)
+            if (part.matches(Regex("\\d{6}"))) {
+                pincode = part
+            }
+            // Common Indian states
+            else if (part.contains("Maharashtra", ignoreCase = true) ||
+                     part.contains("Gujarat", ignoreCase = true) ||
+                     part.contains("Rajasthan", ignoreCase = true) ||
+                     part.contains("Delhi", ignoreCase = true) ||
+                     part.contains("Karnataka", ignoreCase = true) ||
+                     part.contains("Tamil Nadu", ignoreCase = true) ||
+                     part.contains("Uttar Pradesh", ignoreCase = true) ||
+                     part.contains("West Bengal", ignoreCase = true) ||
+                     part.contains("Punjab", ignoreCase = true) ||
+                     part.contains("Haryana", ignoreCase = true) ||
+                     part.contains("Madhya Pradesh", ignoreCase = true) ||
+                     part.contains("Bihar", ignoreCase = true) ||
+                     part.contains("Andhra Pradesh", ignoreCase = true) ||
+                     part.contains("Telangana", ignoreCase = true) ||
+                     part.contains("Kerala", ignoreCase = true) ||
+                     part.contains("Odisha", ignoreCase = true) ||
+                     part.contains("Chhattisgarh", ignoreCase = true) ||
+                     part.contains("Jharkhand", ignoreCase = true) ||
+                     part.contains("Uttarakhand", ignoreCase = true) ||
+                     part.contains("Himachal Pradesh", ignoreCase = true) ||
+                     part.contains("Jammu and Kashmir", ignoreCase = true) ||
+                     part.contains("Goa", ignoreCase = true) ||
+                     part.contains("Puducherry", ignoreCase = true) ||
+                     part.contains("Chandigarh", ignoreCase = true) ||
+                     part.contains("Dadra and Nagar Haveli", ignoreCase = true) ||
+                     part.contains("Daman and Diu", ignoreCase = true) ||
+                     part.contains("Lakshadweep", ignoreCase = true) ||
+                     part.contains("Andaman and Nicobar", ignoreCase = true)) {
+                state = part
+            }
+            // If not pincode and not state, and we're in the right position, it might be city
+            else if (part.isNotEmpty() && city.isEmpty() && part != "India" && !part.contains("India", ignoreCase = true)) {
+                // Skip the first part (usually building/area) and country
+                if (index > 0 && index < parts.size - 2) {
+                    city = part
+                }
+            }
+        }
+
+        return AddressComponents(city, state, pincode)
+    }
+
+    /**
+     * Extract landmark/area information from address components
+     */
+    private fun extractLandmarkInfo(address: android.location.Address, fullAddress: String): String {
+        // Priority order for landmark information:
+        // 1. Thoroughfare (street name)
+        // 2. Feature name (building/landmark)
+        // 3. Parse from address line (area names between city and pincode)
+
+        // Try thoroughfare first (street name)
+        address.thoroughfare?.let { return it }
+
+        // Try feature name (building/landmark name)
+        address.featureName?.let { featureName ->
+            // Skip plus codes (like V8GQ+8P4) as they're not meaningful landmarks
+            if (!featureName.matches(Regex("[A-Z0-9]{4}\\+[A-Z0-9]{2,3}"))) {
+                return featureName
+            }
+        }
+
+        // Parse from full address string
+        // Format: "PlusCode, Area1, Area2, City, State, Pincode, Country"
+        val parts = fullAddress.split(",").map { it.trim() }
+
+        // Find city and pincode positions
+        val cityIndex = parts.indexOfFirst { part ->
+            part == address.locality || part == address.subAdminArea
+        }
+        val pincodeIndex = parts.indexOfFirst { it.matches(Regex("\\d{6}")) }
+
+        if (cityIndex >= 0 && pincodeIndex >= 0 && pincodeIndex > cityIndex) {
+            // Extract areas between city and pincode
+            val landmarkParts = parts.subList(cityIndex + 1, pincodeIndex)
+            val landmark = landmarkParts.joinToString(", ").trim()
+
+            if (landmark.isNotEmpty() && landmark != "India") {
+                return landmark
+            }
+        }
+
+        // Fallback: extract meaningful parts from the beginning
+        val meaningfulParts = parts.filter { part ->
+            part.isNotEmpty() &&
+            part != "India" &&
+            !part.matches(Regex("\\d{6}")) && // Not pincode
+            !part.contains(address.adminArea ?: "") && // Not state
+            !part.contains(address.locality ?: "") && // Not city
+            !part.matches(Regex("[A-Z0-9]{4}\\+[A-Z0-9]{2,3}")) // Not plus code
+        }
+
+        return meaningfulParts.firstOrNull() ?: ""
+    }
+
+    private data class AddressComponents(
+        val city: String,
+        val state: String,
+        val pincode: String
+    )
 }

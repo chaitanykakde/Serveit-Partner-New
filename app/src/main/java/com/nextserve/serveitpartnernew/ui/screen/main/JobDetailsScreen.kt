@@ -539,6 +539,30 @@ private fun JobDetailsContent(
             onJobCompleted = onJobCompleted
         )
 
+        // Voice Call Button - Show for active bookings
+        if (job.status in listOf("accepted", "arrived", "in_progress")) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    context.startActivity(
+                        com.nextserve.serveitpartnernew.ui.screen.call.ProviderCallActivity.createIntent(
+                            context,
+                            job.bookingId
+                        )
+                    )
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(Icons.Default.Call, contentDescription = "Voice Call", modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Start Voice Call", fontWeight = FontWeight.Medium)
+            }
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
     }
 }
@@ -1400,17 +1424,19 @@ private fun SmartActionButtons(
                 // Secondary actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Phone Call Button
                     OutlinedButton(
                         onClick = { viewModel.callCustomer(context) },
                         modifier = Modifier.weight(1f).height(48.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Icon(Icons.Default.Phone, contentDescription = "Call", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Phone, contentDescription = "Phone Call", modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text("Call", fontWeight = FontWeight.Medium)
                     }
+
                     if (job.jobCoordinates != null) {
                         OutlinedButton(
                             onClick = { viewModel.navigateToLocation(context) },

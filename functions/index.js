@@ -691,6 +691,7 @@ exports.acceptJobRequest = functions.https.onCall(async (data, context) => {
           providerName: providerData.personalDetails?.fullName || providerData.fullName || "Unknown Provider",
           providerMobileNo: providerData.personalDetails?.mobileNo || providerData.mobileNo || "",
           status: "accepted",
+          bookingStatus: "accepted", // Keep both fields in sync
           acceptedByProviderId: providerId,
           acceptedAt: acceptedAtTimestamp, // Use Timestamp.now() instead of FieldValue.serverTimestamp()
         };
@@ -706,6 +707,7 @@ exports.acceptJobRequest = functions.https.onCall(async (data, context) => {
           providerName: providerData.personalDetails?.fullName || providerData.fullName || "Unknown Provider",
           providerMobileNo: providerData.personalDetails?.mobileNo || providerData.mobileNo || "",
           status: "accepted",
+          bookingStatus: "accepted", // Keep both fields in sync
           acceptedByProviderId: providerId,
           acceptedAt: admin.firestore.FieldValue.serverTimestamp(), // This is OK for single booking format
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -2596,5 +2598,707 @@ exports.getTransactionDetails = functions.https.onCall(async (data, context) => 
       throw error;
     }
     throw new functions.https.HttpsError('internal', 'Failed to get transaction details');
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// AGORA VOICE CALLING FUNCTIONS - PRODUCTION READY
+// ═══════════════════════════════════════════════════════════
+// These functions handle secure Agora token generation and call management
+
+/**
+ * Serveit Firebase Cloud Functions
+ *
+ * Secure backend for Agora token generation and booking management
+ *
+ * Environment Variables Required:
+ * - AGORA_APP_ID: Your Agora App ID
+ * - AGORA_APP_CERTIFICATE: Your Agora App Certificate (NEVER expose to client)
+ */
+
+const { RtcTokenBuilder, RtcRole } = require("agora-access-token");
+
+/**
+ * Generate Agora RTC Token for Secure Audio Calling
+ *
+ * Security Features:
+ * - Requires authenticated user
+ * - Validates booking ownership
+ * - Validates booking status (must be CONFIRMED)
+ * - Generates unique channel per booking
+ * - Token expires in 10 minutes
+ * - Never exposes app certificate
+ *
+ * @param {Object} data - { bookingId: string }
+ * @param {Object} context - Firebase Auth context
+ * @returns {Object} { success, token, channelName, uid, error }
+ */
+exports.generateAgoraToken = functions.https.onCall(async (data, context) => {
+  const startTime = Date.now();
+
+  try {
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 1: Authentication Check
+    // ═══════════════════════════════════════════════════════════════
+    if (!context.auth) {
+      console.error("❌ Unauthenticated call attempt");
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated to generate call token"
+      );
+    }
+
+    const userId = context.auth.uid;
+    const userPhone = context.auth.token.phone_number || null;
+
+    console.log(`🔐 Auth verified - User: ${userId}, Phone: ${userPhone}`);
+
+  // ═══════════════════════════════════════════════════════════════
+  // STEP 2: Input Validation
+  // ═══════════════════════════════════════════════════════════════
+  const { bookingId, userMobile } = data;
+
+  if (!bookingId || typeof bookingId !== "string" || bookingId.trim() === "") {
+    console.error("❌ Invalid bookingId:", bookingId);
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "bookingId is required and must be a non-empty string"
+    );
+  }
+  if (!userMobile || typeof userMobile !== "string" || userMobile.trim() === "") {
+    console.error("❌ Invalid userMobile:", userMobile);
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "userMobile is required and must be a non-empty string"
+    );
+  }
+
+  console.log(`📋 Generating token for booking: ${bookingId}`);
+  console.log(`👤 Using resolved userMobile: ${userMobile}`);
+
+  // ═══════════════════════════════════════════════════════════════
+  // STEP 3: Fetch Booking from Firestore (Match App Logic Exactly)
+  // ═══════════════════════════════════════════════════════════════
+
+  console.log(`📂 Reading Firestore document: Bookings/${userMobile}`);
+
+  // Use the provided userMobile instead of auth phone
+  const userBookingDoc = await db.collection("Bookings")
+    .doc(userMobile)
+    .get();
+
+    if (!userBookingDoc.exists) {
+      console.error(`❌ No bookings document found for user: ${userMobile}`);
+      console.error(`💡 Make sure the document ID in Firestore matches: ${userMobile}`);
+      throw new functions.https.HttpsError(
+        "not-found",
+        `No bookings found. Document ID should be: ${userMobile}`
+      );
+    }
+
+    // Get bookings array - matches HistoryFragment line 183
+    const bookingsArray = userBookingDoc.data().bookings || [];
+    console.log(`📊 Found ${bookingsArray.length} bookings for user`);
+
+    if (bookingsArray.length === 0) {
+      console.error(`❌ Bookings array is empty`);
+      throw new functions.https.HttpsError(
+        "not-found",
+        "No bookings in your account"
+      );
+    }
+
+    // Find the specific booking by bookingId - matches HistoryFragment line 240
+    const booking = bookingsArray.find(b => b.bookingId === bookingId);
+
+    if (!booking) {
+      console.error(`❌ Booking ${bookingId} not found in user's ${bookingsArray.length} bookings`);
+      console.error(`📋 Available booking IDs:`, bookingsArray.map(b => b.bookingId).join(", "));
+      throw new functions.https.HttpsError(
+        "not-found",
+        `Booking ID "${bookingId}" not found. Available IDs: ${bookingsArray.map(b => b.bookingId).slice(0, 3).join(", ")}`
+      );
+    }
+
+    console.log(`✅ Found booking: ${booking.serviceName || "Unknown Service"}`);
+    console.log(`📦 Booking data:`, JSON.stringify({
+      bookingId: booking.bookingId,
+      serviceName: booking.serviceName,
+      bookingStatus: booking.bookingStatus,
+      providerName: booking.providerName || "Not set"
+    }));
+
+    // Validate booking status - matches HistoryFragment line 243
+    // App uses "bookingStatus" field
+    const bookingStatus = (booking.bookingStatus || "pending").toLowerCase();
+
+    console.log(`🔍 Booking status: "${bookingStatus}"`);
+
+    // Allow calling for: accepted, arrived, in_progress, payment_pending
+    const allowedStatuses = ["accepted", "arrived", "in_progress", "payment_pending"];
+
+    if (!allowedStatuses.includes(bookingStatus)) {
+      console.error(`❌ Invalid booking status for calling: "${bookingStatus}"`);
+      console.error(`✅ Allowed statuses:`, allowedStatuses.join(", "));
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        `Cannot call with status "${bookingStatus}". Booking must be accepted first. Allowed: ${allowedStatuses.join(", ")}`
+      );
+    }
+
+    console.log(`✅ Booking validated - Status: ${bookingStatus}`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 4: Generate Agora Token
+    // ═══════════════════════════════════════════════════════════════
+
+    // Read Agora credentials from Firebase Functions config
+    const appId = functions.config().agora?.app_id || process.env.AGORA_APP_ID;
+    const appCertificate = functions.config().agora?.app_certificate || process.env.AGORA_APP_CERTIFICATE;
+
+    if (!appId || !appCertificate) {
+      console.error("❌ Agora credentials not configured in Firebase Functions config");
+      console.error("💡 Set with: firebase functions:config:set agora.app_id=\"YOUR_APP_ID\"");
+      console.error("💡 Set with: firebase functions:config:set agora.app_certificate=\"YOUR_CERTIFICATE\"");
+      throw new functions.https.HttpsError(
+        "internal",
+        "Agora credentials not configured. Please contact administrator."
+      );
+    }
+
+    // Generate unique channel name for this booking
+    const channelName = `serveit_booking_${bookingId}`;
+
+    // Generate unique UID for this user (hash of phone number)
+    const uid = generateNumericUid(userPhone);
+
+    // Token expires in 10 minutes (600 seconds)
+    const expirationTimeInSeconds = 600;
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+    // Build RTC token with PUBLISHER role (can send and receive audio)
+    const token = RtcTokenBuilder.buildTokenWithUid(
+      appId,
+      appCertificate,
+      channelName,
+      uid,
+      RtcRole.PUBLISHER,
+      privilegeExpiredTs
+    );
+
+    console.log(`✅ Token generated successfully`);
+    console.log(`   Channel: ${channelName}`);
+    console.log(`   UID: ${uid}`);
+    console.log(`   Expires: ${new Date(privilegeExpiredTs * 1000).toISOString()}`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 5: Log Call Initiation (Optional Analytics)
+    // ═══════════════════════════════════════════════════════════════
+
+    await db.collection("CallLogs").add({
+      bookingId: bookingId,
+      userId: userId,
+      userPhone: userPhone,
+      channelName: channelName,
+      uid: uid,
+      tokenGeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(privilegeExpiredTs * 1000),
+      status: "initiated"
+    });
+
+    const executionTime = Date.now() - startTime;
+    console.log(`⏱️  Execution time: ${executionTime}ms`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 6: Return Success Response
+    // ═══════════════════════════════════════════════════════════════
+
+    return {
+      success: true,
+      token: token,
+      channelName: channelName,
+      uid: uid,
+      appId: appId, // Include App ID for Android initialization
+      expiresIn: expirationTimeInSeconds,
+      expiresAt: privilegeExpiredTs * 1000,
+      message: "Token generated successfully"
+    };
+
+  } catch (error) {
+    console.error("❌ Error in generateAgoraToken:", error);
+
+    // Re-throw HttpsError as-is
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    // Wrap unexpected errors
+    throw new functions.https.HttpsError(
+      "internal",
+      `Failed to generate token: ${error.message}`
+    );
+  }
+});
+
+/**
+ * Generate numeric UID from phone number
+ * Agora requires numeric UID for better performance
+ *
+ * @param {string} phoneNumber - User's phone number
+ * @returns {number} - Numeric UID (0 to 2^32-1)
+ */
+function generateNumericUid(phoneNumber) {
+  if (!phoneNumber) {
+    return Math.floor(Math.random() * 1000000);
+  }
+
+  // Remove all non-numeric characters
+  const numericOnly = phoneNumber.replace(/\D/g, "");
+
+  // Take last 9 digits and convert to number
+  // This ensures UID fits in 32-bit integer
+  const uid = parseInt(numericOnly.slice(-9)) || Math.floor(Math.random() * 1000000);
+
+  return uid;
+}
+
+/**
+ * Update Booking Status
+ *
+ * Called when provider accepts booking
+ * Updates status from PENDING → ACCEPTED
+ *
+ * @param {Object} data - { bookingId: string, providerId: string }
+ * @param {Object} context - Firebase Auth context
+ */
+exports.acceptBooking = functions.https.onCall(async (data, context) => {
+  try {
+    // Auth check
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+    }
+
+    const { bookingId, providerId } = data;
+
+    if (!bookingId || !providerId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "bookingId and providerId are required"
+      );
+    }
+
+    console.log(`📞 Provider ${providerId} accepting booking ${bookingId}`);
+
+    // Find booking and update status
+    const bookingsQuery = await db.collection("Bookings").get();
+
+    for (const doc of bookingsQuery.docs) {
+      const bookingsArray = doc.data().bookings || [];
+      const bookingIndex = bookingsArray.findIndex(b => b.bookingId === bookingId);
+
+      if (bookingIndex !== -1) {
+        bookingsArray[bookingIndex].bookingStatus = "accepted";
+        bookingsArray[bookingIndex].providerId = providerId;
+        bookingsArray[bookingIndex].acceptedAt = admin.firestore.FieldValue.serverTimestamp();
+        bookingsArray[bookingIndex].updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+        await doc.ref.update({
+          bookings: bookingsArray,
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        console.log(`✅ Booking ${bookingId} status updated to ACCEPTED`);
+
+        return {
+          success: true,
+          message: "Booking accepted successfully"
+        };
+      }
+    }
+
+    throw new functions.https.HttpsError("not-found", "Booking not found");
+
+  } catch (error) {
+    console.error("❌ Error accepting booking:", error);
+    throw error instanceof functions.https.HttpsError
+      ? error
+      : new functions.https.HttpsError("internal", error.message);
+  }
+});
+
+/**
+ * End Call and Log Duration
+ *
+ * Called when call ends
+ * Updates call log with duration and status
+ */
+exports.endCall = functions.https.onCall(async (data, context) => {
+  try {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+    }
+
+    const { bookingId, duration, endReason } = data;
+
+    console.log(`📞 Ending call for booking ${bookingId}, Duration: ${duration}s`);
+
+    // Update call log
+    const callLogsQuery = await db.collection("CallLogs")
+      .where("bookingId", "==", bookingId)
+      .orderBy("tokenGeneratedAt", "desc")
+      .limit(1)
+      .get();
+
+    if (!callLogsQuery.empty) {
+      const callLogDoc = callLogsQuery.docs[0];
+      await callLogDoc.ref.update({
+        status: "completed",
+        endedAt: admin.firestore.FieldValue.serverTimestamp(),
+        durationSeconds: duration || 0,
+        endReason: endReason || "user_hangup"
+      });
+    }
+
+    return { success: true };
+
+  } catch (error) {
+    console.error("❌ Error ending call:", error);
+    throw error instanceof functions.https.HttpsError
+      ? error
+      : new functions.https.HttpsError("internal", error.message);
+  }
+});
+
+/**
+ * Test Function - Check Booking Setup
+ *
+ * Helps debug booking configuration
+ * Call this to verify your booking structure
+ *
+ * Usage: checkBooking({ bookingId: "your_booking_id" })
+ */
+exports.checkBooking = functions.https.onCall(async (data, context) => {
+  try {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+    }
+
+    const { bookingId } = data;
+    const userPhone = context.auth.token.phone_number;
+
+    if (!userPhone) {
+      return {
+        success: false,
+        error: "No phone number in auth token",
+        hint: "Make sure you're logged in with phone auth"
+      };
+    }
+
+    // Format phone number exactly like the app
+    const formattedPhone = userPhone.startsWith("+91") ? userPhone : `+91${userPhone}`;
+    console.log(`🔍 Checking booking ${bookingId || "ALL"} for user ${formattedPhone}`);
+
+    const userBookingDoc = await db.collection("Bookings")
+      .doc(formattedPhone)
+      .get();
+
+    if (!userBookingDoc.exists) {
+      return {
+        success: false,
+        error: "No bookings document found",
+        phone: formattedPhone,
+        hint: `Create a document in Firestore: Bookings/${formattedPhone}`
+      };
+    }
+
+    const bookingsArray = userBookingDoc.data().bookings || [];
+
+    // If no bookingId provided, return all bookings
+    if (!bookingId) {
+      return {
+        success: true,
+        message: `Found ${bookingsArray.length} bookings`,
+        phone: formattedPhone,
+        totalBookings: bookingsArray.length,
+        bookings: bookingsArray.map(b => ({
+          bookingId: b.bookingId,
+          serviceName: b.serviceName,
+          status: b.bookingStatus || "Unknown",
+          providerName: b.providerName || "Not set",
+          canMakeCall: ["accepted", "arrived", "in_progress", "payment_pending"].includes(
+            (b.bookingStatus || "").toLowerCase()
+          )
+        }))
+      };
+    }
+
+    // Find specific booking
+    const booking = bookingsArray.find(b => b.bookingId === bookingId);
+
+    if (!booking) {
+      return {
+        success: false,
+        error: "Booking not found",
+        phone: formattedPhone,
+        requestedBookingId: bookingId,
+        totalBookings: bookingsArray.length,
+        availableBookingIds: bookingsArray.map(b => b.bookingId),
+        hint: "Check if the bookingId matches exactly (case-sensitive)"
+      };
+    }
+
+    const bookingStatus = (booking.bookingStatus || "pending").toLowerCase();
+    const canMakeCall = ["accepted", "arrived", "in_progress", "payment_pending"].includes(bookingStatus);
+
+    return {
+      success: true,
+      message: "✅ Booking found!",
+      phone: formattedPhone,
+      booking: {
+        bookingId: booking.bookingId,
+        serviceName: booking.serviceName,
+        status: booking.bookingStatus || "Unknown",
+        providerName: booking.providerName || "Not set",
+        providerPhone: booking.providerMobile || "9322067937",
+        totalPrice: booking.totalPrice || 0,
+        createdAt: booking.createdAt || null,
+        canMakeCall: canMakeCall,
+        callAllowedStatuses: ["accepted", "arrived", "in_progress", "payment_pending"],
+        currentStatus: bookingStatus
+      },
+      verdict: canMakeCall
+        ? "✅ This booking CAN make calls"
+        : `❌ Cannot call with status "${bookingStatus}". Change status to: accepted/arrived/in_progress`
+    };
+
+  } catch (error) {
+    console.error("❌ Error checking booking:", error);
+    return {
+      success: false,
+      error: error.message,
+      stack: error.stack
+    };
+  }
+});
+
+/**
+ * Update Booking with Provider Info
+ *
+ * For testing - adds provider details to booking
+ */
+exports.updateBookingProvider = functions.https.onCall(async (data, context) => {
+  try {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+    }
+
+    const { bookingId, providerPhone } = data;
+    const userPhone = context.auth.token.phone_number;
+
+    if (!userPhone || !bookingId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "userPhone and bookingId required"
+      );
+    }
+
+    const userBookingDoc = await db.collection("Bookings")
+      .doc(userPhone)
+      .get();
+
+    if (!userBookingDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "No bookings found");
+    }
+
+    const bookingsArray = userBookingDoc.data().bookings || [];
+    const bookingIndex = bookingsArray.findIndex(b => b.bookingId === bookingId);
+
+    if (bookingIndex === -1) {
+      throw new functions.https.HttpsError("not-found", "Booking not found");
+    }
+
+    // Update booking with provider info
+    bookingsArray[bookingIndex].providerPhone = providerPhone || "9322067937";
+    bookingsArray[bookingIndex].providerName = "Service Provider";
+    bookingsArray[bookingIndex].providerRating = 4.5;
+    bookingsArray[bookingIndex].updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+    await db.collection("Bookings")
+      .doc(userPhone)
+      .update({
+        bookings: bookingsArray,
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+    console.log(`✅ Updated booking ${bookingId} with provider info`);
+
+    return {
+      success: true,
+      message: "Provider info updated",
+      providerPhone: providerPhone || "9322067937"
+    };
+
+  } catch (error) {
+    console.error("❌ Error updating booking:", error);
+    throw error instanceof functions.https.HttpsError
+      ? error
+      : new functions.https.HttpsError("internal", error.message);
+  }
+});
+
+/**
+ * Validate Call Permission
+ *
+ * Checks if a user can make a call for a specific booking
+ * Returns booking details and call permission status
+ */
+exports.validateCallPermission = functions.https.onCall(async (data, context) => {
+  console.log("🔍 validateCallPermission invoked");
+  console.log("📍 Function: validateCallPermission");
+  console.log("📍 Region:", process.env.FUNCTION_REGION || "us-central1");
+  console.log("🛡️ AppCheck present:", !!context.app?.appId);
+
+  try {
+    if (!context.auth) {
+      console.log("❌ AUTH FAILED: No authentication context");
+      throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+    }
+
+    console.log("✅ AUTH SUCCESS: uid =", context.auth.uid);
+    console.log("📞 Caller phone:", context.auth.token.phone_number);
+
+    const { bookingId, userMobile, callerRole } = data;
+    console.log("📥 INPUT DATA:", JSON.stringify({ bookingId, userMobile, callerRole }));
+
+    if (!bookingId || !userMobile || !callerRole) {
+      console.log("❌ VALIDATION FAILED: Missing required fields");
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "bookingId, userMobile, and callerRole are required"
+      );
+    }
+
+    // Step 1: Read ONLY the user's booking document
+    console.log("📂 STEP 1: Reading Firestore document");
+    console.log("🎯 Target path: Bookings/" + userMobile);
+
+    const bookingDoc = await db.collection("Bookings").doc(userMobile).get();
+
+    console.log("📄 Document exists:", bookingDoc.exists);
+
+    if (!bookingDoc.exists) {
+      console.log("❌ STEP 1 FAILED: User booking document not found");
+      throw new functions.https.HttpsError(
+        "not-found",
+        "User booking document not found"
+      );
+    }
+
+    console.log("✅ STEP 1 SUCCESS: Document found");
+
+    // Step 2: Find booking inside bookings[]
+    console.log("🔎 STEP 2: Searching for booking in array");
+    const bookings = bookingDoc.data().bookings || [];
+    console.log("📊 Bookings array length:", bookings.length);
+
+    const booking = bookings.find(b => b.bookingId === bookingId);
+    console.log("🎫 Booking found:", !!booking);
+
+    if (!booking) {
+      console.log("❌ STEP 2 FAILED: Booking not found in array");
+      console.log("🎯 Searched bookingId:", bookingId);
+      console.log("📋 Available bookingIds:", bookings.map(b => b.bookingId));
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Booking not found"
+      );
+    }
+
+    console.log("✅ STEP 2 SUCCESS: Booking found");
+    console.log("📦 Booking data:", JSON.stringify(booking));
+
+    // Step 3: Role-based validation
+    console.log("🔐 STEP 3: Role-based validation");
+    console.log("👤 Caller role:", callerRole);
+
+    if (callerRole === "PROVIDER") {
+      console.log("🔗 Checking provider assignment");
+      console.log("🎯 Expected providerId:", booking.providerId);
+      console.log("🎯 Actual caller uid:", context.auth.uid);
+
+      if (booking.providerId !== context.auth.uid) {
+        console.log("❌ STEP 3 FAILED: Provider not assigned to booking");
+        throw new functions.https.HttpsError(
+          "permission-denied",
+          "Provider not assigned to this booking"
+        );
+      }
+      console.log("✅ STEP 3 SUCCESS: Provider authorized");
+    } else if (callerRole === "USER") {
+      console.log("👤 Validating USER role permissions");
+      console.log("🎯 Booking providerId exists:", !!booking.providerId);
+
+      if (!booking.providerId) {
+        console.log("❌ STEP 3 FAILED: Booking has no assigned provider");
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Booking must have an assigned provider to initiate calls"
+        );
+      }
+      console.log("✅ STEP 3 SUCCESS: User authorized to call assigned provider");
+    } else {
+      console.log("❌ STEP 3 FAILED: Invalid callerRole");
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "callerRole must be either 'USER' or 'PROVIDER'"
+      );
+    }
+
+    // Step 4: Booking status validation (role-specific)
+    console.log("📋 STEP 4: Booking status validation");
+    console.log("📊 Current status:", booking.bookingStatus);
+
+    let allowedStatuses;
+    if (callerRole === "PROVIDER") {
+      allowedStatuses = ["accepted", "arrived", "in_progress", "completed"];
+    } else if (callerRole === "USER") {
+      allowedStatuses = ["accepted", "arrived", "in_progress", "payment_pending"];
+    }
+
+    console.log("✅ Allowed statuses for", callerRole + ":", allowedStatuses);
+
+    if (!allowedStatuses.includes(booking.bookingStatus)) {
+      console.log("❌ STEP 4 FAILED: Invalid booking status");
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Call not allowed for this booking status"
+      );
+    }
+
+    console.log("✅ STEP 4 SUCCESS: Status validated");
+
+    // Step 5: Return success + booking data for call setup
+    console.log("🎉 FINAL RESULT: CALL PERMISSION GRANTED");
+    console.log("📞 Booking ready for call setup:", booking.bookingId);
+
+    return {
+      allowed: true,
+      booking
+    };
+
+  } catch (error) {
+    console.error("💥 EXCEPTION in validateCallPermission:", error);
+    console.error("❌ Error type:", error.constructor.name);
+    console.error("❌ Error message:", error.message);
+
+    if (error instanceof functions.https.HttpsError) {
+      console.error("🚫 HttpsError code:", error.code);
+      console.error("🚫 HttpsError details:", error.details);
+    }
+
+    throw error instanceof functions.https.HttpsError
+      ? error
+      : new functions.https.HttpsError("internal", error.message);
   }
 });

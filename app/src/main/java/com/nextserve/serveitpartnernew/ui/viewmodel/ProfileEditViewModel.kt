@@ -11,9 +11,8 @@ import androidx.lifecycle.viewModelScope
 import com.google.android.gms.location.LocationServices
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
 import com.nextserve.serveitpartnernew.data.model.LocationData
-import com.nextserve.serveitpartnernew.data.model.MainServiceModel
+import com.nextserve.serveitpartnernew.data.model.MainService
 import com.nextserve.serveitpartnernew.data.model.ProviderData
-import com.nextserve.serveitpartnernew.data.model.SubServiceModel
 import com.nextserve.serveitpartnernew.data.repository.FirestoreRepository
 import com.nextserve.serveitpartnernew.data.repository.LocationRepository
 import com.nextserve.serveitpartnernew.data.repository.StorageRepository
@@ -23,8 +22,8 @@ data class ProfileEditUiState(
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val providerData: ProviderData? = null,
-    val mainServices: List<MainServiceModel> = emptyList(),
-    val subServices: List<SubServiceModel> = emptyList(),
+    val mainServices: List<MainService> = emptyList(),
+    val subServices: List<String> = emptyList(),
     val errorMessage: String? = null,
     val successMessage: String? = null
 )

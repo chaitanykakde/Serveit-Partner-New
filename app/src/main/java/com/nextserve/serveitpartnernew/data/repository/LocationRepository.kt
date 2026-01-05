@@ -73,6 +73,24 @@ class LocationRepository(
     }
 
     /**
+     * Get detailed address components from location coordinates
+     */
+    suspend fun getDetailedAddressFromLocation(latitude: Double, longitude: Double): Result<Address> {
+        return try {
+            val geocoder = Geocoder(context)
+            val addresses = geocoder.getFromLocation(latitude, longitude, 1)
+
+            if (addresses?.isNotEmpty() == true) {
+                Result.success(addresses[0])
+            } else {
+                Result.failure(Exception("No address found for location"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Start background location tracking
      */
     fun startLocationTracking(providerId: String) {

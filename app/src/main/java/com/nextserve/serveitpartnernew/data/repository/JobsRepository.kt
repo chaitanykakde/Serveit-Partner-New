@@ -316,6 +316,7 @@ class JobsRepository(
                 
                 val booking = bookingsArray[bookingIndex].toMutableMap()
                 booking["status"] = newStatus
+                booking["bookingStatus"] = newStatus // Keep both fields in sync
                 
                 // Set timestamp if provided
                 timestampField?.let { field ->
@@ -330,7 +331,10 @@ class JobsRepository(
                     throw Exception("Booking ID mismatch")
                 }
                 
-                val updates = mutableMapOf<String, Any>("status" to newStatus)
+                val updates = mutableMapOf<String, Any>(
+                    "status" to newStatus,
+                    "bookingStatus" to newStatus // Keep both fields in sync
+                )
                 timestampField?.let { field ->
                     updates[field] = Timestamp.now()
                 }

@@ -24,29 +24,90 @@ class StorageRepository(
             if (uid.isEmpty()) {
                 return Result.failure(Exception("User not authenticated. Please login again."))
             }
-            
+
             val compressedBitmap = compressImage(imageUri)
             val byteArray = bitmapToByteArray(compressedBitmap)
-            
-            val path = "partners/$uid/documents/aadhaar_$documentType.jpg"
+
+            val path = "providers/$uid/documents/aadhaar_$documentType.jpg"
             val storageRef = storage.reference.child(path)
-            
+
             // Set metadata for better security
             val metadata = com.google.firebase.storage.StorageMetadata.Builder()
                 .setContentType("image/jpeg")
                 .build()
-            
+
             val uploadTask = storageRef.putBytes(byteArray, metadata)
-            
+
             // Monitor progress
             uploadTask.addOnProgressListener { taskSnapshot ->
                 val progress = (100.0 * taskSnapshot.bytesTransferred) / taskSnapshot.totalByteCount
                 onProgress(progress)
             }
-            
+
             val result = uploadTask.await()
             val downloadUrl = result.storage.downloadUrl.await()
-            
+
+            Result.success(downloadUrl.toString())
+        } catch (e: com.google.firebase.storage.StorageException) {
+            val errorMessage = when {
+                e.errorCode == -13021 || e.message?.contains("403") == true || e.message?.contains("Permission denied") == true || e.message?.contains("does not have permission") == true -> {
+                    "Storage permission denied. Please configure Firebase Storage rules in Firebase Console."
+                }
+                e.errorCode == -13020 || e.message?.contains("401") == true || e.message?.contains("Not authenticated") == true -> {
+                    "Not authenticated. Please login again."
+                }
+                else -> {
+                    "Upload failed: ${e.message ?: "Unknown error"}"
+                }
+            }
+            Result.failure(Exception(errorMessage))
+        } catch (e: Exception) {
+            val errorMsg = when {
+                e.message?.contains("403") == true || e.message?.contains("Permission denied") == true || e.message?.contains("does not have permission") == true -> {
+                    "Storage permission denied. Please configure Firebase Storage rules in Firebase Console."
+                }
+                else -> {
+                    e.message ?: "Upload failed. Please try again."
+                }
+            }
+            Result.failure(Exception(errorMsg))
+        }
+    }
+
+    suspend fun uploadAadhaarDocumentFromFile(
+        uid: String,
+        documentType: String, // "front" or "back"
+        imageFile: java.io.File,
+        onProgress: (Double) -> Unit
+    ): Result<String> {
+        return try {
+            // Verify UID is not empty
+            if (uid.isEmpty()) {
+                return Result.failure(Exception("User not authenticated. Please login again."))
+            }
+
+            val compressedBitmap = compressImageFromFile(imageFile)
+            val byteArray = bitmapToByteArray(compressedBitmap)
+
+            val path = "providers/$uid/documents/aadhaar_$documentType.jpg"
+            val storageRef = storage.reference.child(path)
+
+            // Set metadata for better security
+            val metadata = com.google.firebase.storage.StorageMetadata.Builder()
+                .setContentType("image/jpeg")
+                .build()
+
+            val uploadTask = storageRef.putBytes(byteArray, metadata)
+
+            // Monitor progress
+            uploadTask.addOnProgressListener { taskSnapshot ->
+                val progress = (100.0 * taskSnapshot.bytesTransferred) / taskSnapshot.totalByteCount
+                onProgress(progress)
+            }
+
+            val result = uploadTask.await()
+            val downloadUrl = result.storage.downloadUrl.await()
+
             Result.success(downloadUrl.toString())
         } catch (e: com.google.firebase.storage.StorageException) {
             val errorMessage = when {
@@ -128,6 +189,58 @@ class StorageRepository(
         return scaledBitmap
     }
 
+    private suspend fun compressImageFromFile(file: java.io.File): Bitmap {
+        // Load image with memory optimization
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+
+        file.inputStream().use { inputStream ->
+            BitmapFactory.decodeStream(inputStream, null, options)
+        }
+
+        // Calculate optimal sample size for memory efficiency
+        options.inSampleSize = calculateInSampleSize(options, 1920, 1920)
+        options.inJustDecodeBounds = false
+        options.inPreferredConfig = Bitmap.Config.RGB_565 // Use less memory than ARGB_8888
+
+        val inputStream = file.inputStream()
+        val originalBitmap = BitmapFactory.decodeStream(inputStream, null, options)
+            ?: throw Exception("Cannot decode image")
+
+        inputStream.close()
+
+        // Resize if too large (max 1920x1920)
+        val maxDimension = 1920
+        val width = originalBitmap.width
+        val height = originalBitmap.height
+
+        val scaledBitmap = if (width > maxDimension || height > maxDimension) {
+            val scale = minOf(
+                maxDimension.toFloat() / width,
+                maxDimension.toFloat() / height
+            )
+            val newWidth = (width * scale).toInt()
+            val newHeight = (height * scale).toInt()
+            Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+        } else {
+            originalBitmap
+        }
+
+        // Compress to max 1MB
+        var quality = 85
+        var outputStream = ByteArrayOutputStream()
+        scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+
+        while (outputStream.toByteArray().size > 1024 * 1024 && quality > 20) {
+            quality -= 10
+            outputStream = ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+        }
+
+        return scaledBitmap
+    }
+
     /**
      * Calculate optimal inSampleSize for BitmapFactory to reduce memory usage
      */
@@ -161,7 +274,7 @@ class StorageRepository(
         onProgress: (Double) -> Unit
     ): Result<String> {
         return try {
-            val path = "partners/$uid/documents/aadhaar_$documentType.jpg"
+            val path = "providers/$uid/documents/aadhaar_$documentType.jpg"
             val storageRef = storage.reference.child(path)
             
             val uploadTask = storageRef.putFile(Uri.fromFile(file))
@@ -193,7 +306,7 @@ class StorageRepository(
             val compressedBitmap = compressImage(imageUri)
             val byteArray = bitmapToByteArray(compressedBitmap)
             
-            val path = "partners/$uid/documents/profile_photo.jpg"
+            val path = "providers/$uid/documents/profile_photo.jpg"
             val storageRef = storage.reference.child(path)
             
             val metadata = com.google.firebase.storage.StorageMetadata.Builder()
@@ -210,6 +323,55 @@ class StorageRepository(
             val result = uploadTask.await()
             val downloadUrl = result.storage.downloadUrl.await()
             
+            Result.success(downloadUrl.toString())
+        } catch (e: com.google.firebase.storage.StorageException) {
+            val errorMessage = when {
+                e.errorCode == -13021 || e.message?.contains("403") == true || e.message?.contains("Permission denied") == true -> {
+                    "Storage permission denied. Please configure Firebase Storage rules."
+                }
+                e.errorCode == -13020 || e.message?.contains("401") == true -> {
+                    "Not authenticated. Please login again."
+                }
+                else -> {
+                    "Upload failed: ${e.message ?: "Unknown error"}"
+                }
+            }
+            Result.failure(Exception(errorMessage))
+        } catch (e: Exception) {
+            Result.failure(Exception(e.message ?: "Upload failed. Please try again."))
+        }
+    }
+
+    suspend fun uploadProfilePhotoFromFile(
+        uid: String,
+        imageFile: java.io.File,
+        onProgress: (Double) -> Unit
+    ): Result<String> {
+        return try {
+            if (uid.isEmpty()) {
+                return Result.failure(Exception("User not authenticated. Please login again."))
+            }
+
+            val compressedBitmap = compressImageFromFile(imageFile)
+            val byteArray = bitmapToByteArray(compressedBitmap)
+
+            val path = "providers/$uid/documents/profile_photo.jpg"
+            val storageRef = storage.reference.child(path)
+
+            val metadata = com.google.firebase.storage.StorageMetadata.Builder()
+                .setContentType("image/jpeg")
+                .build()
+
+            val uploadTask = storageRef.putBytes(byteArray, metadata)
+
+            uploadTask.addOnProgressListener { taskSnapshot ->
+                val progress = (100.0 * taskSnapshot.bytesTransferred) / taskSnapshot.totalByteCount
+                onProgress(progress)
+            }
+
+            val result = uploadTask.await()
+            val downloadUrl = result.storage.downloadUrl.await()
+
             Result.success(downloadUrl.toString())
         } catch (e: com.google.firebase.storage.StorageException) {
             val errorMessage = when {

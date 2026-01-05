@@ -2,17 +2,13 @@ package com.nextserve.serveitpartnernew.data.model
 
 import com.google.firebase.firestore.PropertyName
 
-data class MainServiceModel(
+/**
+ * Simplified service model for UI consumption
+ * Only contains names to avoid dependency on Firestore schema consistency
+ */
+data class MainService(
+    val id: String = "",
     val name: String = "",
-    val description: String = "",
-    val icon: String = "",
-    @get:PropertyName("isActive") @set:PropertyName("isActive")
-    var isActive: Boolean = true
-)
-
-data class SubServiceModel(
-    val name: String = "",
-    val description: String = "",
-    val unit: String = ""
+    val subServiceNames: List<String> = emptyList()
 )
 

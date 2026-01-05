@@ -78,6 +78,9 @@ dependencies {
     
     // AppCompat for locale support on older Android versions
     implementation("androidx.appcompat:appcompat:1.7.0")
+
+    // Agora Voice SDK for in-app calling
+    implementation("io.agora.rtc:voice-sdk:4.2.6")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

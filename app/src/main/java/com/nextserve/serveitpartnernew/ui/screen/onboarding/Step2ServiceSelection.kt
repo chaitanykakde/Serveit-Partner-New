@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nextserve.serveitpartnernew.R
+import com.nextserve.serveitpartnernew.data.model.MainService
 import com.nextserve.serveitpartnernew.ui.components.BottomStickyButtonContainer
 import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
@@ -45,7 +46,7 @@ import com.nextserve.serveitpartnernew.ui.util.Dimens
 @Composable
 fun Step2ServiceSelection(
     primaryServiceName: String,
-    availableSubServices: List<com.nextserve.serveitpartnernew.data.model.SubServiceModel>,
+    availableSubServices: List<String>,
     selectedSubServices: Set<String>,
     isSelectAllChecked: Boolean,
     isLoadingSubServices: Boolean = false,
@@ -165,11 +166,11 @@ fun Step2ServiceSelection(
                             .fillMaxSize()
                             .weight(1f)
                     ) {
-                        items(availableSubServices) { subService ->
+                        items(availableSubServices) { subServiceName ->
                             SubServiceCard(
-                                subService = subService,
-                                isSelected = selectedSubServices.contains(subService.name),
-                                onToggle = { onSubServiceToggle(subService.name) }
+                                subService = subServiceName,
+                                isSelected = selectedSubServices.contains(subServiceName),
+                                onToggle = { onSubServiceToggle(subServiceName) }
                             )
                         }
                     }
@@ -210,7 +211,7 @@ fun Step2ServiceSelection(
 
 @Composable
 private fun SubServiceCard(
-    subService: com.nextserve.serveitpartnernew.data.model.SubServiceModel,
+    subService: String,
     isSelected: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
@@ -255,7 +256,7 @@ private fun SubServiceCard(
                 )
             )
             Text(
-                text = subService.name,
+                text = subService,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (isSelected) {

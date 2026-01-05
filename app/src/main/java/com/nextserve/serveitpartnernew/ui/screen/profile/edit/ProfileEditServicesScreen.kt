@@ -121,28 +121,21 @@ fun ProfileEditServicesScreen(navController: NavController) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    state.subServices.forEach { sub ->
+                    state.subServices.forEach { subServiceName ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(text = sub.name, fontWeight = FontWeight.Medium)
-                                if (sub.description.isNotEmpty()) {
-                                    Text(
-                                        text = sub.description,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                                Text(text = subServiceName, fontWeight = FontWeight.Medium)
                             }
                             Checkbox(
-                                checked = selectedSubs.contains(sub.name),
+                                checked = selectedSubs.contains(subServiceName),
                                 onCheckedChange = { checked ->
                                     selectedSubs = if (checked) {
-                                        selectedSubs + sub.name
+                                        selectedSubs + subServiceName
                                     } else {
-                                        selectedSubs - sub.name
+                                        selectedSubs - subServiceName
                                     }
                                 }
                             )

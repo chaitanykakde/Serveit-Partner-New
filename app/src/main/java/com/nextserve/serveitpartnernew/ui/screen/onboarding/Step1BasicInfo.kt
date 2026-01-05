@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nextserve.serveitpartnernew.R
+import com.nextserve.serveitpartnernew.data.model.MainService
 import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.ServiceSelector
 import com.nextserve.serveitpartnernew.ui.util.Dimens
@@ -35,7 +36,7 @@ fun Step1BasicInfo(
     onGenderChange: (String) -> Unit,
     primaryService: String,
     onPrimaryServiceChange: (String) -> Unit,
-    primaryServices: List<com.nextserve.serveitpartnernew.data.model.MainServiceModel>,
+    primaryServices: List<MainService>,
     isLoadingServices: Boolean = false,
     email: String,
     onEmailChange: (String) -> Unit,

@@ -18,6 +18,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
 import com.nextserve.serveitpartnernew.ui.navigation.Screen
 import com.nextserve.serveitpartnernew.ui.screen.HomeScreen
@@ -34,6 +36,7 @@ import com.nextserve.serveitpartnernew.ui.utils.rememberNotificationPermissionSt
 import com.nextserve.serveitpartnernew.ui.viewmodel.AuthState
 import com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel
 import com.nextserve.serveitpartnernew.utils.LanguageManager
+import androidx.compose.runtime.LaunchedEffect
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,6 +81,14 @@ class MainActivity : ComponentActivity() {
                                     if (navController.currentDestination?.route == Screen.Splash.route) {
                                         navController.navigate(Screen.Login.route) {
                                             popUpTo(Screen.Splash.route) { inclusive = true }
+                                        }
+                                    }
+                                }
+                                is AuthState.OtpSent -> {
+                                    val otpState = state as AuthState.OtpSent
+                                    if (navController.currentDestination?.route != Screen.Otp.route) {
+                                        navController.navigate(Screen.Otp.createRoute(otpState.phoneNumber, otpState.verificationId)) {
+                                            popUpTo(Screen.Login.route) { inclusive = true }
                                         }
                                     }
                                 }
@@ -138,27 +149,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Handle OTP navigation and other dynamic state changes
-                LaunchedEffect(authState) {
-                    when (authState) {
-                        is AuthState.OtpSent -> {
-                            // Navigate to OTP screen when OTP is sent
-                            val otpState = authState as AuthState.OtpSent
-                            val otpRoute = Screen.Otp.createRoute(otpState.phoneNumber, otpState.verificationId)
-                            if (navController.currentDestination?.route != otpRoute) {
-                                navController.navigate(otpRoute) {
-                                    // Don't pop back to login since we might want to go back
-                                    launchSingleTop = true
-                                }
-                            }
-                        }
-                        // Handle other auth state changes if needed
-                        else -> {
-                            // Other navigation is handled by the splash navigation logic
-                        }
-                    }
-                }
-
                 NavHost(
                     navController = navController,
                     startDestination = startDestination,
@@ -185,17 +175,12 @@ class MainActivity : ComponentActivity() {
                     composable(
                         route = Screen.Otp.route,
                         arguments = listOf(
-                            androidx.navigation.navArgument("phoneNumber") {
-                                type = androidx.navigation.NavType.StringType
-                            },
-                            androidx.navigation.navArgument("verificationId") {
-                                type = androidx.navigation.NavType.StringType
-                            }
+                            navArgument("phoneNumber") { type = NavType.StringType },
+                            navArgument("verificationId") { type = NavType.StringType }
                         )
                     ) { backStackEntry ->
                         val phoneNumber = backStackEntry.arguments?.getString("phoneNumber") ?: ""
                         val verificationId = backStackEntry.arguments?.getString("verificationId") ?: ""
-
                         OtpScreen(
                             phoneNumber = phoneNumber,
                             verificationId = verificationId,
@@ -242,6 +227,13 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable(Screen.Home.route) {
+                        // Start incoming call listener service when provider reaches home
+                        LaunchedEffect(Unit) {
+                            com.nextserve.serveitpartnernew.data.service.IncomingCallListenerService.startService(
+                                this@MainActivity
+                            )
+                        }
+
                         // Main app with bottom navigation will be shown here
                         com.nextserve.serveitpartnernew.ui.screen.main.MainAppScreen()
                     }

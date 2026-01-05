@@ -4,9 +4,8 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.nextserve.serveitpartnernew.data.mapper.ProviderFirestoreMapper
-import com.nextserve.serveitpartnernew.data.model.MainServiceModel
+import com.nextserve.serveitpartnernew.data.model.MainService
 import com.nextserve.serveitpartnernew.data.model.ProviderData
-import com.nextserve.serveitpartnernew.data.model.SubServiceModel
 import kotlinx.coroutines.tasks.await
 
 class FirestoreRepository(
@@ -196,12 +195,12 @@ class FirestoreRepository(
         return getProviderData(uid)
     }
 
-    suspend fun getMainServices(gender: String): Result<List<MainServiceModel>> {
+    suspend fun getMainServices(gender: String): Result<List<MainService>> {
         return try {
             val serviceType = when (gender.lowercase()) {
                 "male", "men" -> "menservices"
                 "female", "women" -> "womenservices"
-                else -> return Result.failure(Exception("Invalid gender: $gender"))
+                else -> return Result.success(emptyList()) // Invalid gender = empty list, not error
             }
 
             val serviceListRef = firestore.collection("services")
@@ -210,20 +209,57 @@ class FirestoreRepository(
 
             val snapshot = serviceListRef.get().await()
             val services = snapshot.documents.mapNotNull { document ->
-                val service = document.toObject(MainServiceModel::class.java)
-                service?.let {
-                    if (it.isActive) it else null
+                try {
+                    // Read raw document data instead of auto-deserialization
+                    val data = document.data ?: return@mapNotNull null
+
+                    // Extract name (fallback to document ID if missing)
+                    val name = data["name"] as? String ?: document.id
+
+                    // Extract isActive (default = true)
+                    val isActive = data["isActive"] as? Boolean ?: true
+
+                    // Skip inactive services
+                    if (!isActive) return@mapNotNull null
+
+                    // Extract sub-service names from subServices Map
+                    val subServiceNames = when (val subServices = data["subServices"]) {
+                        is Map<*, *> -> {
+                            // subServices is a Map<String, Map<String, Any>>
+                            // Keys are sub-service names
+                            (subServices as Map<String, *>).keys.toList()
+                        }
+                        else -> {
+                            // No sub-services or malformed data
+                            android.util.Log.w("FirestoreRepository", "No subServices Map found for service: ${document.id}")
+                            emptyList<String>()
+                        }
+                    }
+
+                    MainService(
+                        id = document.id,
+                        name = name,
+                        subServiceNames = subServiceNames
+                    )
+                } catch (e: Exception) {
+                    // Skip malformed documents silently
+                    android.util.Log.w("FirestoreRepository", "Skipping malformed service document: ${document.id}", e)
+                    null
                 }
             }
 
+            android.util.Log.d("FirestoreRepository", "Loaded ${services.size} services for $gender from /services/$serviceType/serviceList")
             Result.success(services)
+
         } catch (e: Exception) {
-            android.util.Log.e("FirestoreRepository", "Failed to get main services for gender: $gender", e)
-            Result.failure(Exception("Failed to load services. Please check your connection and try again."))
+            android.util.Log.e("FirestoreRepository", "Service load failed for gender: $gender", e)
+            // Return empty list instead of failure for missing collections/network issues
+            android.util.Log.w("FirestoreRepository", "Returning empty services list due to error: ${e.message}")
+            Result.success(emptyList())
         }
     }
 
-    suspend fun getSubServices(gender: String, mainServiceName: String): Result<List<SubServiceModel>> {
+    suspend fun getSubServices(gender: String, mainServiceName: String): Result<List<String>> {
         return try {
             val serviceType = when (gender.lowercase()) {
                 "male", "men" -> "menservices"
@@ -238,46 +274,31 @@ class FirestoreRepository(
 
             val document = serviceDocRef.get().await()
             if (!document.exists()) {
-                return Result.failure(Exception("Service document not found: $mainServiceName"))
+                android.util.Log.w("FirestoreRepository", "Service document not found: $mainServiceName")
+                return Result.success(emptyList()) // Return empty list instead of error
             }
 
-            val data = document.data ?: return Result.failure(Exception("Service document is empty"))
+            val data = document.data ?: return Result.success(emptyList())
 
-            // Handle both array and map formats for subServices
-            val subServicesList = when (val subServices = data["subServices"]) {
-                is List<*> -> {
-                    // Array format
-                    subServices.mapNotNull { item ->
-                        when (item) {
-                            is Map<*, *> -> {
-                                val map = item as Map<String, Any>
-                                SubServiceModel(
-                                    name = map["name"] as? String ?: "",
-                                    description = map["description"] as? String ?: "",
-                                    unit = map["unit"] as? String ?: ""
-                                )
-                            }
-                            else -> null
-                        }
-                    }
-                }
+            // Extract sub-service names from subServices Map
+            val subServiceNames = when (val subServices = data["subServices"]) {
                 is Map<*, *> -> {
-                    // Map format - convert map values to list
-                    (subServices as Map<String, Map<String, Any>>).values.map { serviceMap ->
-                        SubServiceModel(
-                            name = serviceMap["name"] as? String ?: "",
-                            description = serviceMap["description"] as? String ?: "",
-                            unit = serviceMap["unit"] as? String ?: ""
-                        )
-                    }
+                    // subServices is a Map<String, Map<String, Any>>
+                    // Keys are sub-service names
+                    (subServices as Map<String, *>).keys.toList()
                 }
-                else -> emptyList()
+                else -> {
+                    // No sub-services or malformed data
+                    android.util.Log.w("FirestoreRepository", "No subServices Map found for service: $mainServiceName")
+                    emptyList<String>()
+                }
             }
 
-            Result.success(subServicesList)
+            android.util.Log.d("FirestoreRepository", "Loaded ${subServiceNames.size} sub-services for $mainServiceName")
+            Result.success(subServiceNames)
         } catch (e: Exception) {
             android.util.Log.e("FirestoreRepository", "Failed to get sub services for mainService: $mainServiceName", e)
-            Result.failure(Exception("Failed to load sub-services. Please check your connection and try again."))
+            Result.success(emptyList()) // Return empty list instead of failure
         }
     }
 }

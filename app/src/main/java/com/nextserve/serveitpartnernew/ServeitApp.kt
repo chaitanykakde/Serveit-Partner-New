@@ -2,6 +2,8 @@ package com.nextserve.serveitpartnernew
 
 import android.app.Application
 import com.google.firebase.FirebaseApp
+// import com.google.firebase.appcheck.FirebaseAppCheck
+// import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.nextserve.serveitpartnernew.di.AppContainer
 import com.nextserve.serveitpartnernew.utils.LanguageManager
 
@@ -16,6 +18,15 @@ class ServeitApp : Application() {
 
         // Initialize Firebase
         FirebaseApp.initializeApp(this)
+
+        // Initialize Firebase App Check with debug provider (for development)
+        // This prevents "App verification failed" errors during development
+        // TODO: Re-enable Firebase App Check when import issues are resolved
+        /*
+        FirebaseAppCheck.getInstance().installAppCheckProviderFactory(
+            DebugAppCheckProviderFactory.getInstance()
+        )
+        */
 
         // Initialize dependency injection container
         container = AppContainer.getInstance(this)

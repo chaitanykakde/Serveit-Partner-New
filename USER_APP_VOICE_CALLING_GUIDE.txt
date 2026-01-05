@@ -1,0 +1,499 @@
+# SERVEIT USER APP: VOICE CALLING IMPLEMENTATION GUIDE
+
+## 1. SYSTEM OVERVIEW (USER APP PERSPECTIVE)
+
+The Serveit platform enables bidirectional voice calling between users and service providers through a structured, booking-based communication system. Voice calls are initiated within the context of confirmed service bookings, ensuring all communication is tied to legitimate service transactions.
+
+### How User ↔ Provider Calling Works
+- **Booking-Based Communication**: All voice calls are associated with existing bookings, providing context and ensuring only authorized parties can communicate
+- **Cloud-Coordinated**: Firebase Cloud Functions manage call permissions and token generation, providing server-side validation
+- **Real-Time Signaling**: Firestore's ActiveCalls collection coordinates call state between user and provider applications
+- **Shared Media Layer**: Both applications use the same Agora RTC channels for audio communication
+
+### ActiveCalls as Coordination Layer
+The ActiveCalls collection serves as the authoritative signaling mechanism:
+- Documents are created when calls are initiated
+- Status fields coordinate actions between user and provider apps
+- Call metadata (channel names, tokens) is shared through this collection
+- Status transitions trigger UI updates and call state changes
+
+### Agora Channel Naming Convention
+- Channel names follow the format: `serveit_booking_{bookingId}`
+- Same channel name is used by both user and provider for the same booking
+- Enables seamless call handoff and prevents channel conflicts
+- Channel names are generated server-side and shared through ActiveCalls documents
+
+## 2. USER APP RESPONSIBILITIES (HIGH LEVEL)
+
+The user app is responsible for managing the complete user-side calling experience while maintaining strict coordination with the provider app through shared backend services.
+
+### Core Responsibilities
+- **Call Initiation**: Provide UI for users to initiate calls to their assigned service providers
+- **Permission Management**: Handle microphone permissions and foreground service requirements
+- **Firestore Coordination**: Create and monitor ActiveCalls documents for call state management
+- **Agora Integration**: Join voice channels using server-provided tokens and channel names
+- **Call Lifecycle**: Manage complete call flow from initiation through completion
+- **Status Synchronization**: Update Firestore call status to coordinate with provider app
+
+### Explicit Restrictions
+The user app must NOT:
+- Modify Firestore booking documents or schema
+- Create alternative calling mechanisms (phone calls, messaging apps)
+- Generate Agora tokens client-side
+- Implement custom channel naming logic
+- Bypass server-side validation checks
+- Create parallel call coordination systems
+
+## 3. REQUIRED FIRESTORE DATA STRUCTURE (READ-ONLY)
+
+### Bookings Collection
+**Path Structure**: `Bookings/{userMobile}`
+
+**Document Structure** (userMobile is the document ID and booking owner):
+```javascript
+{
+  userMobile: "+919307879687", // Document ID, must match authenticated user
+  bookings: [
+    {
+      bookingId: "3dd7ee64-8f3a-472e-bdb8-9a6699f707a8",
+      serviceName: "AC Repair",
+      bookingStatus: "accepted", // Must be active status for calling
+      providerId: "Ll7l5qZ9nnVHki62VdgnorsqIZ42",
+      providerPhone: "+919983444740",
+      providerName: "Service Provider Name",
+      totalPrice: 1500,
+      createdAt: timestamp
+      // ... other booking fields
+    }
+  ],
+  lastUpdated: timestamp
+}
+```
+
+**Critical Notes**:
+- Document ID must exactly match the authenticated user's mobile number
+- bookings is an array of booking objects
+- Only bookings with eligible status can initiate calls
+- providerId and providerPhone are required for call routing
+
+### ActiveCalls Collection
+**Path Structure**: `ActiveCalls/{bookingId}`
+
+**Document Structure** (bookingId is the document ID):
+```javascript
+{
+  bookingId: "3dd7ee64-8f3a-472e-bdb8-9a6699f707a8", // Document ID
+  userMobile: "+919307879687", // Call initiator's mobile
+  providerId: "Ll7l5qZ9nnVHki62VdgnorsqIZ42", // Call recipient's Firebase UID
+  providerPhone: "+919983444740", // Provider's mobile for display
+  serviceName: "AC Repair", // Service being provided
+  status: "RINGING", // Current call status
+  channelName: "serveit_booking_3dd7ee64-8f3a-472e-bdb8-9a6699f707a8",
+  token: "agora_token_string", // Agora RTC token (optional, for caching)
+  appId: "agora_app_id", // Agora App ID (optional, for caching)
+  initiatedBy: "USER", // Who started the call
+  createdAt: timestamp,
+  updatedAt: timestamp
+}
+```
+
+**Status Lifecycle** (mandatory transitions):
+- **RINGING**: Call initiated, waiting for provider response
+- **ACCEPTED**: Provider accepted, call is active
+- **REJECTED**: Provider declined the call
+- **ENDED**: Call completed normally or timed out
+
+**Field Requirements**:
+- Document ID must be the bookingId
+- userMobile must match the authenticated user
+- providerId must match the booking's assigned provider
+- All timestamp fields must use server timestamps
+- Status field must be updated atomically
+
+## 4. CLOUD FUNCTION CONTRACT (VERY IMPORTANT)
+
+### validateCallPermission Function
+**Purpose**: Validates call permissions before allowing channel access
+
+**Required Payload for USER calls**:
+```javascript
+{
+  bookingId: "3dd7ee64-8f3a-472e-bdb8-9a6699f707a8",
+  userMobile: "+919307879687",
+  callerRole: "USER"
+}
+```
+
+**Server-Side Validation**:
+- Verifies booking exists under provided userMobile
+- Confirms booking has an assigned provider
+- Validates booking status allows calling (accepted/arrived/in_progress/payment_pending)
+- Ensures caller is authenticated and owns the booking
+
+**Response Format**:
+```javascript
+{
+  allowed: true // Boolean indicating permission granted
+}
+```
+
+**Error Conditions**:
+- `not-found`: Booking or user document not found
+- `failed-precondition`: Booking status doesn't allow calling
+- `permission-denied`: Authentication or ownership issues
+
+**Critical Notes**:
+- userMobile parameter must exactly match the booking owner's mobile number
+- Function will reject calls for bookings without assigned providers
+- Status validation is role-specific (USER vs PROVIDER have different allowed statuses)
+
+### generateAgoraToken Function
+**Purpose**: Generates secure Agora RTC tokens for channel access
+
+**Required Payload**:
+```javascript
+{
+  bookingId: "3dd7ee64-8f3a-472e-bdb8-9a6699f707a8",
+  userMobile: "+919307879687",
+  callType: "voice"
+}
+```
+
+**Server-Side Processing**:
+- Validates booking ownership using userMobile
+- Generates unique channel name: `serveit_booking_{bookingId}`
+- Creates time-limited RTC token (10-minute expiry)
+- Returns Agora App ID for client initialization
+
+**Response Format**:
+```javascript
+{
+  token: "agora_rtc_token_string",
+  channelName: "serveit_booking_3dd7ee64-8f3a-472e-bdb8-9a6699f707a8",
+  uid: 123456789, // Numeric user ID for Agora
+  appId: "agora_app_id_string",
+  expiresIn: 600 // Token validity in seconds
+}
+```
+
+**Token Behavior**:
+- Tokens expire after 10 minutes
+- Each call should use a fresh token
+- Tokens are scoped to specific channels and users
+- Failed token generation should prevent call initiation
+
+## 5. USER-SIDE CALL INITIATION FLOW (STEP-BY-STEP)
+
+### Step 1: User Interaction
+- User navigates to active booking details
+- User taps "Call Provider" button (only visible for eligible bookings)
+- App verifies booking status allows calling
+
+### Step 2: Pre-Call Validation
+- Check booking status is eligible (accepted/arrived/in_progress/payment_pending)
+- Verify booking has assigned provider
+- Confirm user owns the booking (userMobile matches authenticated user)
+
+### Step 3: Permission Acquisition
+- Request RECORD_AUDIO permission if not granted
+- Handle permission denial gracefully
+- Continue only after permission is granted
+
+### Step 4: Server Permission Validation
+- Call validateCallPermission with bookingId, userMobile, callerRole="USER"
+- Handle validation errors appropriately
+- Abort call initiation if permission denied
+
+### Step 5: ActiveCalls Document Creation
+- Create ActiveCalls/{bookingId} document with status="RINGING"
+- Include all required metadata (userMobile, providerId, serviceName, etc.)
+- Set initiatedBy="USER" to distinguish from provider-initiated calls
+
+### Step 6: Token Generation
+- Call generateAgoraToken with bookingId and userMobile
+- Extract token, channelName, uid, and appId from response
+- Store token information for immediate use
+
+### Step 7: Agora Channel Join
+- Initialize Agora RTC engine with provided appId
+- Join channel using channelName and token
+- Begin local audio capture and transmission
+
+### Step 8: Provider Response Waiting
+- Monitor ActiveCalls/{bookingId} status changes
+- Display "Calling provider..." UI with timeout counter
+- Play ringback tone or show connecting animation
+
+### Step 9: Response Handling
+- **ACCEPTED**: Transition to active call UI, enable audio
+- **REJECTED**: Show "Provider busy" message, end call attempt
+- **Timeout (30s)**: Show "Provider unavailable" message, end call
+- Update UI and cleanup resources appropriately
+
+### Step 10: Call Completion
+- Either party ends call, update ActiveCalls status to "ENDED"
+- Leave Agora channel and cleanup resources
+- Return to booking details screen
+
+## 6. USER-SIDE CALL RECEIVING FLOW
+
+### Provider-Initiated Call Detection
+When a provider initiates a call, the user app must detect and handle the incoming call appropriately.
+
+### Firestore Listener Setup
+- Attach real-time listener to ActiveCalls collection
+- Filter for documents where userMobile matches authenticated user
+- Monitor for new documents with status="RINGING" and initiatedBy="PROVIDER"
+
+### Incoming Call UI Presentation
+- Launch full-screen incoming call activity
+- Display provider information and service details
+- Show accept/reject action buttons
+- Play ringtone and provide vibration feedback
+- Keep screen awake during incoming call state
+
+### Call Acceptance Flow
+- User taps accept button
+- Update ActiveCalls document status to "ACCEPTED"
+- Call generateAgoraToken to get channel access
+- Join Agora channel using provided channel name
+- Transition to active call UI
+
+### Call Rejection Flow
+- User taps reject button
+- Update ActiveCalls document status to "REJECTED"
+- Stop ringtone and vibration
+- Close incoming call UI
+- Return to previous screen
+
+### Active Call Management
+- Monitor ActiveCalls status for "ENDED" updates
+- Leave Agora channel when provider ends call
+- Handle unexpected disconnections gracefully
+- Update UI to reflect call completion
+
+## 7. REQUIRED USER APP COMPONENTS
+
+### UserCallActivity
+**UI Responsibilities**:
+- Display outgoing call initiation screen
+- Show incoming call acceptance/rejection interface
+- Present active call controls and status
+- Handle screen orientation and wake lock management
+- Manage call timeout displays and progress indicators
+
+### UserCallViewModel
+**State Management**:
+- Track call states (initiating, ringing, connected, ended)
+- Handle call lifecycle events and status transitions
+- Manage UI state updates and error conditions
+- Coordinate between UI and business logic layers
+- Handle call cleanup and resource management
+
+### UserCallManager
+**Agora Integration**:
+- Initialize and configure Agora RTC engine
+- Handle channel joining and leaving operations
+- Manage audio device controls (mute, speaker, volume)
+- Monitor call quality and connection status
+- Provide audio session lifecycle management
+
+### UserCallSetupService
+**Background Processing**:
+- Execute call setup operations in foreground service
+- Handle Cloud Function calls and ActiveCalls document management
+- Manage call state persistence across app lifecycle
+- Provide ongoing notification for active calls
+- Handle cleanup operations when app is backgrounded
+
+### Firestore Integration Layer
+**Data Coordination**:
+- Monitor ActiveCalls collection for incoming calls
+- Create and update call documents with proper status
+- Handle real-time status change notifications
+- Manage document lifecycle and cleanup
+- Provide error handling for network issues
+
+## 8. ANDROID PERMISSIONS & MANIFEST REQUIREMENTS
+
+### Required Permissions
+- `android.permission.RECORD_AUDIO`: Essential for voice capture and transmission during calls
+- `android.permission.FOREGROUND_SERVICE`: Required for call setup service to run while app is backgrounded
+- `android.permission.FOREGROUND_SERVICE_MICROPHONE`: Specific foreground service type for audio operations
+
+### Permission Justification
+- **RECORD_AUDIO**: Enables microphone access for voice communication, required for all calling features
+- **FOREGROUND_SERVICE**: Allows call setup operations to continue when app is not in foreground, preventing call interruption
+- **FOREGROUND_SERVICE_MICROPHONE**: Provides proper categorization for audio-related foreground services, ensuring system compatibility
+
+### Manifest Service Declarations
+Required service declarations in AndroidManifest.xml:
+- UserCallSetupService with foregroundServiceType="microphone"
+- Proper intent-filter configurations for service initialization
+
+## 9. ERROR HANDLING & EDGE CASES
+
+### Provider Response Timeout
+- Implement 30-second timeout for provider response
+- Display clear "Provider unavailable" messaging
+- Update ActiveCalls status to "ENDED"
+- Provide retry option or return to booking screen
+
+### Call Rejection Handling
+- Gracefully handle provider rejection
+- Display user-friendly "Provider is busy" message
+- Update ActiveCalls status appropriately
+- Offer alternative contact options if available
+
+### Network Connectivity Issues
+- Handle token generation failures due to network loss
+- Implement retry logic with exponential backoff
+- Display offline messaging during connectivity issues
+- Preserve call state for resumption when connectivity returns
+
+### App Backgrounding During Call
+- Maintain call state through foreground service
+- Show persistent notification for active calls
+- Handle audio focus and interruption scenarios
+- Resume call UI when app returns to foreground
+
+### App Termination Scenarios
+- Clean up Agora resources on app destruction
+- Update ActiveCalls status to "ENDED" when possible
+- Handle unexpected process termination gracefully
+- Prevent orphaned call documents
+
+### Permission Denial Scenarios
+- Provide clear guidance for enabling microphone permissions
+- Direct users to system settings when needed
+- Prevent call initiation without proper permissions
+- Handle runtime permission revocation
+
+### Booking Status Changes
+- Monitor booking status during call setup
+- Abort calls if booking becomes ineligible
+- Display appropriate messaging for status conflicts
+- Update UI to reflect current booking state
+
+## 10. UI / UX EXPECTATIONS
+
+### Call Button Visibility
+- Display "Call Provider" button only on eligible bookings
+- Hide button for completed, cancelled, or pending bookings
+- Show button state based on real-time booking status
+- Include visual indicators for call availability
+
+### Call Initiation States
+- Show loading spinner during permission requests
+- Display "Connecting..." during server validation
+- Present "Calling provider..." with animated elements
+- Include progress indicators for timeout scenarios
+
+### Incoming Call Presentation
+- Full-screen overlay for incoming calls
+- Provider name and service information display
+- Accept/reject buttons with clear visual hierarchy
+- Ringtone and vibration feedback
+- Screen wake lock to prevent sleep
+
+### Active Call Interface
+- Real-time call duration display
+- Mute and speaker control buttons
+- Call quality indicators when available
+- Clear end call button placement
+- Visual feedback for connection status
+
+### Call Completion Feedback
+- Display call duration summary
+- Show call outcome (completed, rejected, failed)
+- Provide "Call again" options where appropriate
+- Return to booking context after call ends
+
+## 11. STRICT DO / DO NOT LIST (CRITICAL)
+
+### Mandatory Requirements (DO)
+- Use bookingId as the ActiveCalls document ID exactly as specified
+- Include userMobile in all Cloud Function calls matching authenticated user
+- Set callerRole="USER" in validateCallPermission calls
+- Create ActiveCalls documents with all required fields before calling generateAgoraToken
+- Update ActiveCalls status to "ENDED" when calls complete
+- Use server-provided channel names without modification
+- Request RECORD_AUDIO permission before initiating calls
+- Handle all specified error conditions gracefully
+
+### Prohibited Actions (DO NOT)
+- Create alternative channel naming schemes or modify server-provided names
+- Call providers directly using phone numbers from booking data
+- Skip ActiveCalls document creation or status updates
+- Generate Agora tokens on the client side
+- Modify Firestore booking documents or schema
+- Implement custom calling flows outside the specified architecture
+- Bypass server-side validation checks
+- Create parallel call coordination mechanisms
+
+## 12. FINAL VERIFICATION CHECKLIST
+
+- [ ] Call button appears only on eligible bookings (accepted/arrived/in_progress/payment_pending)
+- [ ] RECORD_AUDIO permission requested before call initiation
+- [ ] validateCallPermission called with correct bookingId, userMobile, callerRole="USER"
+- [ ] ActiveCalls document created with status="RINGING" and all required fields
+- [ ] generateAgoraToken called only after ActiveCalls creation
+- [ ] Agora channel joined using server-provided channelName and token
+- [ ] ActiveCalls status monitored for ACCEPTED/REJECTED/ENDED changes
+- [ ] Call UI transitions correctly between states (calling → connected → ended)
+- [ ] 30-second timeout implemented for provider response
+- [ ] Call cleanup occurs on all termination paths (user hangup, rejection, timeout)
+- [ ] ActiveCalls status updated to "ENDED" on call completion
+- [ ] Foreground service properly configured for call persistence
+- [ ] Error handling implemented for all specified edge cases
+- [ ] Incoming call detection working for provider-initiated calls
+- [ ] Accept/reject UI functional for incoming calls
+
+## 13. COMMON INTEGRATION MISTAKES
+
+### Wrong userMobile Usage
+**Problem**: Using provider phone number or incorrect mobile in Cloud Function calls
+**Impact**: Permission validation fails, calls cannot be initiated
+**Solution**: Always use authenticated user's mobile number for userMobile parameter
+
+### Missing ActiveCalls Creation
+**Problem**: Attempting to generate tokens before creating ActiveCalls document
+**Impact**: Provider app cannot detect incoming calls, system fails silently
+**Solution**: Create ActiveCalls document with status="RINGING" before calling generateAgoraToken
+
+### Incorrect Status Transitions
+**Problem**: Not updating ActiveCalls status or using wrong status values
+**Impact**: Provider app cannot determine call state, coordination breaks
+**Solution**: Follow exact status lifecycle: RINGING → ACCEPTED → ENDED/REJECTED
+
+### Inactive Firestore Listener
+**Problem**: Not attaching listener to ActiveCalls collection for incoming calls
+**Impact**: Provider-initiated calls go undetected by user app
+**Solution**: Attach real-time listener on app launch, filter by userMobile
+
+### Premature Token Generation
+**Problem**: Calling generateAgoraToken before ActiveCalls document exists
+**Impact**: Token generation may succeed but call coordination fails
+**Solution**: Always create ActiveCalls document first, then generate token
+
+### Permission Check Bypass
+**Problem**: Initiating calls without proper RECORD_AUDIO permission
+**Impact**: Call fails silently or with poor user experience
+**Solution**: Request and verify permissions before any call setup operations
+
+### Channel Name Modification
+**Problem**: Attempting to customize or modify server-provided channel names
+**Impact**: User and provider join different channels, call never connects
+**Solution**: Use channel names exactly as provided by generateAgoraToken
+
+### Incomplete Error Handling
+**Problem**: Not handling Cloud Function failures or network issues
+**Impact**: Calls fail without user feedback, poor user experience
+**Solution**: Implement comprehensive error handling for all API calls and edge cases
+
+### Foreground Service Misconfiguration
+**Problem**: Incorrect foreground service setup or missing permissions
+**Impact**: Calls interrupted when app backgrounded, Android system restrictions
+**Solution**: Properly configure foreground service with correct permissions and notification
+
+This implementation guide provides the complete technical specification for integrating voice calling into the Serveit User App. Following this guide ensures seamless integration with the existing provider app and backend infrastructure, enabling reliable bidirectional voice communication between users and service providers.
