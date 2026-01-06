@@ -27,6 +27,68 @@ admin.initializeApp();
 const db = admin.firestore();
 const messaging = admin.messaging();
 
+/**
+ * Send FCM notification for incoming call (WhatsApp-style)
+ * @param {string} providerId - Provider to notify
+ * @param {Object} callData - Call information
+ */
+async function sendIncomingCallNotification(providerId, callData) {
+  try {
+    console.log("📱 Sending FCM notification to provider:", providerId);
+
+    // Get provider's FCM token
+    const providerDoc = await db.collection("partners").doc(providerId).get();
+    if (!providerDoc.exists) {
+      console.log("⚠️ Provider document not found for FCM:", providerId);
+      return;
+    }
+
+    const providerData = providerDoc.data();
+    const fcmToken = providerData.fcmToken;
+
+    if (!fcmToken) {
+      console.log("⚠️ No FCM token found for provider:", providerId);
+      return;
+    }
+
+    // Prepare FCM message (high priority like WhatsApp calls)
+    const message = {
+      token: fcmToken,
+      android: {
+        priority: "high",
+        ttl: 300000, // 5 minutes
+        notification: {
+          title: "Incoming Call",
+          body: `${callData.serviceName || 'Service Call'} from ${callData.userMobile?.slice(-4) || 'Customer'}`,
+          sound: "default",
+          priority: "max",
+          channel_id: "incoming_calls",
+          default_vibrate_timings: true,
+          visibility: "public",
+        },
+      },
+      data: {
+        type: "incoming_call",
+        callId: callData.bookingId || callData.callId,
+        bookingId: callData.bookingId,
+        userMobile: callData.userMobile,
+        serviceName: callData.serviceName || 'Service Call',
+        initiatedBy: callData.initiatedBy || 'USER',
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+      },
+    };
+
+    console.log("📤 Sending FCM message:", JSON.stringify(message, null, 2));
+
+    const response = await messaging.send(message);
+    console.log("✅ FCM notification sent successfully:", response);
+
+  } catch (error) {
+    console.error("❌ Failed to send FCM notification:", error);
+    // Don't fail the call if FCM fails
+  }
+}
+
 // ═══════════════════════════════════════════════════════════
 // SECTION 1: COPIED FROM OLD PROJECT - PRODUCTION FUNCTIONS
 // ═══════════════════════════════════════════════════════════
@@ -622,6 +684,14 @@ exports.acceptJobRequest = functions.https.onCall(async (data, context) => {
 
     const providerData = providerDoc.data();
 
+    console.log(`🔍 acceptJobRequest: Provider data for ${providerId}:`, {
+      hasPersonalDetails: !!providerData.personalDetails,
+      personalDetailsMobileNo: providerData.personalDetails?.mobileNo,
+      personalDetailsPhoneNumber: providerData.personalDetails?.phoneNumber,
+      rootMobileNo: providerData.mobileNo,
+      rootPhoneNumber: providerData.phoneNumber
+    });
+
     // Execute transaction - OPTIMIZED: Use inbox for O(1) lookup
     const result = await admin.firestore().runTransaction(async (transaction) => {
       // STEP 1: Read inbox entry (O(1) lookup)
@@ -685,11 +755,20 @@ exports.acceptJobRequest = functions.https.onCall(async (data, context) => {
       if (bookingsArray.length > 0 && Array.isArray(bookingsArray)) {
         // Array format: Update specific booking in array
         const updatedBookings = [...bookingsArray];
+        // Extract provider mobile number with multiple fallbacks
+        const providerMobileNo = providerData.personalDetails?.mobileNo ||
+                                providerData.personalDetails?.phoneNumber ||
+                                providerData.mobileNo ||
+                                providerData.phoneNumber ||
+                                "";
+
+        console.log(`📱 acceptJobRequest: Setting providerMobileNo="${providerMobileNo}" for booking ${bookingId}`);
+
         updatedBookings[bookingIndex] = {
           ...targetBooking,
           providerId: providerId,
           providerName: providerData.personalDetails?.fullName || providerData.fullName || "Unknown Provider",
-          providerMobileNo: providerData.personalDetails?.mobileNo || providerData.mobileNo || "",
+          providerMobileNo: providerMobileNo,
           status: "accepted",
           bookingStatus: "accepted", // Keep both fields in sync
           acceptedByProviderId: providerId,
@@ -702,10 +781,19 @@ exports.acceptJobRequest = functions.https.onCall(async (data, context) => {
         });
       } else {
         // Single booking format (legacy)
+        // Extract provider mobile number with multiple fallbacks
+        const providerMobileNo = providerData.personalDetails?.mobileNo ||
+                                providerData.personalDetails?.phoneNumber ||
+                                providerData.mobileNo ||
+                                providerData.phoneNumber ||
+                                "";
+
+        console.log(`📱 acceptJobRequest: Setting providerMobileNo="${providerMobileNo}" for legacy booking ${bookingId}`);
+
         transaction.update(bookingRef, {
           providerId: providerId,
           providerName: providerData.personalDetails?.fullName || providerData.fullName || "Unknown Provider",
-          providerMobileNo: providerData.personalDetails?.mobileNo || providerData.mobileNo || "",
+          providerMobileNo: providerMobileNo,
           status: "accepted",
           bookingStatus: "accepted", // Keep both fields in sync
           acceptedByProviderId: providerId,
@@ -2807,6 +2895,23 @@ exports.generateAgoraToken = functions.https.onCall(async (data, context) => {
       status: "initiated"
     });
 
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 5.5: Update ActiveCalls document with token and UID
+    // ═══════════════════════════════════════════════════════════════
+
+    try {
+      // Update the ActiveCalls document with Agora token and UID
+      await db.collection("ActiveCalls").doc(bookingId).update({
+        token: token,
+        uid: uid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      console.log(`✅ ActiveCalls document updated with token for booking: ${bookingId}`);
+    } catch (updateError) {
+      console.error(`⚠️ Failed to update ActiveCalls document:`, updateError);
+      // Don't fail the token generation if update fails
+    }
+
     const executionTime = Date.now() - startTime;
     console.log(`⏱️  Execution time: ${executionTime}ms`);
 
@@ -3278,7 +3383,49 @@ exports.validateCallPermission = functions.https.onCall(async (data, context) =>
 
     console.log("✅ STEP 4 SUCCESS: Status validated");
 
-    // Step 5: Return success + booking data for call setup
+    // Step 5: For USER-initiated calls, create ActiveCalls document and send FCM
+    if (callerRole === "USER") {
+      console.log("📱 STEP 5: Creating ActiveCalls document and sending FCM notification");
+
+      // Get Agora credentials for the document
+      const agoraConfig = functions.config().agora;
+      if (!agoraConfig || !agoraConfig.app_id) {
+        console.error("❌ Agora config missing");
+        throw new functions.https.HttpsError("internal", "Call service temporarily unavailable");
+      }
+
+      // Create channel name and basic document (without token yet)
+      const channelName = `serveit_booking_${booking.bookingId}`;
+
+      // Create ActiveCalls document for USER-initiated call
+      const activeCallData = {
+        bookingId: booking.bookingId,
+        userMobile: userMobile,
+        providerId: booking.providerId,
+        providerPhone: booking.providerMobileNo || booking.providerPhone || "",
+        serviceName: booking.serviceName || "Service Call",
+        status: "RINGING",
+        initiatedBy: "USER",
+        channelName: channelName,
+        appId: agoraConfig.app_id,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      // Create the document (this will trigger the provider's listener)
+      await db.collection("ActiveCalls").doc(booking.bookingId).set(activeCallData);
+      console.log("✅ ActiveCalls document created for USER call:", booking.bookingId);
+
+      // Send FCM notification asynchronously
+      sendIncomingCallNotification(booking.providerId, {
+        bookingId: booking.bookingId,
+        userMobile: userMobile,
+        serviceName: booking.serviceName,
+        initiatedBy: "USER"
+      });
+    }
+
+    // Step 6: Return success + booking data for call setup
     console.log("🎉 FINAL RESULT: CALL PERMISSION GRANTED");
     console.log("📞 Booking ready for call setup:", booking.bookingId);
 

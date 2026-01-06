@@ -1,6 +1,7 @@
 package com.nextserve.serveitpartnernew
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -78,6 +79,11 @@ class MainActivity : ComponentActivity() {
                         if (state != AuthState.Uninitialized) {
                             when (state) {
                                 AuthState.LoggedOut -> {
+                                    // Stop incoming call listener service when user logs out
+                                    com.nextserve.serveitpartnernew.data.service.IncomingCallListenerService.stopService(
+                                        this@MainActivity
+                                    )
+
                                     if (navController.currentDestination?.route == Screen.Splash.route) {
                                         navController.navigate(Screen.Login.route) {
                                             popUpTo(Screen.Splash.route) { inclusive = true }
@@ -93,6 +99,12 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 is AuthState.Authenticated -> {
+                                    // Start incoming call listener service when user is authenticated
+                                    Log.d("MainActivity", "User authenticated, starting IncomingCallListenerService")
+                                    com.nextserve.serveitpartnernew.data.service.IncomingCallListenerService.startService(
+                                        this@MainActivity
+                                    )
+
                                     // New user after OTP verification - navigate to language selection
                                     if (navController.currentDestination?.route != Screen.LanguageSelection.route) {
                                         navController.navigate(Screen.LanguageSelection.route) {
@@ -227,13 +239,6 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable(Screen.Home.route) {
-                        // Start incoming call listener service when provider reaches home
-                        LaunchedEffect(Unit) {
-                            com.nextserve.serveitpartnernew.data.service.IncomingCallListenerService.startService(
-                                this@MainActivity
-                            )
-                        }
-
                         // Main app with bottom navigation will be shown here
                         com.nextserve.serveitpartnernew.ui.screen.main.MainAppScreen()
                     }

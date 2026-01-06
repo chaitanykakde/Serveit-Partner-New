@@ -78,6 +78,9 @@ class CallSetupService : Service() {
     // Track if foreground has been started
     private var foregroundStarted = false
 
+    // Track current booking being set up
+    private var currentBookingId: String? = null
+
     // Dependencies
     private lateinit var agoraRepository: AgoraRepository
     private val db = FirebaseFirestore.getInstance()
@@ -125,8 +128,18 @@ class CallSetupService : Service() {
      * Start call setup for a booking
      */
     private fun startCallSetup(bookingId: String) {
-        // Cancel any existing setup
-        currentJob?.cancel()
+        // Check if we're already setting up this booking
+        if (currentBookingId == bookingId && currentJob?.isActive == true) {
+            Log.w(TAG, "Call setup already in progress for booking: $bookingId, ignoring duplicate request")
+            return
+        }
+
+        // Cancel any existing setup for different booking
+        if (currentBookingId != bookingId) {
+            currentJob?.cancel()
+        }
+
+        currentBookingId = bookingId
 
         currentJob = serviceScope.launch {
             try {

@@ -171,11 +171,15 @@ class LoginViewModel(
                     providerResult.onSuccess { providerData ->
                         if (providerData == null) {
                             val formattedPhone = PhoneNumberFormatter.formatPhoneNumber(uiState.phoneNumber)
+                            android.util.Log.d("LoginViewModel", "📱 Creating new provider document with phone: $formattedPhone")
                             firestoreRepository.createProviderDocument(uid, formattedPhone)
                         } else {
                             if (providerData.phoneNumber.isEmpty()) {
                                 val formattedPhone = PhoneNumberFormatter.formatPhoneNumber(uiState.phoneNumber)
+                                android.util.Log.d("LoginViewModel", "📱 Updating existing provider with phone: $formattedPhone")
                                 firestoreRepository.updateProviderData(uid, mapOf("phoneNumber" to formattedPhone))
+                            } else {
+                                android.util.Log.d("LoginViewModel", "📱 Provider already has phone: ${providerData.phoneNumber}")
                             }
                             firestoreRepository.updateLastLogin(uid)
                         }

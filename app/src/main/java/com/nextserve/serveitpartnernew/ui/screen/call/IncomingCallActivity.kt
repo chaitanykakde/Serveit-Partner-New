@@ -6,6 +6,8 @@ import android.content.pm.ActivityInfo
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
@@ -127,6 +129,14 @@ class IncomingCallActivity : ComponentActivity() {
             val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ringtone = RingtoneManager.getRingtone(this, ringtoneUri)
             ringtone?.play()
+
+            // Auto-stop ringtone after 30 seconds as safety measure
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (ringtone?.isPlaying == true) {
+                    Log.w(TAG, "Auto-stopping ringtone after timeout")
+                    stopRingtone()
+                }
+            }, 30000)
         } catch (e: Exception) {
             Log.e(TAG, "Error starting ringtone", e)
         }
@@ -138,14 +148,29 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     private fun startVibration() {
-        vibrator = getSystemService(VIBRATOR_SERVICE) as? Vibrator
-        vibrator?.let {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                it.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 1000, 500), 0))
-            } else {
-                @Suppress("DEPRECATION")
-                it.vibrate(longArrayOf(0, 1000, 500), 0)
+        try {
+            // Check if vibration permission is granted
+            if (checkSelfPermission(android.Manifest.permission.VIBRATE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                Log.w(TAG, "VIBRATE permission not granted, skipping vibration")
+                return
             }
+
+            vibrator = getSystemService(VIBRATOR_SERVICE) as? Vibrator
+            vibrator?.let {
+                try {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        it.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 1000, 500), 0))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        it.vibrate(longArrayOf(0, 1000, 500), 0)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error starting vibration", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Critical error in startVibration", e)
+            // Continue without vibration - don't crash the app
         }
     }
 

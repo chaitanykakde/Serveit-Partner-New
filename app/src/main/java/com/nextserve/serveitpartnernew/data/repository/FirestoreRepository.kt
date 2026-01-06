@@ -40,7 +40,9 @@ class FirestoreRepository(
             } else {
                 "+91$phoneNumber"
             }
-            
+
+            android.util.Log.d("FirestoreRepository", "📱 Creating provider document for uid: $uid with phone: $formattedPhone")
+
             val providerData = ProviderData(
                 uid = uid,
                 phoneNumber = formattedPhone,
@@ -49,13 +51,17 @@ class FirestoreRepository(
                 onboardingStatus = "IN_PROGRESS",
                 currentStep = 1
             )
-            
+
             // Transform flat model to nested Firestore structure using mapper
             val firestoreData = ProviderFirestoreMapper.toFirestore(providerData)
-            
+
+            android.util.Log.d("FirestoreRepository", "🔄 Firestore data structure: personalDetails.mobileNo = ${firestoreData["personalDetails"]?.let { (it as Map<*, *>)["mobileNo"] }}")
+
             // Write to partners collection (Cloud Functions expect this)
             partnersCollection.document(uid).set(firestoreData).await()
-            
+
+            android.util.Log.d("FirestoreRepository", "✅ Provider document created successfully for uid: $uid")
+
             Result.success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)

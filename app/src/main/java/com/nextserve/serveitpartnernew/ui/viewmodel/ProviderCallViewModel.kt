@@ -113,6 +113,14 @@ class ProviderCallViewModel(
      * Now delegates to CallSetupService instead of doing network operations directly
      */
     fun initializeCall(bookingId: String) {
+        // Check if there's already an active call setup for this booking
+        // This prevents duplicate initialization even across ViewModel recreations
+        val currentState = uiState.value
+        if (currentState.callState != CallState.IDLE || currentState.isLoading) {
+            Log.w(TAG, "Call already in progress or initializing for booking: $bookingId, current state: ${currentState.callState}, isLoading: ${currentState.isLoading}")
+            return
+        }
+
         // One-time execution guard - prevent duplicate call initialization
         if (callInitStarted) {
             Log.w(TAG, "Call initialization already started for booking: $bookingId, ignoring duplicate call")
@@ -125,6 +133,7 @@ class ProviderCallViewModel(
         currentBookingId = bookingId
         _uiState.value = _uiState.value.copy(
             bookingId = bookingId,
+            callState = CallState.CONNECTING, // Set state immediately to prevent re-initialization
             isLoading = true,
             errorMessage = null
         )
@@ -248,6 +257,13 @@ class ProviderCallViewModel(
         _uiState.value = CallUiState()
         currentBookingId = ""
         callInitStarted = false
+    }
+
+    /**
+     * Reset error message
+     */
+    fun resetError() {
+        _uiState.value = _uiState.value.copy(errorMessage = null)
     }
 
     /**

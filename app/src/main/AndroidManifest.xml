@@ -29,6 +29,9 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
 
+    <!-- Vibration Permission for Incoming Call Alerts -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:name=".ServeitApp"
         android:allowBackup="true"
@@ -78,7 +81,12 @@
             android:name=".data.service.GeofenceBroadcastReceiver"
             android:enabled="true"
             android:exported="false" />
-        
+
+        <receiver
+            android:name=".data.fcm.CallActionReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

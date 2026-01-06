@@ -144,13 +144,14 @@ fun ProviderCallScreen(
         if (isGranted) {
             android.util.Log.d("ProviderCallActivity", "✅ MICROPHONE PERMISSION GRANTED")
             // Permission granted, now start the call
+            // Don't finish activity here - let the call initialization handle it
             if (bookingId.isNotEmpty()) {
                 viewModel.initializeCall(bookingId)
             }
         } else {
             android.util.Log.w("ProviderCallActivity", "❌ MICROPHONE PERMISSION DENIED")
-            // Permission denied, show error and exit
-            onCallEnded()
+            // Permission denied - show error message
+            // Don't finish activity immediately, let user retry
         }
     }
 
@@ -193,27 +194,44 @@ fun ProviderCallScreen(
     }
 
     // Handle call end - only trigger when call is truly finished
-    LaunchedEffect(uiState.callState) {
+    // Add guard to prevent premature activity finish during initialization
+    var callInitializationStarted by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.callState, callInitializationStarted) {
         when (uiState.callState) {
             CallState.ENDED -> {
                 // Call ended normally
+                android.util.Log.d("ProviderCallActivity", "Call ended, finishing activity")
                 onCallEnded()
             }
             CallState.IDLE -> {
-                // Call became idle (no active call)
-                if (!uiState.isLoading) {
-                    // Only end activity if we're not in loading state (permission validation)
+                // Only end activity if call initialization has started and we're not loading
+                // This prevents premature finish during permission checks
+                if (callInitializationStarted && !uiState.isLoading && uiState.errorMessage == null) {
+                    android.util.Log.d("ProviderCallActivity", "Call idle after initialization, finishing activity")
                     onCallEnded()
+                } else if (!callInitializationStarted && !uiState.isLoading) {
+                    // Initial idle state before any call setup - don't finish
+                    android.util.Log.d("ProviderCallActivity", "Initial idle state, waiting for call initialization")
                 }
             }
             CallState.ERROR -> {
-                // Call failed with error
-                if (uiState.errorMessage != null) {
+                // Call failed with error - only finish if we have an error message
+                if (uiState.errorMessage != null && callInitializationStarted) {
+                    android.util.Log.d("ProviderCallActivity", "Call error after initialization, finishing activity: ${uiState.errorMessage}")
                     onCallEnded()
                 }
             }
+            CallState.CONNECTING, CallState.WAITING_FOR_USER -> {
+                // Mark that call initialization has started
+                callInitializationStarted = true
+                android.util.Log.d("ProviderCallActivity", "Call initialization started, state: ${uiState.callState}")
+            }
             else -> {
-                // Keep activity alive during CONNECTING, WAITING_FOR_USER, CONNECTED, or LOADING
+                // Keep activity alive during other states
+                if (!callInitializationStarted && (uiState.callState != CallState.IDLE)) {
+                    callInitializationStarted = true
+                }
             }
         }
     }
@@ -333,12 +351,38 @@ fun ProviderCallScreen(
             }
         }
 
-        // Error message
+        // Error message with retry option
         uiState.errorMessage?.let { error ->
             Snackbar(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(16.dp)
+                    .padding(16.dp),
+                action = {
+                    // Show retry button for permission errors
+                    if (error.contains("permission", ignoreCase = true) ||
+                        error.contains("microphone", ignoreCase = true)) {
+                        TextButton(
+                            onClick = {
+                                // Reset error and try again
+                                viewModel.resetError()
+                                hasRequestedPermission = false
+                                // Trigger permission check again
+                                val hasPermission = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.RECORD_AUDIO
+                                ) == PackageManager.PERMISSION_GRANTED
+
+                                if (hasPermission) {
+                                    viewModel.initializeCall(bookingId)
+                                } else {
+                                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                }
+                            }
+                        ) {
+                            Text("RETRY", color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
             ) {
                 Text(text = error)
             }
