@@ -100,6 +100,9 @@ fun JobDetailsScreen(
     var showAcceptDialog by remember { mutableStateOf(false) }
     var showRejectDialog by remember { mutableStateOf(false) }
     var showStatusUpdateDialog by remember { mutableStateOf<String?>(null) } // Status to update
+    var showPaymentCollection by remember { mutableStateOf(false) }
+    var showOtpDialog by remember { mutableStateOf(false) }
+    var otpError by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -202,7 +205,23 @@ fun JobDetailsScreen(
                             coroutineScope = coroutineScope,
                             onAcceptClick = { showAcceptDialog = true },
                             onRejectClick = { showRejectDialog = true },
-                            onStatusUpdateClick = { status -> showStatusUpdateDialog = status },
+                            onStatusUpdateClick = { status ->
+                                when (status) {
+                                    "collect_payment" -> showPaymentCollection = true
+                                    "completed" -> {
+                                        val job = uiState.job!!
+                                        if (job.paymentMode == "CASH" && job.paymentStatus == "DONE") {
+                                            // For cash payments, show OTP dialog
+                                            showStatusUpdateDialog = "completed"
+                                        } else {
+                                            // For UPI or legacy bookings, proceed directly
+                                            showStatusUpdateDialog = "completed"
+                                        }
+                                    }
+                                    else -> showStatusUpdateDialog = status
+                                }
+                            },
+                            onOtpDialogClick = { showOtpDialog = true },
                             onJobCompleted = {
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar("Job completed successfully!")
@@ -224,7 +243,23 @@ fun JobDetailsScreen(
                         coroutineScope = coroutineScope,
                         onAcceptClick = { showAcceptDialog = true },
                         onRejectClick = { showRejectDialog = true },
-                        onStatusUpdateClick = { status -> showStatusUpdateDialog = status },
+                        onStatusUpdateClick = { status ->
+                            when (status) {
+                                "collect_payment" -> showPaymentCollection = true
+                                "completed" -> {
+                                    val job = uiState.job!!
+                                    if (job.paymentMode == "CASH" && job.paymentStatus == "DONE") {
+                                        // For cash payments, show OTP dialog
+                                        showStatusUpdateDialog = "completed"
+                                    } else {
+                                        // For UPI or legacy bookings, proceed directly
+                                        showStatusUpdateDialog = "completed"
+                                    }
+                                }
+                                else -> showStatusUpdateDialog = status
+                            }
+                        },
+                        onOtpDialogClick = { showOtpDialog = true },
                         onJobCompleted = {
                             coroutineScope.launch {
                                 snackbarHostState.showSnackbar("Job completed successfully!")
@@ -336,11 +371,23 @@ fun JobDetailsScreen(
                 "Confirm that the service work is complete and waiting for payment.",
                 "Complete Service"
             )
-            "completed" -> Triple(
-                "Mark as Completed?",
-                "Confirm that the job is fully completed and payment has been received.",
-                "Mark Completed"
-            )
+            "completed" -> {
+                val job = uiState.job!!
+                if (job.paymentMode == "CASH" && job.paymentStatus == "DONE") {
+                    // Cash payment - show OTP verification dialog instead
+                    Triple(
+                        "Verify Payment",
+                        "Enter the 6-digit OTP provided by the customer to complete the job.",
+                        "Verify & Complete"
+                    )
+                } else {
+                    Triple(
+                        "Mark as Completed?",
+                        "Confirm that the job is fully completed and payment has been received.",
+                        "Mark Completed"
+                    )
+                }
+            }
             else -> Triple("Confirm Action?", "Are you sure?", "Confirm")
         }
 
@@ -407,23 +454,32 @@ fun JobDetailsScreen(
                                 }
                             }
                             "completed" -> {
-                                {
-                                    viewModel.markAsCompleted(
-                                        onSuccess = {
-                                            showStatusUpdateDialog = null
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar("Job completed successfully!")
-                                                kotlinx.coroutines.delay(1500)
-                                                onBack()
-                                            }
-                                        },
-                                        onError = { error ->
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar(error)
+                                val job = uiState.job!!
+                                if (job.paymentMode == "CASH" && job.paymentStatus == "DONE") {
+                                    // For cash payments, show OTP verification dialog
+                                    showStatusUpdateDialog = null // Close current dialog
+                                    // OTP dialog will be shown by the SmartActionButtons logic
+                                    {} // Empty action since OTP dialog handles it
+                                } else {
+                                    // For UPI or legacy bookings, proceed directly
+                                    {
+                                        viewModel.markAsCompleted(
+                                            onSuccess = {
                                                 showStatusUpdateDialog = null
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar("Job completed successfully!")
+                                                    kotlinx.coroutines.delay(1500)
+                                                    onBack()
+                                                }
+                                            },
+                                            onError = { error ->
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(error)
+                                                    showStatusUpdateDialog = null
+                                                }
                                             }
-                                        }
-                                    )
+                                        )
+                                    }
                                 }
                             }
                             else -> { { showStatusUpdateDialog = null } }
@@ -451,6 +507,46 @@ fun JobDetailsScreen(
         )
     }
 
+    // Payment Collection Screen
+    if (showPaymentCollection && uiState.job != null) {
+        PaymentCollectionScreen(
+            job = uiState.job!!,
+            providerId = providerId,
+            onBack = { showPaymentCollection = false },
+            onPaymentCompleted = {
+                showPaymentCollection = false
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("Payment collected successfully!")
+                    // Reload job details to show updated payment status
+                    viewModel.loadJobDetails()
+                }
+            }
+        )
+    }
+
+    // OTP Verification Dialog for cash payments
+
+    if (showOtpDialog) {
+        com.nextserve.serveitpartnernew.ui.components.OtpVerificationDialog(
+            onDismiss = { showOtpDialog = false },
+            onVerify = { otp ->
+                viewModel.verifyOtpAndComplete(otp) { success, error ->
+                    if (success) {
+                        showOtpDialog = false
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Job completed successfully!")
+                            kotlinx.coroutines.delay(1500)
+                            onBack()
+                        }
+                    } else {
+                        otpError = error ?: "Invalid OTP"
+                    }
+                }
+            },
+            errorMessage = otpError
+        )
+    }
+
     // Show error message if any
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { error ->
@@ -474,6 +570,7 @@ private fun JobDetailsContent(
     onAcceptClick: () -> Unit,
     onRejectClick: () -> Unit,
     onStatusUpdateClick: (String) -> Unit = {},
+    onOtpDialogClick: () -> Unit = {},
     onJobCompleted: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -536,6 +633,7 @@ private fun JobDetailsContent(
             onAcceptClick = onAcceptClick,
             onRejectClick = onRejectClick,
             onStatusUpdateClick = onStatusUpdateClick,
+            onOtpDialogClick = onOtpDialogClick,
             onJobCompleted = onJobCompleted
         )
 
@@ -1338,6 +1436,7 @@ private fun SmartActionButtons(
     onAcceptClick: () -> Unit,
     onRejectClick: () -> Unit,
     onStatusUpdateClick: (String) -> Unit = {},
+    onOtpDialogClick: () -> Unit = {},
     onJobCompleted: () -> Unit
 ) {
     val isUpdating = uiState.isUpdatingStatus
@@ -1521,7 +1620,103 @@ private fun SmartActionButtons(
                 }
             }
             "payment_pending" -> {
-                // Primary: Mark as Completed (large, prominent), Secondary: Call Customer
+                // Check if payment has been collected
+                if (job.paymentStatus == "DONE") {
+                    // Payment already collected - show completion options
+                    when (job.paymentMode) {
+                        "CASH" -> {
+                            // For cash payments, show OTP verification requirement
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = "Cash Payment Collected",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "₹${job.paymentAmount?.toInt() ?: 0}",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Ask customer for OTP to complete job",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            // OTP Verification Button
+                            Button(
+                                onClick = onOtpDialogClick,
+                                modifier = Modifier.fillMaxWidth().height(64.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = "Verify OTP & Complete",
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    "Verify OTP & Complete",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
+                        }
+                        "UPI_QR" -> {
+                            // For UPI payments, allow direct completion
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = "Online Payment Collected",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "₹${job.paymentAmount?.toInt() ?: 0}",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "UPI QR payment completed",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            // Complete Job Button
                 Button(
                     onClick = { onStatusUpdateClick("completed") },
                     modifier = Modifier.fillMaxWidth().height(64.dp),
@@ -1551,7 +1746,76 @@ private fun SmartActionButtons(
                         style = MaterialTheme.typography.titleLarge
                     )
                 }
+                        }
+                        else -> {
+                            // Legacy bookings without payment info - show collect payment option
+                            Button(
+                                onClick = { onStatusUpdateClick("collect_payment") },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary
+                                )
+                            ) {
+                                Icon(
+                                    Icons.Default.Build,
+                                    contentDescription = "Collect Payment",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("Collect Payment", fontWeight = FontWeight.Medium)
+                            }
 
+                            // Fallback complete button for legacy bookings
+                            Button(
+                                onClick = { onStatusUpdateClick("completed") },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                enabled = !isUpdating,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                if (isUpdating && updatingType == "completed") {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = "Mark as Completed",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("Mark as Completed", fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
+                } else {
+                    // Payment not collected yet - show payment collection option
+                    Button(
+                        onClick = { onStatusUpdateClick("collect_payment") },
+                        modifier = Modifier.fillMaxWidth().height(64.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Build,
+                            contentDescription = "Collect Payment",
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "Collect Payment",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
+                }
+
+                // Call Customer button (always available)
                 OutlinedButton(
                     onClick = { viewModel.callCustomer(context) },
                     modifier = Modifier.fillMaxWidth().height(48.dp),

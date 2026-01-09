@@ -217,7 +217,140 @@ class JobDetailsViewModel(
             onError("Cannot mark as completed. Current status: ${job.status}")
             return
         }
+
+        // Check if payment verification is needed
+        if (job.paymentMode == "CASH" && job.paymentStatus == "DONE") {
+            // For cash payments, OTP verification is required
+            // This should be handled by the OTP dialog, not here
+            onError("OTP verification required for cash payments")
+            return
+        }
+
         updateJobStatus("completed", onSuccess, onError)
+    }
+
+    /**
+     * Process cash payment - generate OTP and update payment info
+     */
+    fun processCashPayment(amount: Double, callback: (Boolean, String?) -> Unit) {
+        val job = _uiState.value.job ?: return callback(false, "Job not found")
+
+        viewModelScope.launch {
+            try {
+                val otp = jobsRepository.generateOTP()
+                val currentTime = System.currentTimeMillis()
+
+                val result = jobsRepository.updateJobPaymentInfo(
+                    bookingId = bookingId,
+                    customerPhoneNumber = customerPhoneNumber,
+                    paymentMode = "CASH",
+                    paymentAmount = amount,
+                    paymentStatus = "DONE",
+                    completionOTP = otp,
+                    otpGeneratedAt = currentTime
+                )
+
+                result.fold(
+                    onSuccess = {
+                        // Update local job state
+                        _uiState.value.job?.let { currentJob ->
+                            val updatedJob = currentJob.copy(
+                                paymentMode = "CASH",
+                                paymentAmount = amount,
+                                paymentStatus = "DONE",
+                                completionOTP = otp,
+                                otpGeneratedAt = currentTime
+                            )
+                            _uiState.value = _uiState.value.copy(job = updatedJob)
+                        }
+                        callback(true, null)
+                    },
+                    onFailure = { error ->
+                        callback(false, error.message ?: "Failed to process cash payment")
+                    }
+                )
+            } catch (e: Exception) {
+                callback(false, e.message ?: "Unexpected error")
+            }
+        }
+    }
+
+    /**
+     * Process UPI payment - generate QR and update payment info
+     */
+    fun processUpiPayment(amount: Double, qrBitmap: android.graphics.Bitmap?, callback: (Boolean, String?) -> Unit) {
+        val job = _uiState.value.job ?: return callback(false, "Job not found")
+
+        viewModelScope.launch {
+            try {
+                val upiNote = com.nextserve.serveitpartnernew.utils.QrUtils.generateUpiNote(
+                    customerName = job.userName,
+                    serviceName = job.serviceName,
+                    providerName = job.providerName ?: "Provider",
+                    bookingId = bookingId
+                )
+
+                val upiUri = com.nextserve.serveitpartnernew.utils.QrUtils.generateUpiUri(
+                    amount = amount,
+                    transactionNote = upiNote
+                )
+
+                val result = jobsRepository.updateJobPaymentInfo(
+                    bookingId = bookingId,
+                    customerPhoneNumber = customerPhoneNumber,
+                    paymentMode = "UPI_QR",
+                    paymentAmount = amount,
+                    paymentStatus = "DONE",
+                    qrUpiUri = upiUri,
+                    upiNote = upiNote
+                )
+
+                result.fold(
+                    onSuccess = {
+                        // Update local job state
+                        _uiState.value.job?.let { currentJob ->
+                            val updatedJob = currentJob.copy(
+                                paymentMode = "UPI_QR",
+                                paymentAmount = amount,
+                                paymentStatus = "DONE",
+                                qrUpiUri = upiUri,
+                                upiNote = upiNote
+                            )
+                            _uiState.value = _uiState.value.copy(job = updatedJob)
+                        }
+                        callback(true, null)
+                    },
+                    onFailure = { error ->
+                        callback(false, error.message ?: "Failed to generate QR code")
+                    }
+                )
+            } catch (e: Exception) {
+                callback(false, e.message ?: "Unexpected error")
+            }
+        }
+    }
+
+    /**
+     * Verify OTP and complete job (for cash payments)
+     */
+    fun verifyOtpAndComplete(enteredOtp: String, callback: (Boolean, String?) -> Unit) {
+        val job = _uiState.value.job ?: return callback(false, "Job not found")
+
+        if (job.paymentMode != "CASH") {
+            callback(false, "OTP verification only required for cash payments")
+            return
+        }
+
+        if (job.completionOTP != enteredOtp) {
+            callback(false, "Invalid OTP. Please check with customer.")
+            return
+        }
+
+        // OTP verified, now complete the job
+        markAsCompleted(
+            onSuccess = { callback(true, null) },
+            onError = { error -> callback(false, error) }
+        )
     }
 
     /**

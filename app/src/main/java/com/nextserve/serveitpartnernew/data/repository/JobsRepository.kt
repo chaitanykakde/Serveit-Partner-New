@@ -377,6 +377,77 @@ class JobsRepository(
     }
 
     /**
+     * Update payment information for a job
+     */
+    suspend fun updateJobPaymentInfo(
+        bookingId: String,
+        customerPhoneNumber: String,
+        paymentMode: String,
+        paymentAmount: Double,
+        paymentStatus: String,
+        completionOTP: String? = null,
+        otpGeneratedAt: Long? = null,
+        qrUpiUri: String? = null,
+        upiNote: String? = null
+    ): Result<Unit> {
+        return try {
+            val documentRef = bookingsCollection.document(customerPhoneNumber)
+
+            // Get current document
+            val snapshot = documentRef.get().await()
+            val data = snapshot.data ?: throw Exception("Document not found")
+
+            val updates = mutableMapOf<String, Any>(
+                "paymentMode" to paymentMode,
+                "paymentAmount" to paymentAmount,
+                "paymentStatus" to paymentStatus
+            )
+
+            // Add optional fields only if provided
+            completionOTP?.let { updates["completionOTP"] = it }
+            otpGeneratedAt?.let { updates["otpGeneratedAt"] = it }
+            qrUpiUri?.let { updates["qrUpiUri"] = it }
+            upiNote?.let { updates["upiNote"] = it }
+
+            // Check if document has bookings array (primary format)
+            val bookingsArray = data["bookings"] as? MutableList<Map<String, Any>>
+            if (bookingsArray != null) {
+                // Array format - find and update the specific booking
+                val bookingIndex = bookingsArray.indexOfFirst {
+                    (it["bookingId"] as? String) == bookingId
+                }
+
+                if (bookingIndex == -1) {
+                    throw Exception("Booking not found in array")
+                }
+
+                val booking = bookingsArray[bookingIndex].toMutableMap()
+                booking.putAll(updates)
+                bookingsArray[bookingIndex] = booking
+                documentRef.update("bookings", bookingsArray).await()
+            } else {
+                // Single booking format (legacy)
+                if ((data["bookingId"] as? String) != bookingId) {
+                    throw Exception("Booking ID mismatch")
+                }
+
+                documentRef.update(updates).await()
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Generate a 6-digit OTP
+     */
+    fun generateOTP(): String {
+        return (100000..999999).random().toString()
+    }
+
+    /**
      * Map Firestore booking data to Job model
      * Handles field name inconsistencies (status vs bookingStatus)
      */
@@ -454,6 +525,15 @@ class JobsRepository(
         // Extract expiresAt (if available from inbox entry)
         val expiresAt = bookingData["expiresAt"] as? Timestamp
 
+        // Extract payment-related fields (optional, backward-compatible)
+        val paymentMode = bookingData["paymentMode"] as? String
+        val paymentAmount = (bookingData["paymentAmount"] as? Number)?.toDouble()
+        val paymentStatus = bookingData["paymentStatus"] as? String
+        val completionOTP = bookingData["completionOTP"] as? String
+        val otpGeneratedAt = (bookingData["otpGeneratedAt"] as? Number)?.toLong()
+        val qrUpiUri = bookingData["qrUpiUri"] as? String
+        val upiNote = bookingData["upiNote"] as? String
+
         return Job(
             bookingId = bookingId,
             serviceName = serviceName,
@@ -478,7 +558,14 @@ class JobsRepository(
             notes = notes,
             customerEmail = customerEmail,
             estimatedDuration = estimatedDuration,
-            expiresAt = expiresAt
+            expiresAt = expiresAt,
+            paymentMode = paymentMode,
+            paymentAmount = paymentAmount,
+            paymentStatus = paymentStatus,
+            completionOTP = completionOTP,
+            otpGeneratedAt = otpGeneratedAt,
+            qrUpiUri = qrUpiUri,
+            upiNote = upiNote
         )
     }
 

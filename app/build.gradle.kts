@@ -79,6 +79,9 @@ dependencies {
     // AppCompat for locale support on older Android versions
     implementation("androidx.appcompat:appcompat:1.7.0")
 
+    // ZXing for QR code generation
+    implementation("com.google.zxing:core:3.5.2")
+
     // Agora Voice SDK for in-app calling
     implementation("io.agora.rtc:voice-sdk:4.2.6")
     

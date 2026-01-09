@@ -38,7 +38,29 @@ data class Job(
     val priority: String? = null, // "high", "medium", "low" - for job prioritization
     val customerEmail: String? = null, // Customer email (if available)
     val estimatedDuration: Int? = null, // Estimated service duration in minutes
-    val expiresAt: Timestamp? = null // Job expiry timestamp (30 min from creation)
+    val expiresAt: Timestamp? = null, // Job expiry timestamp (30 min from creation)
+
+    // Payment-related fields (optional, backward-compatible)
+    @get:PropertyName("paymentMode") @set:PropertyName("paymentMode")
+    var paymentMode: String? = null, // "CASH" | "UPI_QR"
+
+    @get:PropertyName("paymentAmount") @set:PropertyName("paymentAmount")
+    var paymentAmount: Double? = null,
+
+    @get:PropertyName("paymentStatus") @set:PropertyName("paymentStatus")
+    var paymentStatus: String? = null, // "PENDING" | "DONE"
+
+    @get:PropertyName("completionOTP") @set:PropertyName("completionOTP")
+    var completionOTP: String? = null,
+
+    @get:PropertyName("otpGeneratedAt") @set:PropertyName("otpGeneratedAt")
+    var otpGeneratedAt: Long? = null,
+
+    @get:PropertyName("qrUpiUri") @set:PropertyName("qrUpiUri")
+    var qrUpiUri: String? = null,
+
+    @get:PropertyName("upiNote") @set:PropertyName("upiNote")
+    var upiNote: String? = null
 ) {
     /**
      * Check if job is available (pending and provider was notified)
