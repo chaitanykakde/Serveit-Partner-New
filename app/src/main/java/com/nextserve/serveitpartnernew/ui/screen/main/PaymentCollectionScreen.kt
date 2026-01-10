@@ -243,7 +243,8 @@ fun PaymentCollectionScreen(
                                     viewModel.processCashPayment(amountDouble) { success, error ->
                                         isProcessing = false
                                         if (success) {
-                                            showOtpDialog = true
+                                            // Payment processed successfully - OTP will be shown during completion
+                                            onPaymentCompleted()
                                         } else {
                                             errorMessage = error ?: "Failed to process cash payment"
                                         }

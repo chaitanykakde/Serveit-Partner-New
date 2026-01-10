@@ -24,8 +24,15 @@ object QrUtils {
         currency: String = "INR",
         transactionNote: String
     ): String {
+        // Ensure amount has exactly 2 decimal places for UPI compatibility
+        val formattedAmount = String.format("%.2f", amount)
+
+        // URL encode payee name and transaction note for maximum compatibility
+        val encodedPayeeName = URLEncoder.encode(payeeName, StandardCharsets.UTF_8.toString())
         val encodedNote = URLEncoder.encode(transactionNote, StandardCharsets.UTF_8.toString())
-        return "upi://pay?pa=$upiId&pn=$payeeName&am=$amount&cu=$currency&tn=$encodedNote"
+
+        // Use standard UPI parameter order: pa, pn, am, cu, tn
+        return "upi://pay?pa=$upiId&pn=$encodedPayeeName&am=$formattedAmount&cu=$currency&tn=$encodedNote"
     }
 
     /**
@@ -48,11 +55,12 @@ object QrUtils {
             val hints = hashMapOf<EncodeHintType, Any>()
             hints[EncodeHintType.CHARACTER_SET] = "UTF-8"
             hints[EncodeHintType.MARGIN] = 1 // Default margin
+            hints[EncodeHintType.ERROR_CORRECTION] = com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M // Medium error correction for better compatibility
 
             val writer = QRCodeWriter()
             val bitMatrix = writer.encode(text, BarcodeFormat.QR_CODE, size, size, hints)
 
-            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
+            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888) // Use ARGB_8888 for better quality
             for (x in 0 until size) {
                 for (y in 0 until size) {
                     bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
