@@ -1,13 +1,25 @@
 package com.nextserve.serveitpartnernew.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -39,8 +51,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
@@ -148,75 +164,30 @@ fun HomeScreen(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .animateContentSize()
-        ) {
-            // New Requests Section
-            if (highlightedJob != null) {
-                item { SectionHeader("New Requests") }
-                HomeNewJobSection(
-                    highlightedJob = highlightedJob,
-                    hasOngoingJob = hasOngoingJob,
-                    acceptingJobId = acceptingJobId,
-                    onShowAcceptDialog = { job -> showAcceptDialog = job },
-                    onJobReject = { viewModel.rejectJob(it) },
-                    onViewAllJobs = onViewAllJobs
-                )
-            }
+        // HARD-GATED: Skeleton fully owns screen during loading
+        android.util.Log.d("HomeRender", "isLoading = $isLoading")
 
-            // Ongoing Jobs Section
-            if (ongoingJobs.isNotEmpty()) {
-                item { SectionHeader("Ongoing Jobs") }
-                HomeOngoingSection(
-                    ongoingJobs = ongoingJobs,
-                    onOngoingJobClick = onOngoingJobClick
-                )
-            }
-
-            // Today Section
-            if (todayCompletedJobs.isNotEmpty()) {
-                item { SectionHeader("Today") }
-                HomeTodaySection(
-                    todayCompletedJobs = todayCompletedJobs,
-                    onOngoingJobClick = onOngoingJobClick
-                )
-            }
-
-            // Today's Summary Section
-            item { SectionHeader("Today's Summary") }
-            HomeStatsSection(
-                todayJobsCompleted = todayStats.first,
-                todayEarnings = todayStats.second,
-                isLoading = isLoading
+        if (isLoading) {
+            android.util.Log.d("HomeRender", "Rendering HomeSkeleton (hard gate)")
+            HomeSkeleton(paddingValues = paddingValues)
+        } else {
+            android.util.Log.d("HomeRender", "Rendering HomeContent (hard gate)")
+            HomeContent(
+                paddingValues = paddingValues,
+                highlightedJob = highlightedJob,
+                hasOngoingJob = hasOngoingJob,
+                acceptingJobId = acceptingJobId,
+                ongoingJobs = ongoingJobs,
+                todayCompletedJobs = todayCompletedJobs,
+                todayStats = todayStats,
+                errorMessage = errorMessage,
+                hasAttemptedDataLoad = hasAttemptedDataLoad,
+                onShowAcceptDialog = { showAcceptDialog = it },
+                onJobReject = { viewModel.rejectJob(it) },
+                onViewAllJobs = onViewAllJobs,
+                onOngoingJobClick = onOngoingJobClick,
+                onRefresh = { viewModel.refresh() }
             )
-
-            // Error state with retry
-            item {
-                if (errorMessage != null && !isLoading && highlightedJob == null && ongoingJobs.isEmpty()) {
-                    ErrorState(
-                        message = errorMessage ?: "An error occurred",
-                        onRetry = { viewModel.refresh() },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-
-            // Empty state - only show after attempting to load data and when no jobs
-            item {
-                if (hasAttemptedDataLoad && highlightedJob == null && ongoingJobs.isEmpty() && errorMessage == null) {
-                    EmptyState(
-                        icon = Icons.Default.Home,
-                        title = "No Jobs Available",
-                        description = "New job requests will appear here when available",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
         }
     }
 
@@ -268,5 +239,192 @@ fun HomeScreen(
                 }
             }
         )
+    }
+}
+
+/**
+ * Home Skeleton - Google-grade professional loading placeholders
+ */
+@Composable
+private fun HomeSkeleton(paddingValues: PaddingValues) {
+    LaunchedEffect(Unit) {
+        android.util.Log.d("HomeRender", "HomeSkeleton entered composition")
+    }
+
+    // Subtle alpha animation for professional feel
+    val infiniteTransition = rememberInfiniteTransition(label = "skeleton")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+    ) {
+        // 3 professional skeleton cards with internal structure
+        items(3) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    // Circular avatar placeholder
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                CircleShape
+                            )
+                    )
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // Content structure simulation
+                    androidx.compose.foundation.layout.Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Title line
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .height(14.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                    MaterialTheme.shapes.small
+                                )
+                        )
+
+                        // Subtitle line
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.6f)
+                                .height(12.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                    MaterialTheme.shapes.small
+                                )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Home Content - Shows actual data after loading
+ */
+@Composable
+private fun HomeContent(
+    paddingValues: PaddingValues,
+    highlightedJob: Job?,
+    hasOngoingJob: Boolean,
+    acceptingJobId: String?,
+    ongoingJobs: List<Job>,
+    todayCompletedJobs: List<Job>,
+    todayStats: Pair<Int, Double>,
+    errorMessage: String?,
+    hasAttemptedDataLoad: Boolean,
+    onShowAcceptDialog: (Job) -> Unit,
+    onJobReject: (Job) -> Unit,
+    onViewAllJobs: () -> Unit,
+    onOngoingJobClick: (Job) -> Unit,
+    onRefresh: () -> Unit
+) {
+    LaunchedEffect(Unit) {
+        android.util.Log.d("HomeRender", "HomeContent entered composition")
+    }
+
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .animateContentSize()
+    ) {
+        // New Requests Section
+        if (highlightedJob != null) {
+            item { SectionHeader("New Requests") }
+            HomeNewJobSection(
+                highlightedJob = highlightedJob,
+                hasOngoingJob = hasOngoingJob,
+                acceptingJobId = acceptingJobId,
+                onShowAcceptDialog = onShowAcceptDialog,
+                onJobReject = onJobReject,
+                onViewAllJobs = onViewAllJobs
+            )
+        }
+
+        // Ongoing Jobs Section
+        if (ongoingJobs.isNotEmpty()) {
+            item { SectionHeader("Ongoing Jobs") }
+            HomeOngoingSection(
+                ongoingJobs = ongoingJobs,
+                onOngoingJobClick = onOngoingJobClick
+            )
+        }
+
+        // Today Section
+        if (todayCompletedJobs.isNotEmpty()) {
+            item { SectionHeader("Today") }
+            HomeTodaySection(
+                todayCompletedJobs = todayCompletedJobs,
+                onOngoingJobClick = onOngoingJobClick
+            )
+        }
+
+        // Today's Summary Section
+        item { SectionHeader("Today's Summary") }
+        HomeStatsSection(
+            todayJobsCompleted = todayStats.first,
+            todayEarnings = todayStats.second,
+            isLoading = false
+        )
+
+        // Error state with retry
+        item {
+            if (errorMessage != null && highlightedJob == null && ongoingJobs.isEmpty()) {
+                ErrorState(
+                    message = errorMessage ?: "An error occurred",
+                    onRetry = onRefresh,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+
+        // Empty state - only show after attempting to load data and when no jobs
+        item {
+            if (hasAttemptedDataLoad && highlightedJob == null && ongoingJobs.isEmpty() && errorMessage == null) {
+                EmptyState(
+                    icon = Icons.Default.Home,
+                    title = "No Jobs Available",
+                    description = "New job requests will appear here when available",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
     }
 }

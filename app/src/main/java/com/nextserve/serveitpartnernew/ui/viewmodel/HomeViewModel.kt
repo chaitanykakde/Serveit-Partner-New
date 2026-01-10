@@ -2,7 +2,8 @@ package com.nextserve.serveitpartnernew.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nextserve.serveitpartnernew.data.model.Job
+import com.nextserve.serveitpartnernew.data.model.Job as BookingJob
+import kotlinx.coroutines.Job as CoroutineJob
 import com.nextserve.serveitpartnernew.data.model.JobInboxEntry
 import com.nextserve.serveitpartnernew.data.repository.JobsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,14 +24,14 @@ import com.nextserve.serveitpartnernew.utils.NetworkMonitor
  * UI State for Home Fragment
  */
 data class HomeUiState(
-    val highlightedJob: Job? = null, // ONE best new job to highlight
-    val ongoingJobs: List<Job> = emptyList(),
+    val highlightedJob: BookingJob? = null, // ONE best new job to highlight
+    val ongoingJobs: List<BookingJob> = emptyList(),
     val isLoading: Boolean = false,
     val hasOngoingJob: Boolean = false,
     val errorMessage: String? = null,
     val acceptingJobId: String? = null, // Track which job is being accepted
     val isOffline: Boolean = false, // Network connectivity status
-    val todayCompletedJobs: List<Job> = emptyList(), // Today's completed jobs
+    val todayCompletedJobs: List<BookingJob> = emptyList(), // Today's completed jobs
     val todayStats: Pair<Int, Double> = Pair(0, 0.0) // (jobs count, earnings)
 )
 
@@ -42,6 +43,10 @@ class HomeViewModel(
     val jobsRepository: JobsRepository,
     private val networkMonitor: NetworkMonitor? = null
 ) : ViewModel() {
+
+
+    // Timeout job to prevent infinite skeleton
+    private var skeletonTimeoutJob: CoroutineJob? = null
 
     init {
         android.util.Log.d("HomeViewModel", "🏗️ HomeViewModel created for provider: $providerId")
@@ -83,6 +88,19 @@ class HomeViewModel(
     private fun loadHomeData() {
         android.util.Log.d("HomeViewModel", "🚀 loadHomeData() called - setting isLoading = true")
         _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+
+        // Cancel any existing timeout
+        skeletonTimeoutJob?.cancel()
+
+        // Timeout: Stop skeleton after 3 seconds even if no data (to prevent infinite loading)
+        skeletonTimeoutJob = viewModelScope.launch {
+            delay(3000)
+            val currentState = _uiState.value
+            if (currentState.isLoading && currentState.highlightedJob == null && currentState.ongoingJobs.isEmpty()) {
+                android.util.Log.d("HomeViewModel", "⏰ Skeleton timeout - showing empty state")
+                _uiState.value = currentState.copy(isLoading = false)
+            }
+        }
 
         // Listen to new jobs for highlighted job
         val newJobsFlow = jobsRepository.listenToNewJobs(providerId)
@@ -138,14 +156,24 @@ class HomeViewModel(
             val hasOngoing = ongoingJobs.isNotEmpty()
             android.util.Log.d("HomeViewModel", "📋 hasOngoingJob: $hasOngoing")
 
+            // Only stop loading when we have data to show OR when we can show empty state
+            val hasDataToShow = highlighted != null || ongoingJobs.isNotEmpty()
+            val shouldStopLoading = hasDataToShow
+
+            // Cancel timeout if we have data
+            if (shouldStopLoading) {
+                skeletonTimeoutJob?.cancel()
+                android.util.Log.d("HomeViewModel", "✅ Data received - canceling skeleton timeout")
+            }
+
             val newState = _uiState.value.copy(
                 highlightedJob = highlighted,
                 ongoingJobs = ongoingJobs,
                 hasOngoingJob = hasOngoing,
-                isLoading = false,
+                isLoading = !shouldStopLoading,
                 errorMessage = null
             )
-            android.util.Log.d("HomeViewModel", "📊 Emitting new state - isLoading: false, highlighted: ${highlighted != null}, ongoing: ${ongoingJobs.size}")
+            android.util.Log.d("HomeViewModel", "📊 Emitting new state - isLoading: ${!shouldStopLoading}, highlighted: ${highlighted != null}, ongoing: ${ongoingJobs.size}")
             newState
         }
             .onEach { newState ->
@@ -159,7 +187,7 @@ class HomeViewModel(
      * Select ONE highlighted job from available new jobs
      * Priority: Nearest job OR earliest created
      */
-    private fun selectHighlightedJob(jobs: List<Job>): Job? {
+    private fun selectHighlightedJob(jobs: List<BookingJob>): BookingJob? {
         if (jobs.isEmpty()) return null
 
         // If jobs have distance info, pick nearest
@@ -177,7 +205,7 @@ class HomeViewModel(
     /**
      * Accept highlighted job
      */
-    fun acceptJob(job: Job, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun acceptJob(job: BookingJob, onSuccess: () -> Unit, onError: (String) -> Unit) {
         if (_uiState.value.hasOngoingJob) {
             onError("Complete ongoing job to accept new requests")
             return
@@ -227,7 +255,7 @@ class HomeViewModel(
     /**
      * Reject highlighted job (local only)
      */
-    fun rejectJob(job: Job) {
+    fun rejectJob(job: BookingJob) {
         rejectedJobIds.add(job.bookingId)
         _uiState.value = _uiState.value.copy(
             highlightedJob = null
