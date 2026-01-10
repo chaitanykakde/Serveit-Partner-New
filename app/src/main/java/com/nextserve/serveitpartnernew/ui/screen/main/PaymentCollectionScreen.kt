@@ -46,14 +46,37 @@ fun PaymentCollectionScreen(
     )
 ) {
     val context = LocalContext.current
-    var selectedPaymentMode by remember { mutableStateOf<String?>(null) }
-    var amount by remember { mutableStateOf(job.totalPrice.toString()) }
+    
+    // State tracking
+    var selectedPaymentMode by remember { mutableStateOf<String?>(job.paymentMode) }
+    var amount by remember { mutableStateOf((job.paymentAmount ?: job.totalPrice).toString()) }
     var isProcessing by remember { mutableStateOf(false) }
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var showOtpDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-
+    
+    // Track payment states
+    val qrGenerated = remember { mutableStateOf(job.qrGeneratedAt != null) }
+    val paymentConfirmed = remember { mutableStateOf(job.paymentStatus == "DONE") }
+    
     val scrollState = rememberScrollState()
+    
+    // Generate QR bitmap if QR was already generated
+    LaunchedEffect(job.qrUpiUri, job.paymentMode) {
+        if (job.paymentMode == "UPI_QR" && job.qrUpiUri != null && qrBitmap == null) {
+            // QR was generated previously, regenerate bitmap for display
+            val amountValue = job.paymentAmount ?: job.totalPrice
+            qrBitmap = QrUtils.generateUpiQRCode(
+                customerName = job.userName,
+                customerContact = job.customerPhoneNumber,
+                serviceName = job.serviceName,
+                providerName = job.providerName ?: "Provider",
+                providerContact = job.providerMobileNo,
+                bookingId = job.bookingId,
+                amount = amountValue
+            )
+            qrGenerated.value = true
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -118,8 +141,8 @@ fun PaymentCollectionScreen(
                 }
             }
 
-            // Amount Input (only show if payment not already done)
-            if (job.paymentStatus != "DONE") {
+            // Amount Input (only show if payment not confirmed)
+            if (!paymentConfirmed.value) {
                 OutlinedInputField(
                     value = amount,
                     onValueChange = { newValue ->
@@ -133,8 +156,8 @@ fun PaymentCollectionScreen(
                 )
             }
 
-            // Payment Mode Selection
-            if (job.paymentStatus != "DONE") {
+            // Payment Mode Selection (only show if payment not confirmed)
+            if (!paymentConfirmed.value) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -259,11 +282,16 @@ fun PaymentCollectionScreen(
                                             // Generate QR bitmap for display
                                             qrBitmap = QrUtils.generateUpiQRCode(
                                                 customerName = job.userName,
+                                                customerContact = job.customerPhoneNumber,
                                                 serviceName = job.serviceName,
                                                 providerName = job.providerName ?: "Provider",
+                                                providerContact = job.providerMobileNo,
                                                 bookingId = job.bookingId,
                                                 amount = amountDouble
                                             )
+                                            qrGenerated.value = true
+                                            // Reload job to get updated state
+                                            viewModel.loadJobDetails()
                                         } else {
                                             errorMessage = error ?: "Failed to generate QR code"
                                         }
@@ -279,7 +307,7 @@ fun PaymentCollectionScreen(
             }
 
             // QR Code Display (for UPI payments)
-            if (selectedPaymentMode == "UPI_QR" && qrBitmap != null) {
+            if (qrGenerated.value && qrBitmap != null && selectedPaymentMode == "UPI_QR") {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -317,15 +345,89 @@ fun PaymentCollectionScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        PrimaryButton(
-                            text = "Mark as Completed",
-                            onClick = {
-                                viewModel.markAsCompleted(
-                                    onSuccess = onPaymentCompleted,
-                                    onError = { error ->
-                                        errorMessage = error
+                        if (!paymentConfirmed.value) {
+                            // Show "Confirm Payment Received" button
+                            PrimaryButton(
+                                text = "Confirm Payment Received",
+                                onClick = {
+                                    isProcessing = true
+                                    viewModel.confirmPaymentReceived { success, error ->
+                                        isProcessing = false
+                                        if (success) {
+                                            paymentConfirmed.value = true
+                                            viewModel.loadJobDetails()
+                                        } else {
+                                            errorMessage = error ?: "Failed to confirm payment"
+                                        }
                                     }
-                                )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                isLoading = isProcessing
+                            )
+                        } else {
+                            // Payment confirmed, show completion button
+                            PrimaryButton(
+                                text = "Complete Job",
+                                onClick = {
+                                    // For UPI payments, complete directly
+                                    // For cash payments, OTP will be handled in JobDetailsScreen
+                                    viewModel.markAsCompleted(
+                                        onSuccess = onPaymentCompleted,
+                                        onError = { error ->
+                                            errorMessage = error
+                                        },
+                                        onOtpRequired = {
+                                            // This shouldn't happen for UPI, but handle gracefully
+                                            errorMessage = "OTP verification required. Please complete from job details."
+                                        }
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Payment Confirmed State (for both CASH and UPI)
+            if (paymentConfirmed.value && !qrGenerated.value) {
+                // Cash payment confirmed - show completion option
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Cash Payment Confirmed",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "₹${job.paymentAmount?.toInt() ?: 0}",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Payment received. You can now complete the job.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        PrimaryButton(
+                            text = "Complete Job",
+                            onClick = {
+                                // OTP will be shown during completion in JobDetailsScreen
+                                onPaymentCompleted()
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -352,20 +454,4 @@ fun PaymentCollectionScreen(
         }
     }
 
-    // OTP Verification Dialog for cash payments
-    if (showOtpDialog) {
-        com.nextserve.serveitpartnernew.ui.components.OtpVerificationDialog(
-            onDismiss = { showOtpDialog = false },
-            onVerify = { otp ->
-                viewModel.verifyOtpAndComplete(otp) { success, error ->
-                    if (success) {
-                        showOtpDialog = false
-                        onPaymentCompleted()
-                    } else {
-                        errorMessage = error ?: "Invalid OTP"
-                    }
-                }
-            }
-        )
-    }
 }

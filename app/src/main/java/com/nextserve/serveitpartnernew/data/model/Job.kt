@@ -60,7 +60,10 @@ data class Job(
     var qrUpiUri: String? = null,
 
     @get:PropertyName("upiNote") @set:PropertyName("upiNote")
-    var upiNote: String? = null
+    var upiNote: String? = null,
+
+    @get:PropertyName("qrGeneratedAt") @set:PropertyName("qrGeneratedAt")
+    var qrGeneratedAt: Long? = null // Timestamp when QR code was generated (for UPI payments)
 ) {
     /**
      * Check if job is available (pending and provider was notified)

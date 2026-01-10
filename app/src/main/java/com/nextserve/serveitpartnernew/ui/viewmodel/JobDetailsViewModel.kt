@@ -210,8 +210,13 @@ class JobDetailsViewModel(
 
     /**
      * Mark job as completed
+     * @param onOtpRequired Callback when OTP verification is required (for cash payments)
      */
-    fun markAsCompleted(onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun markAsCompleted(
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit,
+        onOtpRequired: (() -> Unit)? = null
+    ) {
         val job = _uiState.value.job ?: return
         if (!job.canTransitionTo("completed")) {
             onError("Cannot mark as completed. Current status: ${job.status}")
@@ -221,8 +226,8 @@ class JobDetailsViewModel(
         // Check if payment verification is needed
         if (job.paymentMode == "CASH" && job.paymentStatus == "DONE") {
             // For cash payments, OTP verification is required
-            // This should be handled by the OTP dialog, not here
-            onError("OTP verification required for cash payments")
+            // Trigger OTP dialog via callback
+            onOtpRequired?.invoke() ?: onError("OTP verification required for cash payments")
             return
         }
 
@@ -277,6 +282,7 @@ class JobDetailsViewModel(
 
     /**
      * Process UPI payment - generate QR and update payment info
+     * Note: paymentStatus remains "PENDING" until provider confirms payment received
      */
     fun processUpiPayment(amount: Double, qrBitmap: android.graphics.Bitmap?, callback: (Boolean, String?) -> Unit) {
         val job = _uiState.value.job ?: return callback(false, "Job not found")
@@ -285,8 +291,10 @@ class JobDetailsViewModel(
             try {
                 val upiNote = com.nextserve.serveitpartnernew.utils.QrUtils.generateUpiNote(
                     customerName = job.userName,
+                    customerContact = job.customerPhoneNumber,
                     serviceName = job.serviceName,
                     providerName = job.providerName ?: "Provider",
+                    providerContact = job.providerMobileNo,
                     bookingId = bookingId
                 )
 
@@ -295,14 +303,18 @@ class JobDetailsViewModel(
                     transactionNote = upiNote
                 )
 
+                val qrGeneratedAt = System.currentTimeMillis()
+
+                // Keep paymentStatus as "PENDING" until provider confirms payment received
                 val result = jobsRepository.updateJobPaymentInfo(
                     bookingId = bookingId,
                     customerPhoneNumber = customerPhoneNumber,
                     paymentMode = "UPI_QR",
                     paymentAmount = amount,
-                    paymentStatus = "DONE",
+                    paymentStatus = "PENDING", // Not confirmed yet
                     qrUpiUri = upiUri,
-                    upiNote = upiNote
+                    upiNote = upiNote,
+                    qrGeneratedAt = qrGeneratedAt
                 )
 
                 result.fold(
@@ -312,9 +324,10 @@ class JobDetailsViewModel(
                             val updatedJob = currentJob.copy(
                                 paymentMode = "UPI_QR",
                                 paymentAmount = amount,
-                                paymentStatus = "DONE",
+                                paymentStatus = "PENDING", // Not confirmed yet
                                 qrUpiUri = upiUri,
-                                upiNote = upiNote
+                                upiNote = upiNote,
+                                qrGeneratedAt = qrGeneratedAt
                             )
                             _uiState.value = _uiState.value.copy(job = updatedJob)
                         }
@@ -351,6 +364,37 @@ class JobDetailsViewModel(
             onSuccess = { callback(true, null) },
             onError = { error -> callback(false, error) }
         )
+    }
+
+    /**
+     * Confirm payment received - sets paymentStatus to "DONE"
+     * Called when provider confirms payment after QR scan
+     */
+    fun confirmPaymentReceived(callback: (Boolean, String?) -> Unit) {
+        val job = _uiState.value.job ?: return callback(false, "Job not found")
+
+        viewModelScope.launch {
+            val result = jobsRepository.confirmPaymentReceived(
+                bookingId = bookingId,
+                customerPhoneNumber = customerPhoneNumber
+            )
+
+            result.fold(
+                onSuccess = {
+                    // Update local job state
+                    _uiState.value.job?.let { currentJob ->
+                        val updatedJob = currentJob.copy(
+                            paymentStatus = "DONE"
+                        )
+                        _uiState.value = _uiState.value.copy(job = updatedJob)
+                    }
+                    callback(true, null)
+                },
+                onFailure = { error ->
+                    callback(false, error.message ?: "Failed to confirm payment")
+                }
+            )
+        }
     }
 
     /**

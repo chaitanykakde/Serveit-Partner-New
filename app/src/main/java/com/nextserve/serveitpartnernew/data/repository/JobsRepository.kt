@@ -388,7 +388,8 @@ class JobsRepository(
         completionOTP: String? = null,
         otpGeneratedAt: Long? = null,
         qrUpiUri: String? = null,
-        upiNote: String? = null
+        upiNote: String? = null,
+        qrGeneratedAt: Long? = null
     ): Result<Unit> {
         return try {
             val documentRef = bookingsCollection.document(customerPhoneNumber)
@@ -408,6 +409,7 @@ class JobsRepository(
             otpGeneratedAt?.let { updates["otpGeneratedAt"] = it }
             qrUpiUri?.let { updates["qrUpiUri"] = it }
             upiNote?.let { updates["upiNote"] = it }
+            qrGeneratedAt?.let { updates["qrGeneratedAt"] = it }
 
             // Check if document has bookings array (primary format)
             val bookingsArray = data["bookings"] as? MutableList<Map<String, Any>>
@@ -445,6 +447,56 @@ class JobsRepository(
      */
     fun generateOTP(): String {
         return (100000..999999).random().toString()
+    }
+
+    /**
+     * Confirm payment received - sets paymentStatus to "DONE"
+     * Called when provider confirms payment after QR scan or cash collection
+     */
+    suspend fun confirmPaymentReceived(
+        bookingId: String,
+        customerPhoneNumber: String
+    ): Result<Unit> {
+        return try {
+            val documentRef = bookingsCollection.document(customerPhoneNumber)
+
+            // Get current document
+            val snapshot = documentRef.get().await()
+            val data = snapshot.data ?: throw Exception("Document not found")
+
+            val updates = mapOf<String, Any>(
+                "paymentStatus" to "DONE"
+            )
+
+            // Check if document has bookings array (primary format)
+            val bookingsArray = data["bookings"] as? MutableList<Map<String, Any>>
+            if (bookingsArray != null) {
+                // Array format - find and update the specific booking
+                val bookingIndex = bookingsArray.indexOfFirst {
+                    (it["bookingId"] as? String) == bookingId
+                }
+
+                if (bookingIndex == -1) {
+                    throw Exception("Booking not found in array")
+                }
+
+                val booking = bookingsArray[bookingIndex].toMutableMap()
+                booking.putAll(updates)
+                bookingsArray[bookingIndex] = booking
+                documentRef.update("bookings", bookingsArray).await()
+            } else {
+                // Single booking format (legacy)
+                if ((data["bookingId"] as? String) != bookingId) {
+                    throw Exception("Booking ID mismatch")
+                }
+
+                documentRef.update(updates).await()
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     /**
@@ -533,6 +585,7 @@ class JobsRepository(
         val otpGeneratedAt = (bookingData["otpGeneratedAt"] as? Number)?.toLong()
         val qrUpiUri = bookingData["qrUpiUri"] as? String
         val upiNote = bookingData["upiNote"] as? String
+        val qrGeneratedAt = (bookingData["qrGeneratedAt"] as? Number)?.toLong()
 
         return Job(
             bookingId = bookingId,
@@ -565,7 +618,8 @@ class JobsRepository(
             completionOTP = completionOTP,
             otpGeneratedAt = otpGeneratedAt,
             qrUpiUri = qrUpiUri,
-            upiNote = upiNote
+            upiNote = upiNote,
+            qrGeneratedAt = qrGeneratedAt
         )
     }
 

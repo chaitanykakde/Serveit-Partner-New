@@ -36,15 +36,29 @@ object QrUtils {
     }
 
     /**
-     * Generate UPI transaction note
+     * Generate UPI transaction note with full contact information
      */
     fun generateUpiNote(
         customerName: String,
+        customerContact: String?,
         serviceName: String,
         providerName: String,
+        providerContact: String?,
         bookingId: String
     ): String {
-        return "Payment for $serviceName - $customerName by $providerName (ID: ${bookingId.takeLast(8)})"
+        val customerInfo = if (customerContact != null && customerContact.isNotEmpty()) {
+            "$customerName ($customerContact)"
+        } else {
+            customerName
+        }
+        
+        val providerInfo = if (providerContact != null && providerContact.isNotEmpty()) {
+            "$providerName ($providerContact)"
+        } else {
+            providerName
+        }
+        
+        return "Payment for $serviceName - Customer: $customerInfo | Provider: $providerInfo | Booking ID: ${bookingId.takeLast(8)}"
     }
 
     /**
@@ -74,17 +88,26 @@ object QrUtils {
     }
 
     /**
-     * Generate UPI QR code bitmap with payment details
+     * Generate UPI QR code bitmap with payment details including contact information
      */
     fun generateUpiQRCode(
         customerName: String,
+        customerContact: String?,
         serviceName: String,
         providerName: String,
+        providerContact: String?,
         bookingId: String,
         amount: Double,
         size: Int = 512
     ): Bitmap? {
-        val upiNote = generateUpiNote(customerName, serviceName, providerName, bookingId)
+        val upiNote = generateUpiNote(
+            customerName = customerName,
+            customerContact = customerContact,
+            serviceName = serviceName,
+            providerName = providerName,
+            providerContact = providerContact,
+            bookingId = bookingId
+        )
         val upiUri = generateUpiUri(amount = amount, transactionNote = upiNote)
         return generateQRCode(upiUri, size)
     }
