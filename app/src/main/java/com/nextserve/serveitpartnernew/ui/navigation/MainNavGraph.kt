@@ -14,9 +14,22 @@ import com.nextserve.serveitpartnernew.ui.screen.main.JobsScreen
 import com.nextserve.serveitpartnernew.ui.screen.main.ProfileScreen
 
 fun NavGraphBuilder.mainNavGraph(navController: NavController) {
-    composable(BottomNavItem.Home.route) {
+    composable(BottomNavItem.Home.route) { backStackEntry ->
         val providerId = com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.auth.currentUser?.uid ?: ""
-        HomeScreen(providerId = providerId)
+
+        // Create HomeViewModel scoped to this navigation entry
+        val homeViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+            viewModelStoreOwner = backStackEntry,
+            factory = com.nextserve.serveitpartnernew.ui.viewmodel.HomeViewModel.factory(
+                providerId = providerId,
+                context = androidx.compose.ui.platform.LocalContext.current
+            )
+        )
+
+        HomeScreen(
+            providerId = providerId,
+            viewModel = homeViewModel
+        )
     }
     
     composable(BottomNavItem.Jobs.route) {

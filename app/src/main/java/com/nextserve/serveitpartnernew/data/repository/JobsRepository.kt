@@ -36,20 +36,25 @@ class JobsRepository(
      * Firestore's whereArrayContains only works on document-level fields, not nested array items.
      */
     fun listenToNewJobs(providerId: String): Flow<List<Job>> = callbackFlow {
+        android.util.Log.d("JobsRepository", "👂 listenToNewJobs() started for provider: $providerId")
         // Query ALL Bookings documents (since notifiedProviderIds is nested in array)
         // This is necessary because Firestore can't query array item fields
         val listener = bookingsCollection
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    android.util.Log.d("JobsRepository", "❌ listenToNewJobs - Error: ${error.message}")
                     // Emit empty list on error instead of closing, allowing retry
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
 
                 if (snapshot == null) {
+                    android.util.Log.d("JobsRepository", "⚠️ listenToNewJobs - Snapshot is null")
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
+
+                android.util.Log.d("JobsRepository", "📄 listenToNewJobs - Received snapshot with ${snapshot.documents.size} documents")
 
                 val jobs = mutableListOf<Job>()
                 snapshot.documents.forEach { document ->
@@ -62,6 +67,7 @@ class JobsRepository(
                     jobs.addAll(availableJobs)
                 }
 
+                android.util.Log.d("JobsRepository", "📤 listenToNewJobs - Emitting ${jobs.size} new jobs")
                 trySend(jobs)
             }
 
@@ -76,19 +82,24 @@ class JobsRepository(
      * we must query all Bookings documents and filter client-side.
      */
     fun listenToOngoingJobs(providerId: String): Flow<List<Job>> = callbackFlow {
+        android.util.Log.d("JobsRepository", "👂 listenToOngoingJobs() started for provider: $providerId")
         // Query ALL Bookings documents (since providerId is nested in array)
         val listener = bookingsCollection
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    android.util.Log.d("JobsRepository", "❌ listenToOngoingJobs - Error: ${error.message}")
                     // Emit empty list on error instead of closing, allowing retry
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
 
                 if (snapshot == null) {
+                    android.util.Log.d("JobsRepository", "⚠️ listenToOngoingJobs - Snapshot is null")
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
+
+                android.util.Log.d("JobsRepository", "📄 listenToOngoingJobs - Received snapshot with ${snapshot.documents.size} documents")
 
                 val jobs = mutableListOf<Job>()
                 snapshot.documents.forEach { document ->
@@ -98,6 +109,7 @@ class JobsRepository(
                     jobs.addAll(ongoingJobs)
                 }
 
+                android.util.Log.d("JobsRepository", "📤 listenToOngoingJobs - Emitting ${jobs.size} ongoing jobs")
                 trySend(jobs)
             }
 

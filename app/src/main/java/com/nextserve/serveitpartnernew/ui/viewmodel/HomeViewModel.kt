@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -42,8 +43,19 @@ class HomeViewModel(
     private val networkMonitor: NetworkMonitor? = null
 ) : ViewModel() {
 
+    init {
+        android.util.Log.d("HomeViewModel", "🏗️ HomeViewModel created for provider: $providerId")
+    }
+
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    init {
+        android.util.Log.d("HomeViewModel", "🔄 HomeViewModel init block starting...")
+        loadHomeData()
+        loadTodayStats()
+        android.util.Log.d("HomeViewModel", "✅ HomeViewModel init block completed")
+    }
 
     private var rejectedJobIds = mutableSetOf<String>()
 
@@ -69,6 +81,7 @@ class HomeViewModel(
      * Load home data: highlighted job and ongoing jobs
      */
     private fun loadHomeData() {
+        android.util.Log.d("HomeViewModel", "🚀 loadHomeData() called - setting isLoading = true")
         _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
         // Listen to new jobs for highlighted job
@@ -99,27 +112,44 @@ class HomeViewModel(
                 emit(emptyList())
             }
 
-        // Combine both flows
-        combine(newJobsFlow, ongoingJobsFlow) { newJobs, ongoingJobs ->
+        // Combine both flows with immediate emission (fixes infinite skeletons)
+        android.util.Log.d("HomeViewModel", "🔗 Setting up combine operation for newJobs + ongoingJobs")
+        combine(
+            newJobsFlow.onStart {
+                android.util.Log.d("HomeViewModel", "📤 newJobsFlow.onStart - emitting emptyList()")
+                emit(emptyList())
+            },
+            ongoingJobsFlow.onStart {
+                android.util.Log.d("HomeViewModel", "📤 ongoingJobsFlow.onStart - emitting emptyList()")
+                emit(emptyList())
+            }
+        ) { newJobs, ongoingJobs ->
+            android.util.Log.d("HomeViewModel", "🔄 combine lambda called - newJobs: ${newJobs.size}, ongoingJobs: ${ongoingJobs.size}")
+
             // Filter out rejected jobs
             val availableNewJobs = newJobs.filter { it.bookingId !in rejectedJobIds }
-            
+            android.util.Log.d("HomeViewModel", "🔍 Filtered newJobs: ${availableNewJobs.size} (rejected: ${newJobs.size - availableNewJobs.size})")
+
             // Select ONE highlighted job (nearest or earliest)
             val highlighted = selectHighlightedJob(availableNewJobs)
-            
+            android.util.Log.d("HomeViewModel", "⭐ Selected highlighted job: ${highlighted?.serviceName ?: "null"}")
+
             // Check if has ongoing job
             val hasOngoing = ongoingJobs.isNotEmpty()
+            android.util.Log.d("HomeViewModel", "📋 hasOngoingJob: $hasOngoing")
 
-            HomeUiState(
+            val newState = _uiState.value.copy(
                 highlightedJob = highlighted,
                 ongoingJobs = ongoingJobs,
-                isLoading = false,
                 hasOngoingJob = hasOngoing,
-                errorMessage = null,
-                acceptingJobId = _uiState.value.acceptingJobId
+                isLoading = false,
+                errorMessage = null
             )
+            android.util.Log.d("HomeViewModel", "📊 Emitting new state - isLoading: false, highlighted: ${highlighted != null}, ongoing: ${ongoingJobs.size}")
+            newState
         }
             .onEach { newState ->
+                android.util.Log.d("HomeViewModel", "💾 Applying new state to _uiState")
                 _uiState.value = newState
             }
             .launchIn(viewModelScope)

@@ -65,15 +65,38 @@ fun MainAppScreen(
             startDestination = BottomNavItem.Home.route,
             modifier = Modifier.fillMaxSize()
         ) {
-            composable(BottomNavItem.Home.route) {
+            composable(BottomNavItem.Home.route) { backStackEntry ->
                 val providerId = com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.auth.currentUser?.uid ?: ""
+
+                // Create HomeViewModel scoped to this navigation entry
+                val homeViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+                    viewModelStoreOwner = backStackEntry,
+                    factory = com.nextserve.serveitpartnernew.ui.viewmodel.HomeViewModel.factory(
+                        providerId = providerId,
+                        context = androidx.compose.ui.platform.LocalContext.current
+                    )
+                )
+
                 HomeScreen(
                     providerId = providerId,
+                    viewModel = homeViewModel,
                     onOngoingJobClick = { job ->
                         // Navigate to job details with full job information
                         // For ongoing jobs, bookingIndex may not be available, so use -1
                         val route = "jobDetails/${job.bookingId}/${job.customerPhoneNumber}/-1"
                         navController.navigate(route)
+                    },
+                    onJobAccepted = { jobId ->
+                        // Job acceptance is handled internally by HomeScreen's ViewModel
+                        // This callback is for any additional navigation or side effects
+                    },
+                    onViewAllJobs = {
+                        // Navigate to jobs list screen
+                        navController.navigate(BottomNavItem.Jobs.route) {
+                            popUpTo(BottomNavItem.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 )
             }
