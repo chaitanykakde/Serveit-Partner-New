@@ -456,10 +456,30 @@ fun JobDetailsScreen(
                             "completed" -> {
                                 val job = uiState.job!!
                                 if (job.paymentMode == "CASH" && job.paymentStatus == "DONE") {
-                                    // For cash payments, show OTP verification dialog
-                                    showStatusUpdateDialog = null // Close current dialog
-                                    // OTP dialog will be shown by the SmartActionButtons logic
-                                    {} // Empty action since OTP dialog handles it
+                                    // For cash payments, trigger OTP verification via ViewModel
+                                    {
+                                        viewModel.markAsCompleted(
+                                            onSuccess = {
+                                                showStatusUpdateDialog = null
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar("Job completed successfully!")
+                                                    kotlinx.coroutines.delay(1500)
+                                                    onBack()
+                                                }
+                                            },
+                                            onError = { error ->
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(error)
+                                                    showStatusUpdateDialog = null
+                                                }
+                                            },
+                                            onOtpRequired = {
+                                                // Show OTP dialog for cash payments
+                                                showStatusUpdateDialog = null
+                                                showOtpDialog = true
+                                            }
+                                        )
+                                    }
                                 } else {
                                     // For UPI or legacy bookings, proceed directly
                                     {
@@ -1701,7 +1721,7 @@ private fun SmartActionButtons(
                 } else if (job.paymentStatus == "DONE") {
                     // Payment already collected - show completion options
                     when (job.paymentMode) {
-                        "CASH" -> {
+                        "CASH", "UPI_QR" -> {
                             // For cash payments, show OTP verification requirement
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1718,7 +1738,11 @@ private fun SmartActionButtons(
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     Text(
-                                        text = "Cash Payment Collected",
+                                        text = when (job.paymentMode) {
+                                            "CASH" -> "Cash Payment Collected"
+                                            "UPI_QR" -> "Online Payment Collected"
+                                            else -> "Payment Collected"
+                                        },
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -1729,7 +1753,11 @@ private fun SmartActionButtons(
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "Ask customer for OTP to complete job",
+                                        text = when (job.paymentMode) {
+                                            "CASH" -> "Ask customer for OTP to complete job"
+                                            "UPI_QR" -> "Verify payment completion with OTP"
+                                            else -> "Verify payment to complete job"
+                                        },
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1776,72 +1804,6 @@ private fun SmartActionButtons(
                                     style = MaterialTheme.typography.titleLarge
                                 )
                             }
-                        }
-                        "UPI_QR" -> {
-                            // For UPI payments, allow direct completion
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                                ),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Text(
-                                        text = "Online Payment Collected",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "₹${job.paymentAmount?.toInt() ?: 0}",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = "UPI QR payment completed",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            // Complete Job Button
-                Button(
-                    onClick = { onStatusUpdateClick("completed") },
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
-                    enabled = !isUpdating,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    if (isUpdating && updatingType == "completed") {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 3.dp
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = "Mark as Completed",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        "Mark as Completed",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                }
                         }
                         else -> {
                             // Legacy bookings without payment info - show collect payment option

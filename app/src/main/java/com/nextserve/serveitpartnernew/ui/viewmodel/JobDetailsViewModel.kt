@@ -224,10 +224,10 @@ class JobDetailsViewModel(
         }
 
         // Check if payment verification is needed
-        if (job.paymentMode == "CASH" && job.paymentStatus == "DONE") {
-            // For cash payments, OTP verification is required
+        if ((job.paymentMode == "CASH" || job.paymentMode == "UPI_QR") && job.paymentStatus == "DONE") {
+            // For both cash and UPI payments, OTP verification is required
             // Trigger OTP dialog via callback
-            onOtpRequired?.invoke() ?: onError("OTP verification required for cash payments")
+            onOtpRequired?.invoke() ?: onError("OTP verification required for payment completion")
             return
         }
 
@@ -349,8 +349,8 @@ class JobDetailsViewModel(
     fun verifyOtpAndComplete(enteredOtp: String, callback: (Boolean, String?) -> Unit) {
         val job = _uiState.value.job ?: return callback(false, "Job not found")
 
-        if (job.paymentMode != "CASH") {
-            callback(false, "OTP verification only required for cash payments")
+        if (job.paymentMode != "CASH" && job.paymentMode != "UPI_QR") {
+            callback(false, "OTP verification only required for payment completion")
             return
         }
 
@@ -359,41 +359,57 @@ class JobDetailsViewModel(
             return
         }
 
-        // OTP verified, now complete the job
-        markAsCompleted(
+        // OTP verified, now complete the job directly (bypass OTP check)
+        updateJobStatus("completed",
             onSuccess = { callback(true, null) },
             onError = { error -> callback(false, error) }
         )
     }
 
     /**
-     * Confirm payment received - sets paymentStatus to "DONE"
+     * Confirm payment received - sets paymentStatus to "DONE" and generates OTP
      * Called when provider confirms payment after QR scan
      */
     fun confirmPaymentReceived(callback: (Boolean, String?) -> Unit) {
         val job = _uiState.value.job ?: return callback(false, "Job not found")
 
         viewModelScope.launch {
-            val result = jobsRepository.confirmPaymentReceived(
-                bookingId = bookingId,
-                customerPhoneNumber = customerPhoneNumber
-            )
+            try {
+                // Generate OTP for verification regardless of payment mode
+                val otp = jobsRepository.generateOTP()
+                val currentTime = System.currentTimeMillis()
 
-            result.fold(
-                onSuccess = {
-                    // Update local job state
-                    _uiState.value.job?.let { currentJob ->
-                        val updatedJob = currentJob.copy(
-                            paymentStatus = "DONE"
-                        )
-                        _uiState.value = _uiState.value.copy(job = updatedJob)
+                // Update payment status and add OTP
+                val result = jobsRepository.updateJobPaymentInfo(
+                    bookingId = bookingId,
+                    customerPhoneNumber = customerPhoneNumber,
+                    paymentMode = job.paymentMode ?: "UPI_QR", // Keep existing payment mode
+                    paymentAmount = job.paymentAmount ?: job.totalPrice,
+                    paymentStatus = "DONE",
+                    completionOTP = otp,
+                    otpGeneratedAt = currentTime
+                )
+
+                result.fold(
+                    onSuccess = {
+                        // Update local job state
+                        _uiState.value.job?.let { currentJob ->
+                            val updatedJob = currentJob.copy(
+                                paymentStatus = "DONE",
+                                completionOTP = otp,
+                                otpGeneratedAt = currentTime
+                            )
+                            _uiState.value = _uiState.value.copy(job = updatedJob)
+                        }
+                        callback(true, null)
+                    },
+                    onFailure = { error ->
+                        callback(false, error.message ?: "Failed to confirm payment")
                     }
-                    callback(true, null)
-                },
-                onFailure = { error ->
-                    callback(false, error.message ?: "Failed to confirm payment")
-                }
-            )
+                )
+            } catch (e: Exception) {
+                callback(false, e.message ?: "Unexpected error")
+            }
         }
     }
 

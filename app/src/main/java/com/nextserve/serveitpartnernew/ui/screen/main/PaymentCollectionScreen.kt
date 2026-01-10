@@ -8,7 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -84,7 +84,7 @@ fun PaymentCollectionScreen(
                 title = { Text("Collect Payment") },
                 navigationIcon = {
                     IconButton(onClick = onBack, enabled = !isProcessing) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -95,6 +95,7 @@ fun PaymentCollectionScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp)
+                .padding(bottom = 80.dp) // Add bottom padding for navigation bar
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
@@ -365,22 +366,12 @@ fun PaymentCollectionScreen(
                                 isLoading = isProcessing
                             )
                         } else {
-                            // Payment confirmed, show completion button
+                            // Payment confirmed, return to job details screen
                             PrimaryButton(
-                                text = "Complete Job",
+                                text = "Return to Job Details",
                                 onClick = {
-                                    // For UPI payments, complete directly
-                                    // For cash payments, OTP will be handled in JobDetailsScreen
-                                    viewModel.markAsCompleted(
-                                        onSuccess = onPaymentCompleted,
-                                        onError = { error ->
-                                            errorMessage = error
-                                        },
-                                        onOtpRequired = {
-                                            // This shouldn't happen for UPI, but handle gracefully
-                                            errorMessage = "OTP verification required. Please complete from job details."
-                                        }
-                                    )
+                                    // Close payment screen - completion will be handled from job details screen
+                                    onPaymentCompleted()
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             )
