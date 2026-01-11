@@ -10,32 +10,33 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,23 +48,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
-import com.nextserve.serveitpartnernew.data.model.ProviderData
 import com.nextserve.serveitpartnernew.ui.components.ProfileIcons
 import com.nextserve.serveitpartnernew.ui.viewmodel.ProfileEditViewModel
 import com.nextserve.serveitpartnernew.ui.viewmodel.ProfileViewModel
 import com.nextserve.serveitpartnernew.utils.LanguageManager
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.graphics.drawscope.*
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import kotlin.math.roundToInt
 
 @Composable
 private fun FlatOptionRow(
@@ -85,21 +82,22 @@ private fun FlatOptionRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                modifier = Modifier.size(28.dp),
+                tint = Color.Black
             )
 
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp),
+                    color = Color.Black,
+                    fontWeight = FontWeight.Normal
                 )
                 subtitle?.let {
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                        color = Color.Black.copy(alpha = 0.6f)
                     )
                 }
             }
@@ -107,24 +105,26 @@ private fun FlatOptionRow(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                modifier = Modifier.size(24.dp),
+                tint = Color.Black
             )
         }
 
         if (showDivider) {
             androidx.compose.material3.HorizontalDivider(
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                color = Color.Black.copy(alpha = 0.1f),
                 thickness = 1.dp,
-                modifier = Modifier.padding(start = 56.dp)
+                modifier = Modifier.padding(start = 60.dp)
             )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     navController: NavController,
+    parentPaddingValues: PaddingValues = PaddingValues(),
     modifier: Modifier = Modifier
 ) {
     val uid = FirebaseProvider.auth.currentUser?.uid ?: return
@@ -157,228 +157,188 @@ fun ProfileScreen(
         }
     }
 
-    // Skip loading state for now - show content directly
-
     val providerData = uiState.providerData
     val scrollState = rememberScrollState()
 
-    Column(
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Profile",
+                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                },
+                actions = {
+                    TextButton(
+                        onClick = { FirebaseProvider.auth.signOut() }
+                    ) {
+                        Text(
+                            text = "Logout",
+                            color = Color.Black,
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.White,
+                    titleContentColor = Color.Black
+                )
+            )
+        },
+        containerColor = Color.White,
         modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // New flat Profile Header (minimalist)
-        Row(
+    ) { scaffoldPaddingValues ->
+        // Calculate bottom padding for bottom navigation
+        val parentBottomPadding = parentPaddingValues.calculateBottomPadding()
+        
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .verticalScroll(scrollState)
+                .padding(scaffoldPaddingValues)
+                .background(Color.White)
         ) {
-            // Profile Photo (64dp, CircleShape)
-            Box(
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Horizontal Profile Header: Icon on left, Info on right
+            Row(
                 modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = { imagePicker.launch("image/*") }),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (providerData?.profilePhotoUrl?.isNotEmpty() == true) {
-                    AsyncImage(
-                        model = providerData.profilePhotoUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else {
+                // Profile Photo with Edit Button Overlay (left side)
+                Box(
+                    modifier = Modifier.size(100.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = { imagePicker.launch("image/*") }),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (providerData?.profilePhotoUrl?.isNotEmpty() == true) {
+                            AsyncImage(
+                                model = providerData.profilePhotoUrl,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Surface(
+                                modifier = Modifier.fillMaxSize(),
+                                shape = CircleShape,
+                                color = Color.Black.copy(alpha = 0.1f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = providerData?.fullName?.firstOrNull()?.uppercase() ?: "U",
+                                        style = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp),
+                                        color = Color.Black,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Small Edit Button Overlay (bottom-right)
+                    Surface(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .offset(x = 6.dp, y = 6.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = { imagePicker.launch("image/*") }),
+                        color = Color.Black,
+                        shape = CircleShape
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit",
+                                modifier = Modifier.size(14.dp),
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
+
+                // Name, ID, and Badge (right side, vertically stacked)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Name
                     Text(
-                        text = providerData?.fullName?.firstOrNull()?.uppercase() ?: "U",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = providerData?.fullName ?: "—",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
                     )
+
+                    // ID Number
+                    Text(
+                        text = "ID No: ${providerData?.uid?.takeLast(10) ?: "—"}",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
+                        color = Color.Black.copy(alpha = 0.6f)
+                    )
+
+                    // Verified Badge
+                    val badgeText = when (providerData?.approvalStatus) {
+                        "APPROVED" -> "Verified"
+                        "PENDING" -> "Pending Approval"
+                        "REJECTED" -> "Review Required"
+                        else -> "Incomplete Profile"
+                    }
+                    
+                    Surface(
+                        modifier = Modifier.padding(top = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.Black.copy(alpha = 0.05f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (providerData?.approvalStatus == "APPROVED") {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = Color.Black
+                                )
+                            }
+                            Text(
+                                text = badgeText,
+                                style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                                fontWeight = FontWeight.Medium,
+                                color = Color.Black
+                            )
+                        }
+                    }
                 }
             }
 
-            // Name, Phone, and Completion text
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                // Name (titleLarge)
-                Text(
-                    text = providerData?.fullName ?: "—",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                // Phone number (bodySmall, muted)
-                Text(
-                    text = providerData?.phoneNumber ?: "—",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                // Completion text: "Profile X% complete" (bodySmall)
-                val progress = ((providerData?.currentStep ?: 1).coerceAtLeast(0).coerceAtMost(5)).toFloat() / 5.toFloat()
-                val progressPercent = (progress * 100).roundToInt()
-                Text(
-                    text = "Profile ${progressPercent}% complete",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+            Spacer(modifier = Modifier.height(24.dp))
 
-        // Inline Status Row (flat, no banner)
-        val statusInfo = when (providerData?.approvalStatus) {
-            "APPROVED" -> Pair("Ready to accept jobs", MaterialTheme.colorScheme.primary)
-            "REJECTED" -> Pair("Review your documents", MaterialTheme.colorScheme.error)
-            "PENDING" -> if (providerData?.onboardingStatus == "SUBMITTED")
-                Pair("Under review", MaterialTheme.colorScheme.secondary)
-                else Pair("Complete your profile", MaterialTheme.colorScheme.secondary)
-            else -> Pair("Complete your profile", MaterialTheme.colorScheme.secondary)
-        }
-
-        val showAction = when (providerData?.approvalStatus) {
-            "APPROVED", "PENDING" -> providerData?.onboardingStatus != "SUBMITTED"
-            "REJECTED" -> true
-            else -> true
-        }
-
-        val actionRoute = when {
-            providerData?.approvalStatus == "REJECTED" -> "profile/edit/basic"
-            showAction -> "profile/edit/basic"
-            else -> ""
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Small colored dot
-            Canvas(modifier = Modifier.size(6.dp)) {
-                drawCircle(color = statusInfo.second.copy(alpha = 0.7f))
-            }
-
-            // Status text
+            // Settings Section Header
             Text(
-                text = statusInfo.first,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
+                text = "Settings",
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
+                fontWeight = FontWeight.Bold,
+                color = Color.Black,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            // Optional action button
-            if (showAction && actionRoute.isNotEmpty()) {
-                TextButton(
-                    onClick = { navController.navigate(actionRoute) },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = when (providerData?.approvalStatus) {
-                            "REJECTED" -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.primary
-                        }
-                    )
-                ) {
-                    Text(
-                        text = when (providerData?.approvalStatus) {
-                            "REJECTED" -> stringResource(R.string.edit_profile)
-                            else -> stringResource(R.string.complete_now)
-                        },
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
-            }
-        }
-
-        // Flat Quick Actions (no chips)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            TextButton(
-                onClick = { navController.navigate("profile/edit/basic") }
-            ) {
-                Text(
-                    text = stringResource(R.string.edit_profile_button),
-                    style = MaterialTheme.typography.labelLarge
-                )
-            }
-        }
-
-        // Flat Stats Row (no card, no elevation)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(32.dp)
-        ) {
-            if (uiState.isLoadingStats || uiState.stats == null) {
-                repeat(3) {
-                    Text(
-                        text = "—",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            } else {
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = uiState.stats.getFormattedRating(),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Rating",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = uiState.stats.totalJobs.toString(),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Jobs",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = uiState.stats.getFormattedEarnings(),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Earnings",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        val context = LocalContext.current
-        
-        // Flat Account Section (Android Settings style)
-        Text(
-            text = stringResource(R.string.account),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-
+            // Settings Options (consolidated from all sections)
         FlatOptionRow(
             icon = ProfileIcons.PersonalInformation,
             title = stringResource(R.string.personal_information),
@@ -404,18 +364,9 @@ fun ProfileScreen(
             icon = ProfileIcons.Documents,
             title = stringResource(R.string.documents),
             subtitle = stringResource(R.string.aadhaar_verification),
-            showDivider = false,
+                showDivider = true,
             onClick = { navController.navigate("profile/edit/documents") }
         )
-
-        // Flat Preferences Section
-        Text(
-            text = stringResource(R.string.preferences),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-
         FlatOptionRow(
             icon = ProfileIcons.Language,
             title = stringResource(R.string.language),
@@ -427,18 +378,9 @@ fun ProfileScreen(
             icon = Icons.Filled.Notifications,
             title = stringResource(R.string.notifications),
             subtitle = stringResource(R.string.manage_push_alerts),
-            showDivider = false,
+                showDivider = true,
             onClick = { navController.navigate("profile/edit/preferences") }
         )
-
-        // Flat Support/About Section
-        Text(
-            text = stringResource(R.string.support_about),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-
         FlatOptionRow(
             icon = Icons.Filled.Info,
             title = stringResource(R.string.help_support),
@@ -447,41 +389,14 @@ fun ProfileScreen(
             onClick = { navController.navigate("help/support") }
         )
         FlatOptionRow(
-            icon = Icons.Outlined.Info,
+                icon = Icons.Filled.Info,
             title = stringResource(R.string.about_app),
             subtitle = stringResource(R.string.version_terms_privacy),
             showDivider = false,
             onClick = { navController.navigate("about/app") }
         )
 
-        // Flat Logout (subtle text button)
-        TextButton(
-            onClick = { FirebaseProvider.auth.signOut() },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            colors = ButtonDefaults.textButtonColors(
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        ) {
-            Text(
-                text = stringResource(R.string.logout),
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Spacer(modifier = Modifier.height(16.dp + parentBottomPadding))
         }
-
-        Text(
-            text = stringResource(R.string.app_version),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Normal
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
     }
 }
-

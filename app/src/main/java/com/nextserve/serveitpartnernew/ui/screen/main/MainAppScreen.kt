@@ -146,8 +146,11 @@ fun MainAppScreen(
             composable(BottomNavItem.Payouts.route) {
                 PayoutScreen()
             }
-            composable(BottomNavItem.Profile.route) {
-                ProfileScreen(navController = navController)
+            composable(BottomNavItem.Profile.route) { backStackEntry ->
+                ProfileScreen(
+                    navController = navController,
+                    parentPaddingValues = paddingValues
+                )
             }
             composable("profile/edit/basic") { ProfileEditBasicScreen(navController) }
             composable("profile/edit/services") { ProfileEditServicesScreen(navController) }
