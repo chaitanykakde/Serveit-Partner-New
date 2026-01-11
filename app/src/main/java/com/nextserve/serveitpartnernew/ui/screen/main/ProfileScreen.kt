@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
@@ -50,19 +52,75 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
 import com.nextserve.serveitpartnernew.data.model.ProviderData
-import com.nextserve.serveitpartnernew.ui.components.LogoutRow
-import com.nextserve.serveitpartnernew.ui.components.ProfileHeader
 import com.nextserve.serveitpartnernew.ui.components.ProfileIcons
-import com.nextserve.serveitpartnernew.ui.components.ProfileOptionRow
-import com.nextserve.serveitpartnernew.ui.components.ProfileSection
-import com.nextserve.serveitpartnernew.ui.components.QuickActionChip
-import com.nextserve.serveitpartnernew.ui.components.StatChip
 import com.nextserve.serveitpartnernew.ui.viewmodel.ProfileEditViewModel
 import com.nextserve.serveitpartnernew.ui.viewmodel.ProfileViewModel
 import com.nextserve.serveitpartnernew.utils.LanguageManager
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.*
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import kotlin.math.roundToInt
+
+@Composable
+private fun FlatOptionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String? = null,
+    showDivider: Boolean = true,
+    onClick: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                subtitle?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (showDivider) {
+            androidx.compose.material3.HorizontalDivider(
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                thickness = 1.dp,
+                modifier = Modifier.padding(start = 56.dp)
+            )
+        }
+    }
+}
 
 @Composable
 fun ProfileScreen(
@@ -99,10 +157,7 @@ fun ProfileScreen(
         }
     }
 
-    if (uiState.isLoading) {
-        ProfileLoadingPlaceholder(modifier = modifier)
-        return
-    }
+    // Skip loading state for now - show content directly
 
     val providerData = uiState.providerData
     val scrollState = rememberScrollState()
@@ -116,97 +171,304 @@ fun ProfileScreen(
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        ProfileHeader(
-            fullName = providerData?.fullName ?: "",
-            phoneNumber = providerData?.phoneNumber ?: "",
-            approvalStatus = providerData?.approvalStatus ?: "PENDING",
-            onboardingStatus = providerData?.onboardingStatus ?: "IN_PROGRESS",
-            currentStep = providerData?.currentStep ?: 1,
-            profilePhotoUrl = providerData?.profilePhotoUrl ?: "",
-            onProfilePhotoClick = { imagePicker.launch("image/*") }
-        )
+        // New flat Profile Header (minimalist)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Profile Photo (64dp, CircleShape)
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = { imagePicker.launch("image/*") }),
+                contentAlignment = Alignment.Center
+            ) {
+                if (providerData?.profilePhotoUrl?.isNotEmpty() == true) {
+                    AsyncImage(
+                        model = providerData.profilePhotoUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        text = providerData?.fullName?.firstOrNull()?.uppercase() ?: "U",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
-        StatusBanner(providerData, navController)
+            // Name, Phone, and Completion text
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Name (titleLarge)
+                Text(
+                    text = providerData?.fullName ?: "—",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                // Phone number (bodySmall, muted)
+                Text(
+                    text = providerData?.phoneNumber ?: "—",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                // Completion text: "Profile X% complete" (bodySmall)
+                val progress = ((providerData?.currentStep ?: 1).coerceAtLeast(0).coerceAtMost(5)).toFloat() / 5.toFloat()
+                val progressPercent = (progress * 100).roundToInt()
+                Text(
+                    text = "Profile ${progressPercent}% complete",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
-        QuickActionsRow(navController)
+        // Inline Status Row (flat, no banner)
+        val statusInfo = when (providerData?.approvalStatus) {
+            "APPROVED" -> Pair("Ready to accept jobs", MaterialTheme.colorScheme.primary)
+            "REJECTED" -> Pair("Review your documents", MaterialTheme.colorScheme.error)
+            "PENDING" -> if (providerData?.onboardingStatus == "SUBMITTED")
+                Pair("Under review", MaterialTheme.colorScheme.secondary)
+                else Pair("Complete your profile", MaterialTheme.colorScheme.secondary)
+            else -> Pair("Complete your profile", MaterialTheme.colorScheme.secondary)
+        }
 
-        StatsRow(
-            stats = uiState.stats,
-            isLoading = uiState.isLoadingStats
-        )
+        val showAction = when (providerData?.approvalStatus) {
+            "APPROVED", "PENDING" -> providerData?.onboardingStatus != "SUBMITTED"
+            "REJECTED" -> true
+            else -> true
+        }
+
+        val actionRoute = when {
+            providerData?.approvalStatus == "REJECTED" -> "profile/edit/basic"
+            showAction -> "profile/edit/basic"
+            else -> ""
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Small colored dot
+            Canvas(modifier = Modifier.size(6.dp)) {
+                drawCircle(color = statusInfo.second.copy(alpha = 0.7f))
+            }
+
+            // Status text
+            Text(
+                text = statusInfo.first,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Optional action button
+            if (showAction && actionRoute.isNotEmpty()) {
+                TextButton(
+                    onClick = { navController.navigate(actionRoute) },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = when (providerData?.approvalStatus) {
+                            "REJECTED" -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.primary
+                        }
+                    )
+                ) {
+                    Text(
+                        text = when (providerData?.approvalStatus) {
+                            "REJECTED" -> stringResource(R.string.edit_profile)
+                            else -> stringResource(R.string.complete_now)
+                        },
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+        }
+
+        // Flat Quick Actions (no chips)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            TextButton(
+                onClick = { navController.navigate("profile/edit/basic") }
+            ) {
+                Text(
+                    text = stringResource(R.string.edit_profile_button),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        }
+
+        // Flat Stats Row (no card, no elevation)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(32.dp)
+        ) {
+            if (uiState.isLoadingStats || uiState.stats == null) {
+                repeat(3) {
+                    Text(
+                        text = "—",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            } else {
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = uiState.stats.getFormattedRating(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Rating",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = uiState.stats.totalJobs.toString(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Jobs",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = uiState.stats.getFormattedEarnings(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Earnings",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
 
         val context = LocalContext.current
         
-        ProfileSection(title = stringResource(R.string.account)) {
-            ProfileOptionRow(
-                icon = ProfileIcons.PersonalInformation,
-                title = stringResource(R.string.personal_information),
-                subtitle = stringResource(R.string.name_phone_email),
-                showDivider = true,
-                onClick = { navController.navigate("profile/edit/basic") }
-            )
-            ProfileOptionRow(
-                icon = ProfileIcons.ServiceInformation,
-                title = stringResource(R.string.service_information),
-                subtitle = stringResource(R.string.skills_categories),
-                showDivider = true,
-                onClick = { navController.navigate("profile/edit/services") }
-            )
-            ProfileOptionRow(
-                icon = ProfileIcons.AddressInformation,
-                title = stringResource(R.string.address_information),
-                subtitle = stringResource(R.string.city_radius_pincode),
-                showDivider = true,
-                onClick = { navController.navigate("profile/edit/address") }
-            )
-            ProfileOptionRow(
-                icon = ProfileIcons.Documents,
-                title = stringResource(R.string.documents),
-                subtitle = stringResource(R.string.aadhaar_verification),
-                showDivider = false,
-                onClick = { navController.navigate("profile/edit/documents") }
-            )
-        }
-
-        ProfileSection(title = stringResource(R.string.preferences)) {
-            ProfileOptionRow(
-                icon = ProfileIcons.Language,
-                title = stringResource(R.string.language),
-                subtitle = LanguageManager.getLanguageDisplayName(LanguageManager.getSavedLanguage(context), context),
-                showDivider = true,
-                onClick = { navController.navigate("profile/edit/preferences") }
-            )
-            ProfileOptionRow(
-                icon = Icons.Filled.Notifications,
-                title = stringResource(R.string.notifications),
-                subtitle = stringResource(R.string.manage_push_alerts),
-                showDivider = false,
-                onClick = { navController.navigate("profile/edit/preferences") }
-            )
-        }
-
-        ProfileSection(title = stringResource(R.string.support_about)) {
-            ProfileOptionRow(
-                icon = Icons.Filled.Info,
-                title = stringResource(R.string.help_support),
-                subtitle = stringResource(R.string.faqs_contact_us),
-                showDivider = true,
-                onClick = { navController.navigate("help/support") }
-            )
-            ProfileOptionRow(
-                icon = Icons.Outlined.Info,
-                title = stringResource(R.string.about_app),
-                subtitle = stringResource(R.string.version_terms_privacy),
-                showDivider = false,
-                onClick = { navController.navigate("about/app") }
-            )
-        }
-
-        LogoutRow(
-            onClick = {
-                FirebaseProvider.auth.signOut()
-            }
+        // Flat Account Section (Android Settings style)
+        Text(
+            text = stringResource(R.string.account),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
+
+        FlatOptionRow(
+            icon = ProfileIcons.PersonalInformation,
+            title = stringResource(R.string.personal_information),
+            subtitle = stringResource(R.string.name_phone_email),
+            showDivider = true,
+            onClick = { navController.navigate("profile/edit/basic") }
+        )
+        FlatOptionRow(
+            icon = ProfileIcons.ServiceInformation,
+            title = stringResource(R.string.service_information),
+            subtitle = stringResource(R.string.skills_categories),
+            showDivider = true,
+            onClick = { navController.navigate("profile/edit/services") }
+        )
+        FlatOptionRow(
+            icon = ProfileIcons.AddressInformation,
+            title = stringResource(R.string.address_information),
+            subtitle = stringResource(R.string.city_radius_pincode),
+            showDivider = true,
+            onClick = { navController.navigate("profile/edit/address") }
+        )
+        FlatOptionRow(
+            icon = ProfileIcons.Documents,
+            title = stringResource(R.string.documents),
+            subtitle = stringResource(R.string.aadhaar_verification),
+            showDivider = false,
+            onClick = { navController.navigate("profile/edit/documents") }
+        )
+
+        // Flat Preferences Section
+        Text(
+            text = stringResource(R.string.preferences),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        FlatOptionRow(
+            icon = ProfileIcons.Language,
+            title = stringResource(R.string.language),
+            subtitle = LanguageManager.getLanguageDisplayName(LanguageManager.getSavedLanguage(context), context),
+            showDivider = true,
+            onClick = { navController.navigate("profile/edit/preferences") }
+        )
+        FlatOptionRow(
+            icon = Icons.Filled.Notifications,
+            title = stringResource(R.string.notifications),
+            subtitle = stringResource(R.string.manage_push_alerts),
+            showDivider = false,
+            onClick = { navController.navigate("profile/edit/preferences") }
+        )
+
+        // Flat Support/About Section
+        Text(
+            text = stringResource(R.string.support_about),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        FlatOptionRow(
+            icon = Icons.Filled.Info,
+            title = stringResource(R.string.help_support),
+            subtitle = stringResource(R.string.faqs_contact_us),
+            showDivider = true,
+            onClick = { navController.navigate("help/support") }
+        )
+        FlatOptionRow(
+            icon = Icons.Outlined.Info,
+            title = stringResource(R.string.about_app),
+            subtitle = stringResource(R.string.version_terms_privacy),
+            showDivider = false,
+            onClick = { navController.navigate("about/app") }
+        )
+
+        // Flat Logout (subtle text button)
+        TextButton(
+            onClick = { FirebaseProvider.auth.signOut() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        ) {
+            Text(
+                text = stringResource(R.string.logout),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
 
         Text(
             text = stringResource(R.string.app_version),
@@ -220,262 +482,6 @@ fun ProfileScreen(
         )
 
         Spacer(modifier = Modifier.height(8.dp))
-    }
-}
-
-@Composable
-private fun QuickActionsRow(navController: NavController) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        QuickActionChip(
-            icon = Icons.Filled.Edit,
-            label = stringResource(R.string.edit_profile_button),
-            onClick = { navController.navigate("profile/edit/basic") }
-        )
-        QuickActionChip(
-            icon = ProfileIcons.ServiceInformation,
-            label = stringResource(R.string.services),
-            onClick = { navController.navigate("profile/edit/services") }
-        )
-        QuickActionChip(
-            icon = Icons.Filled.Info,
-            label = stringResource(R.string.documents),
-            onClick = { navController.navigate("profile/edit/documents") }
-        )
-    }
-}
-
-@Composable
-private fun StatsRow(
-    stats: com.nextserve.serveitpartnernew.data.model.ProviderStats?,
-    isLoading: Boolean
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        if (isLoading || stats == null) {
-            repeat(3) {
-                StatChipShimmer(modifier = Modifier.weight(1f))
-            }
-        } else {
-            StatChip(
-                value = stats.getFormattedRating(),
-                label = stringResource(R.string.rating),
-                icon = Icons.Filled.Star,
-                modifier = Modifier.weight(1f)
-            )
-            StatChip(
-                value = stats.totalJobs.toString(),
-                label = stringResource(R.string.jobs_done),
-                icon = Icons.Filled.List,
-                modifier = Modifier.weight(1f)
-            )
-            StatChip(
-                value = stats.getFormattedEarnings(),
-                label = stringResource(R.string.earnings),
-                icon = Icons.Filled.Star,
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatChipShimmer(modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-        tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(width = 40.dp, height = 20.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-            )
-            Box(
-                modifier = Modifier
-                    .size(width = 50.dp, height = 12.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatusBanner(
-    providerData: ProviderData?,
-    navController: NavController
-) {
-    val statusInfo = when (providerData?.approvalStatus) {
-        "APPROVED" -> StatusInfo(
-            title = stringResource(R.string.approved_status),
-            subtitle = stringResource(R.string.approved_message),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-            icon = Icons.Filled.CheckCircle,
-            iconTint = MaterialTheme.colorScheme.primary,
-            showActionButton = false,
-            actionText = "",
-            actionRoute = ""
-        )
-        "REJECTED" -> StatusInfo(
-            title = stringResource(R.string.rejected_status),
-            subtitle = providerData.rejectionReason ?: stringResource(R.string.please_review_your_documents),
-            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-            icon = Icons.Filled.Close,
-            iconTint = MaterialTheme.colorScheme.error,
-            showActionButton = true,
-            actionText = stringResource(R.string.edit_profile),
-            actionRoute = "profile/edit/basic"
-        )
-        "PENDING" -> {
-            if (providerData?.onboardingStatus == "SUBMITTED") {
-                StatusInfo(
-                    title = stringResource(R.string.under_review),
-                    subtitle = stringResource(R.string.we_will_notify_once_verification_completes),
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
-                    icon = Icons.Filled.Info,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    showActionButton = false,
-                    actionText = "",
-                    actionRoute = ""
-                )
-            } else {
-                StatusInfo(
-                    title = stringResource(R.string.complete_profile),
-                    subtitle = stringResource(R.string.finish_steps_to_submit),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    icon = Icons.Filled.Edit,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    showActionButton = true,
-                    actionText = stringResource(R.string.complete_now),
-                    actionRoute = "profile/edit/basic"
-                )
-            }
-        }
-        else -> StatusInfo(
-            title = stringResource(R.string.complete_profile),
-            subtitle = stringResource(R.string.finish_steps_to_submit),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            icon = Icons.Filled.Edit,
-            iconTint = MaterialTheme.colorScheme.secondary,
-            showActionButton = true,
-            actionText = stringResource(R.string.complete_now),
-            actionRoute = "profile/edit/basic"
-        )
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = statusInfo.color,
-        tonalElevation = 4.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(statusInfo.iconTint.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = statusInfo.icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = statusInfo.iconTint
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = statusInfo.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = statusInfo.subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            
-            if (statusInfo.showActionButton && statusInfo.actionText.isNotEmpty()) {
-                Button(
-                    onClick = { navController.navigate(statusInfo.actionRoute) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = when (providerData?.approvalStatus) {
-                            "REJECTED" -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.primary
-                        }
-                    )
-                ) {
-                    Text(text = statusInfo.actionText)
-                }
-            }
-        }
-    }
-}
-
-private data class StatusInfo(
-    val title: String,
-    val subtitle: String,
-    val color: androidx.compose.ui.graphics.Color,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val iconTint: androidx.compose.ui.graphics.Color,
-    val showActionButton: Boolean,
-    val actionText: String,
-    val actionRoute: String
-)
-
-@Composable
-private fun ProfileLoadingPlaceholder(modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            repeat(4) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (it == 0) 140.dp else 96.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = MaterialTheme.shapes.large,
-                    tonalElevation = 2.dp
-                ) {}
-            }
-        }
     }
 }
 
