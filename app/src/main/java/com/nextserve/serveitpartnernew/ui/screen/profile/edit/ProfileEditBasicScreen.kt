@@ -107,14 +107,6 @@ fun ProfileEditBasicScreen(navController: NavController) {
                 placeholder = "Male / Female / Other"
             )
 
-            Text(
-                text = "Phone number is managed by login and cannot be edited here.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
             PrimaryButton(
                 text = if (state.isSaving) "Saving..." else "Save changes",
                 onClick = { viewModel.updateBasicInfo(fullName, email, gender) },
@@ -130,6 +122,12 @@ fun ProfileEditBasicScreen(navController: NavController) {
                     fontWeight = FontWeight.Medium
                 )
             }
+
+            Text(
+                text = "Phone number is managed by login and cannot be edited here.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
