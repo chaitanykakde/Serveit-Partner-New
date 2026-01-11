@@ -37,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -151,17 +152,26 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = when {
-                            providerName.isNotEmpty() -> "Welcome back, ${providerName.split(" ").firstOrNull() ?: providerName}!"
-                            else -> "Welcome to Serveit Partner!"
-                        },
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
-                    )
+                    Column {
+                        Text(
+                            text = when {
+                                providerName.isNotEmpty() -> "Welcome back, ${providerName.split(" ").firstOrNull() ?: providerName}!"
+                                else -> "Welcome to Serveit Partner!"
+                            },
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Ready for your next task?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = Color.White,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
@@ -175,7 +185,7 @@ fun HomeScreen(
             }
         },
         modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.White
     ) { scaffoldPaddingValues ->
         // ONE persistent LazyColumn for guaranteed scroll behavior
         // listState is created once and persists across all recompositions
@@ -418,7 +428,7 @@ private fun HomeContent(
         // 4️⃣ NORMAL CONTENT: Render existing sections in order
         // New Requests Section
         if (highlightedJob != null) {
-            item(key = "new_requests_header") { SectionHeader("New Requests") }
+            item(key = "new_requests_header") { SectionHeader("New Requests", showPriorityBadge = true) }
             HomeNewJobSection(
                 highlightedJob = highlightedJob,
                 hasOngoingJob = hasOngoingJob,
@@ -443,6 +453,7 @@ private fun HomeContent(
             item(key = "today_header") { SectionHeader("Today") }
             HomeTodaySection(
                 todayCompletedJobs = todayCompletedJobs,
+                todayEarnings = todayStats.second,
                 onOngoingJobClick = onOngoingJobClick
             )
         }

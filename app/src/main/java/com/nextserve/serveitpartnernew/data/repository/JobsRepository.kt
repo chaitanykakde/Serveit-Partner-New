@@ -520,6 +520,7 @@ class JobsRepository(
         customerPhoneNumber: String
     ): Job? {
         val bookingId = bookingData["bookingId"] as? String ?: return null
+        android.util.Log.d("JobsRepository", "📋 Mapping booking to job: bookingId=$bookingId, available keys: ${bookingData.keys.joinToString()}")
         val serviceName = bookingData["serviceName"] as? String ?: "Unknown Service"
         
         // Handle status field inconsistency
@@ -551,11 +552,14 @@ class JobsRepository(
         }
 
         // Extract timestamps
-        val createdAt = bookingData["createdAt"] as? Timestamp
+        val createdAt = (bookingData["createdAt"] as? Timestamp)
+            ?: (bookingData["timestamp"] as? Timestamp)
         val acceptedAt = bookingData["acceptedAt"] as? Timestamp
         val arrivedAt = bookingData["arrivedAt"] as? Timestamp
         val serviceStartedAt = bookingData["serviceStartedAt"] as? Timestamp
         val completedAt = bookingData["completedAt"] as? Timestamp
+        
+        android.util.Log.d("JobsRepository", "⏰ Extracting timestamps for job $bookingId: createdAt=$createdAt, timestamp=${bookingData["timestamp"]}")
 
         val subServicesSelected = bookingData["subServicesSelected"] as? Map<String, Any>
         
@@ -570,6 +574,11 @@ class JobsRepository(
             ?: bookingData["address"] as? String
             ?: bookingData["fullAddress"] as? String
             ?: bookingData["locationAddress"] as? String
+            ?: bookingData["location"] as? String
+            ?: locationName // Fallback to locationName if available
+        
+        android.util.Log.d("JobsRepository", "🏠 Extracting address for job $bookingId: customerAddress=$customerAddress, locationName=$locationName")
+        android.util.Log.d("JobsRepository", "🔍 Available address fields in booking: customerAddress=${bookingData["customerAddress"]}, address=${bookingData["address"]}, fullAddress=${bookingData["fullAddress"]}")
 
         // Extract notes/description
         val notes = bookingData["notes"] as? String
@@ -708,6 +717,28 @@ class JobsRepository(
             }
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Fetch customer address from serveit_users collection
+     * Used as fallback when address is not available in booking data
+     */
+    suspend fun fetchCustomerAddress(customerPhoneNumber: String): String? {
+        return try {
+            val customerDoc = firestore.collection("serveit_users")
+                .document(customerPhoneNumber)
+                .get()
+                .await()
+            
+            val customerData = customerDoc.data
+            val address = customerData?.get("address") as? String
+            
+            android.util.Log.d("JobsRepository", "🏠 Fetched address from serveit_users/$customerPhoneNumber: ${address?.take(50)}")
+            address
+        } catch (e: Exception) {
+            android.util.Log.w("JobsRepository", "⚠️ Failed to fetch address from serveit_users/$customerPhoneNumber: ${e.message}")
+            null
         }
     }
 
