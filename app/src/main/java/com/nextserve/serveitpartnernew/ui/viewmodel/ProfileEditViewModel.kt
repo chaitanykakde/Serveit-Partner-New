@@ -275,15 +275,35 @@ class ProfileEditViewModel(
         viewModelScope.launch {
             val locationResult = locationRepository.getCurrentLocation()
             locationResult.onSuccess { location ->
-                val addressResult = locationRepository.getAddressFromLocation(
+                val addressResult = locationRepository.getDetailedAddressFromLocation(
                     location.latitude,
                     location.longitude
                 )
                 addressResult.onSuccess { address ->
+                    // Extract individual address components with fallbacks
+                    val city = address.locality ?: address.subAdminArea ?: ""
+                    val state = address.adminArea ?: ""
+                    val pincode = address.postalCode ?: ""
+                    val areaLocality = address.thoroughfare ?: address.featureName ?: ""
+                    
+                    // Build full address string
+                    val fullAddressParts = mutableListOf<String>()
+                    address.featureName?.let { fullAddressParts.add(it) }
+                    address.thoroughfare?.let { fullAddressParts.add(it) }
+                    address.locality?.let { fullAddressParts.add(it) }
+                    address.adminArea?.let { fullAddressParts.add(it) }
+                    address.postalCode?.let { fullAddressParts.add(it) }
+                    address.countryName?.let { fullAddressParts.add(it) }
+                    val fullAddress = fullAddressParts.joinToString(", ")
+                    
                     val locationData = LocationData(
                         latitude = location.latitude,
                         longitude = location.longitude,
-                        fullAddress = address
+                        state = state,
+                        city = city,
+                        address = areaLocality,
+                        pincode = pincode,
+                        fullAddress = fullAddress.ifEmpty { null }
                     )
                     onResult(Result.success(locationData))
                 }.onFailure { exception ->

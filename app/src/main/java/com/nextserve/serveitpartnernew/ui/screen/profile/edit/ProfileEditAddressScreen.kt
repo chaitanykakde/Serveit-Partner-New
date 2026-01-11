@@ -2,22 +2,14 @@ package com.nextserve.serveitpartnernew.ui.screen.profile.edit
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,18 +19,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
-import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
-import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileEditScreenLayout
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileMinimalTextField
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileSaveButton
 import com.nextserve.serveitpartnernew.ui.utils.rememberLocationPermissionState
 import com.nextserve.serveitpartnernew.ui.viewmodel.ProfileEditViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileEditAddressScreen(navController: NavController) {
+fun ProfileEditAddressScreen(
+    navController: NavController,
+    parentPaddingValues: PaddingValues = PaddingValues()
+) {
     val uid = FirebaseProvider.auth.currentUser?.uid ?: return
     val context = LocalContext.current
     val viewModel: ProfileEditViewModel = viewModel(
@@ -76,36 +72,23 @@ fun ProfileEditAddressScreen(navController: NavController) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Edit Address") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    ProfileEditScreenLayout(
+        navController = navController,
+        title = "Edit Address",
+        subtitle = "Update your service location",
+        parentPaddingValues = parentPaddingValues
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Update your service location",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            PrimaryButton(
+            // Use current location button - styled like ProfileSaveButton
+            ProfileSaveButton(
                 text = "Use current location",
-                leadingIcon = {
-                    Icon(imageVector = Icons.Default.LocationOn, contentDescription = "Location")
-                },
+                isLoading = false,
+                enabled = !state.isSaving,
+                leadingIcon = Icons.Default.LocationOn,
+                showTrailingArrow = false,
                 onClick = {
                     viewModel.useCurrentLocation { result ->
                         result.onSuccess { locationData ->
@@ -121,44 +104,45 @@ fun ProfileEditAddressScreen(navController: NavController) {
                         if (!hasLocationPermission) requestLocationPermission()
                     }
                 },
-                enabled = !state.isSaving
+                modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            OutlinedInputField(
+            ProfileMinimalTextField(
                 value = stateText,
                 onValueChange = { stateText = it },
                 label = "State",
-                placeholder = "State"
+                modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            OutlinedInputField(
+            ProfileMinimalTextField(
                 value = city,
                 onValueChange = { city = it },
                 label = "City",
-                placeholder = "City"
+                modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            OutlinedInputField(
+            ProfileMinimalTextField(
                 value = address,
                 onValueChange = { address = it },
                 label = "Area / Locality / Landmark",
-                placeholder = "Area / locality / landmark",
-                singleLine = false
+                singleLine = false,
+                modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            OutlinedInputField(
+            ProfileMinimalTextField(
                 value = fullAddress,
                 onValueChange = { fullAddress = it },
                 label = "Full address",
-                placeholder = "Enter full address",
-                singleLine = false
+                singleLine = false,
+                modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            OutlinedInputField(
+            ProfileMinimalTextField(
                 value = pincode,
                 onValueChange = { pincode = it },
                 label = "Pincode",
-                placeholder = "Pincode"
+                keyboardType = KeyboardType.Number,
+                modifier = Modifier.padding(bottom = 24.dp)
             )
 
             Text(
@@ -174,8 +158,10 @@ fun ProfileEditAddressScreen(navController: NavController) {
                 modifier = Modifier.fillMaxWidth()
             )
 
-            PrimaryButton(
+            ProfileSaveButton(
                 text = if (state.isSaving) "Saving..." else "Save address",
+                isLoading = state.isSaving,
+                enabled = !state.isSaving,
                 onClick = {
                     viewModel.updateAddress(
                         state = stateText,
@@ -187,9 +173,7 @@ fun ProfileEditAddressScreen(navController: NavController) {
                         latitude = latitude,
                         longitude = longitude
                     )
-                },
-                isLoading = state.isSaving,
-                enabled = !state.isSaving
+                }
             )
 
             if (state.errorMessage != null) {
@@ -197,7 +181,8 @@ fun ProfileEditAddressScreen(navController: NavController) {
                     text = state.errorMessage,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 16.dp)
                 )
             }
         }

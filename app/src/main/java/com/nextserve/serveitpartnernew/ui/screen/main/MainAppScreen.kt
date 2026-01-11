@@ -152,13 +152,48 @@ fun MainAppScreen(
                     parentPaddingValues = paddingValues
                 )
             }
-            composable("profile/edit/basic") { ProfileEditBasicScreen(navController) }
-            composable("profile/edit/services") { ProfileEditServicesScreen(navController) }
-            composable("profile/edit/address") { ProfileEditAddressScreen(navController) }
-            composable("profile/edit/documents") { ProfileEditDocumentsScreen(navController) }
-            composable("profile/edit/preferences") { ProfileEditPreferencesScreen(navController) }
-            composable("help/support") { HelpSupportScreen(navController) }
-            composable("about/app") { AboutAppScreen(navController) }
+            composable("profile/edit/basic") { 
+                ProfileEditBasicScreen(
+                    navController = navController,
+                    parentPaddingValues = paddingValues
+                ) 
+            }
+            composable("profile/edit/services") { 
+                ProfileEditServicesScreen(
+                    navController = navController,
+                    parentPaddingValues = paddingValues
+                ) 
+            }
+            composable("profile/edit/address") { 
+                ProfileEditAddressScreen(
+                    navController = navController,
+                    parentPaddingValues = paddingValues
+                ) 
+            }
+            composable("profile/edit/documents") { 
+                ProfileEditDocumentsScreen(
+                    navController = navController,
+                    parentPaddingValues = paddingValues
+                ) 
+            }
+            composable("profile/edit/preferences") { 
+                ProfileEditPreferencesScreen(
+                    navController = navController,
+                    parentPaddingValues = paddingValues
+                ) 
+            }
+            composable("help/support") { 
+                HelpSupportScreen(
+                    navController = navController,
+                    parentPaddingValues = paddingValues
+                ) 
+            }
+            composable("about/app") { 
+                AboutAppScreen(
+                    navController = navController,
+                    parentPaddingValues = paddingValues
+                ) 
+            }
         }
     }
 }

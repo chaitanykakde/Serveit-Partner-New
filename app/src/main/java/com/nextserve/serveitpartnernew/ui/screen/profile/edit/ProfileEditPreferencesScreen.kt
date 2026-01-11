@@ -6,23 +6,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,13 +32,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
-import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileEditScreenLayout
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileSaveButton
 import com.nextserve.serveitpartnernew.ui.viewmodel.ProfileEditViewModel
 import com.nextserve.serveitpartnernew.utils.LanguageManager
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileEditPreferencesScreen(navController: NavController) {
+fun ProfileEditPreferencesScreen(
+    navController: NavController,
+    parentPaddingValues: PaddingValues = PaddingValues()
+) {
     val uid = FirebaseProvider.auth.currentUser?.uid ?: return
     val context = LocalContext.current
     val viewModel: ProfileEditViewModel = viewModel(
@@ -69,30 +65,16 @@ fun ProfileEditPreferencesScreen(navController: NavController) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.edit_preferences)) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    ProfileEditScreenLayout(
+        navController = navController,
+        title = stringResource(R.string.edit_preferences),
+        subtitle = stringResource(R.string.update_preferences),
+        parentPaddingValues = parentPaddingValues
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = stringResource(R.string.update_preferences),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
 
             Text(
                 text = stringResource(R.string.language),
@@ -124,11 +106,11 @@ fun ProfileEditPreferencesScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            PrimaryButton(
+            ProfileSaveButton(
                 text = if (state.isSaving) stringResource(R.string.saving) else stringResource(R.string.save_changes),
-                onClick = { viewModel.updatePreferences(languageCode, notificationsEnabled, context) },
                 isLoading = state.isSaving,
-                enabled = !state.isSaving
+                enabled = !state.isSaving,
+                onClick = { viewModel.updatePreferences(languageCode, notificationsEnabled, context) }
             )
 
             if (state.errorMessage != null) {
@@ -136,7 +118,8 @@ fun ProfileEditPreferencesScreen(navController: NavController) {
                     text = state.errorMessage,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 16.dp)
                 )
             }
         }

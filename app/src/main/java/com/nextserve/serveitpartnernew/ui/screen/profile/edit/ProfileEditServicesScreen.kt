@@ -2,20 +2,13 @@ package com.nextserve.serveitpartnernew.ui.screen.profile.edit
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,13 +22,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
-import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
 import com.nextserve.serveitpartnernew.ui.components.ServiceSelector
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileEditScreenLayout
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileSaveButton
 import com.nextserve.serveitpartnernew.ui.viewmodel.ProfileEditViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileEditServicesScreen(navController: NavController) {
+fun ProfileEditServicesScreen(
+    navController: NavController,
+    parentPaddingValues: PaddingValues = PaddingValues()
+) {
     val uid = FirebaseProvider.auth.currentUser?.uid ?: return
     val context = LocalContext.current
     val viewModel: ProfileEditViewModel = viewModel(
@@ -72,30 +68,16 @@ fun ProfileEditServicesScreen(navController: NavController) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Edit Services") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    ProfileEditScreenLayout(
+        navController = navController,
+        title = "Edit Services",
+        subtitle = "Update the services you offer",
+        parentPaddingValues = parentPaddingValues
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Update the services you offer",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
 
             ServiceSelector(
                 selectedService = mainService,
@@ -144,17 +126,17 @@ fun ProfileEditServicesScreen(navController: NavController) {
                 }
             }
 
-            PrimaryButton(
+            ProfileSaveButton(
                 text = if (state.isSaving) "Saving..." else "Save services",
+                isLoading = state.isSaving,
+                enabled = !state.isSaving && mainService.isNotEmpty(),
                 onClick = {
                     viewModel.updateServices(
                         gender = gender,
                         mainService = mainService,
                         subServices = selectedSubs.toList()
                     )
-                },
-                isLoading = state.isSaving,
-                enabled = !state.isSaving && mainService.isNotEmpty()
+                }
             )
 
             if (state.errorMessage != null) {
@@ -162,7 +144,8 @@ fun ProfileEditServicesScreen(navController: NavController) {
                     text = state.errorMessage,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 16.dp)
                 )
             }
         }
