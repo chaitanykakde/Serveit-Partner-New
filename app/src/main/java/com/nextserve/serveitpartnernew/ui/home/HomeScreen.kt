@@ -52,7 +52,6 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -65,6 +64,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
+ * HOME SCREEN ARCHITECTURE CONTRACT
+ *
+ * - Exactly ONE LazyColumn is allowed
+ * - No nested vertical scroll containers
+ * - Loading / Error / Empty are rendered as LazyColumn ITEMS
+ * - No fillMaxSize() or weight() inside LazyColumn items
+ * - Scaffold padding must always be respected
+ * - rememberLazyListState() must be created once and persist across recompositions
+ * - All dynamic lists must use stable keys (bookingId for jobs)
+ *
+ * Violating this contract WILL break scrolling and performance.
+ *
  * Home Screen - Google-grade Material 3 design with premium UX
  * Coordinator pattern: Composes sections without containing UI logic
  */
@@ -167,6 +178,7 @@ fun HomeScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { scaffoldPaddingValues ->
         // ONE persistent LazyColumn for guaranteed scroll behavior
+        // listState is created once and persists across all recompositions
         val listState = rememberLazyListState()
         
         android.util.Log.d("HomeRender", "isLoading = $isLoading")
@@ -363,8 +375,13 @@ private fun HomeContent(
         modifier = Modifier
             .fillMaxWidth()
             .padding(scaffoldPaddingValues)
-            .animateContentSize()
     ) {
+        // UI state priority (strict order, early returns):
+        // 1. Loading - Skeleton placeholder items
+        // 2. Error - Error state with retry
+        // 3. Empty - Empty state placeholder
+        // 4. Content - Normal sections (New Requests, Ongoing, Today, Stats)
+        
         // 1️⃣ LOADING STATE: Render skeleton placeholder items
         if (isLoading) {
             items(3, key = { "skeleton_$it" }) {
