@@ -101,10 +101,11 @@ fun MainAppScreen(
                     }
                 )
             }
-            composable(BottomNavItem.Jobs.route) {
+            composable(BottomNavItem.Jobs.route) { backStackEntry ->
                 val providerId = com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.auth.currentUser?.uid ?: ""
                 JobsScreen(
                     providerId = providerId,
+                    parentPaddingValues = paddingValues,
                     onNavigateToJobDetails = { bookingId, customerPhoneNumber, bookingIndex ->
                         val route = if (bookingIndex != null && bookingIndex >= 0) {
                             "jobDetails/$bookingId/$customerPhoneNumber/$bookingIndex"

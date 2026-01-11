@@ -2,7 +2,6 @@ package com.nextserve.serveitpartnernew.ui.screen.main
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,14 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.tween
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,27 +31,13 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Warning
-// Temporarily disabled problematic icons
-// import androidx.compose.material.icons.filled.FilterList
-// import androidx.compose.material.icons.filled.Search
-// import androidx.compose.material.icons.filled.Sort
-// import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.RangeSlider
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -88,11 +66,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -108,6 +86,16 @@ import com.nextserve.serveitpartnernew.utils.NetworkMonitor
 import kotlinx.coroutines.launch
 
 /**
+ * JOBS SCREEN SCROLL CONTRACT
+ *
+ * - One LazyColumn per tab
+ * - No nested vertical scrolling
+ * - Loading/Error/Empty are LazyColumn items
+ * - Scaffold padding must be respected
+ * - Parent padding (from MainAppScreen) must be combined with local Scaffold padding
+ */
+
+/**
  * Jobs Screen with tabs for New Jobs and History
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -115,6 +103,7 @@ import kotlinx.coroutines.launch
 fun JobsScreen(
     modifier: Modifier = Modifier,
     providerId: String,
+    parentPaddingValues: PaddingValues = PaddingValues(),
     onNavigateToJobDetails: (String, String, Int?) -> Unit = { _, _, _ -> }, // bookingId, customerPhoneNumber, bookingIndex
     onJobAccepted: (String) -> Unit = {}, // Navigate to job details
     viewModel: JobsViewModel = viewModel(
@@ -131,9 +120,6 @@ fun JobsScreen(
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var showAcceptDialog by remember { mutableStateOf<Job?>(null) }
-    var showRejectDialog by remember { mutableStateOf<Job?>(null) }
-    var showSearch by remember { mutableStateOf(false) }
-    var showFilters by remember { mutableStateOf(false) }
 
     // Sync pager with tab selection
     LaunchedEffect(selectedTabIndex) {
@@ -163,89 +149,38 @@ fun JobsScreen(
     Scaffold(
         topBar = {
             Column {
-                // Enhanced Header with gradient background
-                androidx.compose.material3.Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
-                    tonalElevation = 4.dp,
-                    shadowElevation = 2.dp
-                ) {
-                    val gradient = androidx.compose.ui.graphics.Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "Jobs",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Medium
                         )
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .background(gradient)
-                            .padding(horizontal = 20.dp, vertical = 16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Available Jobs",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                androidx.compose.material3.FilledTonalIconButton(
-                                    onClick = { showSearch = true },
-                                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
-                                    )
-                                ) {
-                                    Text(
-                                        text = "🔍",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = {
+                                // Cycle through sort options
+                                val nextSort = when (uiState.sortBy) {
+                                    "distance" -> "price"
+                                    "price" -> "time"
+                                    else -> "distance"
                                 }
-                                androidx.compose.material3.FilledTonalIconButton(
-                                    onClick = { showFilters = true },
-                                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
-                                    )
-                                ) {
-                                    Text(
-                                        text = "⚙️",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                }
-                                androidx.compose.material3.FilledTonalIconButton(
-                                    onClick = {
-                                        // Cycle through sort options
-                                        val nextSort = when (uiState.sortBy) {
-                                            "distance" -> "price"
-                                            "price" -> "time"
-                                            else -> "distance"
-                                        }
-                                        viewModel.setSortBy(nextSort)
-                                    },
-                                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
-                                    )
-                                ) {
-                                    Text(
-                                        text = "⇅",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                }
+                                viewModel.setSortBy(nextSort)
                             }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Sort",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
-                    }
-                }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
                 TabRow(selectedTabIndex = selectedTabIndex) {
                     Tab(
                         selected = selectedTabIndex == 0,
@@ -253,8 +188,7 @@ fun JobsScreen(
                             selectedTabIndex = 0
                             coroutineScope.launch { pagerState.animateScrollToPage(0) }
                         },
-                        text = { Text("New Jobs") },
-                        icon = { Icon(Icons.Default.List, contentDescription = null) }
+                        text = { Text("New Jobs") }
                     )
                     Tab(
                         selected = selectedTabIndex == 1,
@@ -262,8 +196,7 @@ fun JobsScreen(
                             selectedTabIndex = 1
                             coroutineScope.launch { pagerState.animateScrollToPage(1) }
                         },
-                        text = { Text("History") },
-                        icon = { Icon(Icons.Default.Info, contentDescription = null) }
+                        text = { Text("History") }
                     )
                 }
             }
@@ -299,12 +232,15 @@ fun JobsScreen(
             }
         },
         modifier = modifier
-    ) { paddingValues ->
+    ) { scaffoldPaddingValues ->
+        // Combine parent bottom padding (from MainAppScreen's bottomBar) with local Scaffold padding
+        val parentBottomPadding = parentPaddingValues.calculateBottomPadding()
+        
         HorizontalPager(
             state = pagerState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(scaffoldPaddingValues),
             userScrollEnabled = true
         ) { page ->
             when (page) {
@@ -334,6 +270,7 @@ fun JobsScreen(
                     },
                     uiState = uiState,
                     viewModel = viewModel,
+                    parentBottomPadding = parentBottomPadding,
                     modifier = Modifier.fillMaxSize()
                 )
                 1 -> HistoryTab(
@@ -347,6 +284,7 @@ fun JobsScreen(
                         onNavigateToJobDetails(job.bookingId, job.customerPhoneNumber, null)
                     },
                     errorMessage = uiState.errorMessage?.takeIf { it.contains("load more") },
+                    parentBottomPadding = parentBottomPadding,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -386,6 +324,7 @@ fun JobsScreen(
 
 /**
  * New Jobs Tab - Shows available jobs
+ * Uses LazyColumn items for all states (loading, error, empty, content) - Google-grade pattern
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -402,104 +341,136 @@ private fun NewJobsTab(
     onRejectClick: (Job) -> Unit,
     uiState: com.nextserve.serveitpartnernew.ui.viewmodel.JobsUiState,
     viewModel: JobsViewModel,
+    parentBottomPadding: Dp,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier) {
-        when {
-            errorMessage != null && !isLoading && jobs.isEmpty() -> {
-                ErrorState(
-                    message = errorMessage,
-                    onRetry = onRetry,
-                    modifier = Modifier.fillMaxSize()
-                )
+    val listState = rememberLazyListState()
+    
+    // Determine content state (priority: loading > error > empty > content)
+    val showError = errorMessage != null && !isLoading && jobs.isEmpty()
+    val showEmpty = !isLoading && jobs.isEmpty() && errorMessage == null
+
+    PullToRefreshBox(
+        isRefreshing = isLoading && jobs.isNotEmpty(), // Only show refresh indicator when we have content
+        onRefresh = { onRetry() }
+    ) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 16.dp,
+                bottom = 16.dp + parentBottomPadding
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = modifier.fillMaxWidth()
+        ) {
+            // UI state priority (strict order, early returns):
+            // 1. Loading - Skeleton placeholder items
+            // 2. Error - Error state with retry
+            // 3. Empty - Empty state placeholder
+            // 4. Content - Normal job cards
+            
+            // 1️⃣ LOADING STATE: Render skeleton placeholder items
+            if (isLoading) {
+                items(3, key = { "skeleton_$it" }) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                return@LazyColumn
             }
-            isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
+
+            // 2️⃣ ERROR STATE: Render error item (non-fullscreen)
+            if (showError) {
+                item(key = "error_state") {
+                    ErrorState(
+                        message = errorMessage ?: "An error occurred",
+                        onRetry = onRetry,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                return@LazyColumn
+            }
+
+            // 3️⃣ EMPTY STATE: Render empty item (non-fullscreen)
+            if (showEmpty) {
+                item(key = "empty_state") {
+                    EmptyState(
+                        icon = Icons.Default.List,
+                        title = "No New Jobs",
+                        description = "New job requests will appear here",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                return@LazyColumn
+            }
+
+            // 4️⃣ NORMAL CONTENT: Render job cards
+            // Ongoing job banner (if applicable)
+            if (hasOngoingJob) {
+                item(key = "ongoing_banner") {
+                    OngoingJobBanner(
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
-            jobs.isEmpty() -> {
-                EmptyState(
-                    icon = Icons.Default.List,
-                    title = "No New Jobs",
-                    description = "New job requests will appear here",
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            else -> {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // Ongoing job banner
-                    if (hasOngoingJob) {
-                        OngoingJobBanner(
+
+            // Show active filters indicator
+            if (searchQuery.isNotEmpty() ||
+                uiState.selectedServiceFilter != null ||
+                uiState.maxDistanceFilter != null ||
+                uiState.minPriceFilter != null ||
+                uiState.maxPriceFilter != null) {
+                item(key = "filter_indicator") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp)
-                        )
-                    }
-
-                    PullToRefreshBox(
-                        isRefreshing = isLoading,
-                        onRefresh = { onRetry() }
-                    ) {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Show active filters indicator
-                            if (searchQuery.isNotEmpty() ||
-                                uiState.selectedServiceFilter != null ||
-                                uiState.maxDistanceFilter != null ||
-                                uiState.minPriceFilter != null ||
-                                uiState.maxPriceFilter != null) {
-                                item {
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                                        )
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(12.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "Filters applied",
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                            Text(
-                                                text = "Clear",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.clickable { viewModel.clearFilters() }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            items(
-                                items = jobs,
-                                key = { it.bookingId }
-                            ) { job ->
-                                NewJobCard(
-                                    job = job,
-                                    isAccepting = acceptingJobId == job.bookingId,
-                                    isAcceptDisabled = hasOngoingJob,
-                                    onJobClick = { onJobClick(job) },
-                                    onAcceptClick = { onAcceptClick(job) },
-                                    onRejectClick = { onRejectClick(job) },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
+                            Text(
+                                text = "Filters applied",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "Clear",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable { viewModel.clearFilters() }
+                            )
                         }
                     }
                 }
+            }
+
+            // Job cards
+            items(
+                items = jobs,
+                key = { it.bookingId }
+            ) { job ->
+                NewJobCard(
+                    job = job,
+                    isAccepting = acceptingJobId == job.bookingId,
+                    isAcceptDisabled = hasOngoingJob,
+                    onJobClick = { onJobClick(job) },
+                    onAcceptClick = { onAcceptClick(job) },
+                    onRejectClick = { onRejectClick(job) },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -507,6 +478,7 @@ private fun NewJobsTab(
 
 /**
  * History Tab - Shows completed jobs
+ * Uses LazyColumn items for all states (loading, error, empty, content) - Google-grade pattern
  */
 @Composable
 private fun HistoryTab(
@@ -517,6 +489,7 @@ private fun HistoryTab(
     onLoadMore: () -> Unit,
     onJobClick: (Job) -> Unit = {},
     errorMessage: String? = null,
+    parentBottomPadding: Dp,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -528,78 +501,100 @@ private fun HistoryTab(
         }
     }
 
-    Box(modifier = modifier) {
-        when {
-            isLoading && jobs.isEmpty() -> {
+    // Determine content state (priority: loading > empty > content)
+    val showEmpty = !isLoading && jobs.isEmpty()
+
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 16.dp,
+            bottom = 16.dp + parentBottomPadding
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        // UI state priority (strict order, early returns):
+        // 1. Loading - Loading indicator item
+        // 2. Empty - Empty state placeholder
+        // 3. Content - Job cards + pagination UI
+        
+        // 1️⃣ LOADING STATE: Render loading indicator item
+        if (isLoading && jobs.isEmpty()) {
+            item(key = "loading_state") {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
                 }
             }
-            jobs.isEmpty() -> {
+            return@LazyColumn
+        }
+
+        // 2️⃣ EMPTY STATE: Render empty item (non-fullscreen)
+        if (showEmpty) {
+            item(key = "empty_state") {
                 EmptyState(
                     icon = Icons.Default.Info,
                     title = "No Completed Jobs",
                     description = "Your completed jobs will appear here",
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
-            else -> {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(
-                        items = jobs,
-                        key = { it.bookingId }
-                    ) { job ->
-                        CompletedJobCard(
-                            job = job,
-                            onClick = { onJobClick(job) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+            return@LazyColumn
+        }
 
-                    if (isLoadingMore) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                            }
-                        }
-                    }
-                    
-                    // Show error message if pagination failed
-                    if (!isLoadingMore && hasMore && errorMessage != null) {
-                        item {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = errorMessage,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.error,
-                                    textAlign = TextAlign.Center
-                                )
-                                Button(
-                                    onClick = onLoadMore,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("Retry")
-                                }
-                            }
-                        }
+        // 3️⃣ NORMAL CONTENT: Render job cards
+        items(
+            items = jobs,
+            key = { it.bookingId }
+        ) { job ->
+            CompletedJobCard(
+                job = job,
+                onClick = { onJobClick(job) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Pagination loading indicator
+        if (isLoadingMore) {
+            item(key = "pagination_loading") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                }
+            }
+        }
+        
+        // Show error message if pagination failed
+        if (!isLoadingMore && hasMore && errorMessage != null) {
+            item(key = "pagination_error") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center
+                    )
+                    Button(
+                        onClick = onLoadMore,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Retry")
                     }
                 }
             }
@@ -706,12 +701,12 @@ private fun NewJobCard(
                                     imageVector = Icons.Default.Warning,
                                     contentDescription = null,
                                     modifier = Modifier.size(12.dp),
-                                    tint = Color(0xFFFF5722)
+                                    tint = MaterialTheme.colorScheme.error
                                 )
                                 Text(
                                     text = "High Priority",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFFF5722),
+                                    color = MaterialTheme.colorScheme.error,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -730,7 +725,7 @@ private fun NewJobCard(
                                             imageVector = Icons.Default.Warning,
                                             contentDescription = null,
                                             modifier = Modifier.size(12.dp),
-                                            tint = if (timeRemaining <= 5) Color(0xFFFF5722) else Color(0xFFFF9800)
+                                            tint = if (timeRemaining <= 5) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
                                         )
                                         Text(
                                             text = if (timeRemaining <= 5) {
@@ -739,7 +734,7 @@ private fun NewJobCard(
                                                 "$timeRemaining min left"
                                             },
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = if (timeRemaining <= 5) Color(0xFFFF5722) else Color(0xFFFF9800),
+                                            color = if (timeRemaining <= 5) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -753,12 +748,12 @@ private fun NewJobCard(
                                             imageVector = Icons.Default.Close,
                                             contentDescription = null,
                                             modifier = Modifier.size(12.dp),
-                                            tint = Color(0xFFFF5722)
+                                            tint = MaterialTheme.colorScheme.error
                                         )
                                         Text(
                                             text = "Expired",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFFF5722),
+                                            color = MaterialTheme.colorScheme.error,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -973,7 +968,7 @@ private fun StatusBadge(
 ) {
     val (color, text, icon) = when (status.lowercase()) {
         "pending" -> Triple(
-            Color(0xFFFF9800), // Orange
+            MaterialTheme.colorScheme.secondary,
             "Pending",
             Icons.Default.Warning
         )
@@ -983,22 +978,22 @@ private fun StatusBadge(
             Icons.Default.CheckCircle
         )
         "arrived" -> Triple(
-            Color(0xFF2196F3), // Blue
+            MaterialTheme.colorScheme.tertiary,
             "Arrived",
             Icons.Default.LocationOn
         )
         "in_progress" -> Triple(
-            Color(0xFF9C27B0), // Purple
+            MaterialTheme.colorScheme.primaryContainer,
             "In Progress",
             Icons.Default.Build
         )
         "payment_pending" -> Triple(
-            Color(0xFFFFC107), // Amber
+            MaterialTheme.colorScheme.secondaryContainer,
             "Payment Pending",
             Icons.Default.Info
         )
         "completed" -> Triple(
-            Color(0xFF4CAF50), // Green
+            MaterialTheme.colorScheme.primary,
             "Completed",
             Icons.Default.CheckCircle
         )
@@ -1071,14 +1066,14 @@ private fun CompletedJobCard(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF4CAF50).copy(alpha = 0.15f)),
+                            .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
                             modifier = Modifier.size(24.dp),
-                            tint = Color(0xFF4CAF50)
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
