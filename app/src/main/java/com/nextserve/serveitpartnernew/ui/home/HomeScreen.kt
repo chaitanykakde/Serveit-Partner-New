@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,7 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -36,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nextserve.serveitpartnernew.data.model.Job
@@ -57,7 +59,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
@@ -75,7 +76,8 @@ fun HomeScreen(
     onJobAccepted: (String) -> Unit = {},
     onOngoingJobClick: (Job) -> Unit = {},
     onViewAllJobs: () -> Unit = {},
-    viewModel: HomeViewModel
+    viewModel: HomeViewModel,
+    parentPaddingValues: PaddingValues = PaddingValues()
 ) {
     android.util.Log.d("HomeScreen", "🎨 HomeScreen composable called for provider: $providerId")
 
@@ -163,32 +165,31 @@ fun HomeScreen(
         },
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        // HARD-GATED: Skeleton fully owns screen during loading
+    ) { scaffoldPaddingValues ->
+        // ONE persistent LazyColumn for guaranteed scroll behavior
+        val listState = rememberLazyListState()
+        
         android.util.Log.d("HomeRender", "isLoading = $isLoading")
 
-        if (isLoading) {
-            android.util.Log.d("HomeRender", "Rendering HomeSkeleton (hard gate)")
-            HomeSkeleton(paddingValues = paddingValues)
-        } else {
-            android.util.Log.d("HomeRender", "Rendering HomeContent (hard gate)")
-            HomeContent(
-                paddingValues = paddingValues,
-                highlightedJob = highlightedJob,
-                hasOngoingJob = hasOngoingJob,
-                acceptingJobId = acceptingJobId,
-                ongoingJobs = ongoingJobs,
-                todayCompletedJobs = todayCompletedJobs,
-                todayStats = todayStats,
-                errorMessage = errorMessage,
-                hasAttemptedDataLoad = hasAttemptedDataLoad,
-                onShowAcceptDialog = { showAcceptDialog = it },
-                onJobReject = { viewModel.rejectJob(it) },
-                onViewAllJobs = onViewAllJobs,
-                onOngoingJobClick = onOngoingJobClick,
-                onRefresh = { viewModel.refresh() }
-            )
-        }
+        HomeContent(
+            scaffoldPaddingValues = scaffoldPaddingValues,
+            parentBottomPadding = parentPaddingValues.calculateBottomPadding(),
+            listState = listState,
+            isLoading = isLoading,
+            highlightedJob = highlightedJob,
+            hasOngoingJob = hasOngoingJob,
+            acceptingJobId = acceptingJobId,
+            ongoingJobs = ongoingJobs,
+            todayCompletedJobs = todayCompletedJobs,
+            todayStats = todayStats,
+            errorMessage = errorMessage,
+            hasAttemptedDataLoad = hasAttemptedDataLoad,
+            onShowAcceptDialog = { showAcceptDialog = it },
+            onJobReject = { viewModel.rejectJob(it) },
+            onViewAllJobs = onViewAllJobs,
+            onOngoingJobClick = onOngoingJobClick,
+            onRefresh = { viewModel.refresh() }
+        )
     }
 
     // Accept job dialog
@@ -243,102 +244,79 @@ fun HomeScreen(
 }
 
 /**
- * Home Skeleton - Google-grade professional loading placeholders
+ * Skeleton Card Item - Used as LazyColumn item for loading state
  */
 @Composable
-private fun HomeSkeleton(paddingValues: PaddingValues) {
-    LaunchedEffect(Unit) {
-        android.util.Log.d("HomeRender", "HomeSkeleton entered composition")
-    }
-
-    // Subtle alpha animation for professional feel
-    val infiniteTransition = rememberInfiniteTransition(label = "skeleton")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alpha"
-    )
-
-    LazyColumn(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+private fun SkeletonCardItem(alpha: Float) {
+    Card(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
+            .fillMaxWidth()
+            .height(120.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
+        )
     ) {
-        // 3 professional skeleton cards with internal structure
-        items(3) {
-            Card(
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            // Circular avatar placeholder
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                ) {
-                    // Circular avatar placeholder
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                                CircleShape
-                            )
+                    .size(40.dp)
+                    .background(
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                        CircleShape
                     )
+            )
 
-                    Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-                    // Content structure simulation
-                    androidx.compose.foundation.layout.Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Title line
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.8f)
-                                .height(14.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                                    MaterialTheme.shapes.small
-                                )
+            // Content structure simulation
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Title line
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .height(14.dp)
+                        .background(
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            MaterialTheme.shapes.small
                         )
+                )
 
-                        // Subtitle line
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.6f)
-                                .height(12.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                                    MaterialTheme.shapes.small
-                                )
+                // Subtitle line
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(12.dp)
+                        .background(
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            MaterialTheme.shapes.small
                         )
-                    }
-                }
+                )
             }
         }
     }
 }
 
 /**
- * Home Content - Shows actual data after loading
+ * Home Content - ONE persistent LazyColumn with conditional content rendering
+ * Guarantees scroll position preservation and Google-recommended scroll behavior
  */
 @Composable
 private fun HomeContent(
-    paddingValues: PaddingValues,
+    scaffoldPaddingValues: PaddingValues,
+    parentBottomPadding: Dp,
+    listState: LazyListState,
+    isLoading: Boolean,
     highlightedJob: Job?,
     hasOngoingJob: Boolean,
     acceptingJobId: String?,
@@ -357,17 +335,73 @@ private fun HomeContent(
         android.util.Log.d("HomeRender", "HomeContent entered composition")
     }
 
+    // Subtle alpha animation for skeleton loading
+    val infiniteTransition = rememberInfiniteTransition(label = "skeleton")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    // Determine content state
+    val showError = errorMessage != null && highlightedJob == null && ongoingJobs.isEmpty() && !isLoading
+    val showEmpty = hasAttemptedDataLoad && highlightedJob == null && ongoingJobs.isEmpty() && errorMessage == null && !isLoading
+
     LazyColumn(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        state = listState,
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 16.dp,
+            bottom = 16.dp + parentBottomPadding
+        ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
+            .fillMaxWidth()
+            .padding(scaffoldPaddingValues)
             .animateContentSize()
     ) {
+        // 1️⃣ LOADING STATE: Render skeleton placeholder items
+        if (isLoading) {
+            items(3, key = { "skeleton_$it" }) {
+                SkeletonCardItem(alpha = alpha)
+            }
+            return@LazyColumn
+        }
+
+        // 2️⃣ ERROR STATE: Render error item (non-fullscreen)
+        if (showError) {
+            item(key = "error_state") {
+                ErrorState(
+                    message = errorMessage ?: "An error occurred",
+                    onRetry = onRefresh,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            return@LazyColumn
+        }
+
+        // 3️⃣ EMPTY STATE: Render empty item (non-fullscreen)
+        if (showEmpty) {
+            item(key = "empty_state") {
+                EmptyState(
+                    icon = Icons.Default.Home,
+                    title = "No Jobs Available",
+                    description = "New job requests will appear here when available",
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            return@LazyColumn
+        }
+
+        // 4️⃣ NORMAL CONTENT: Render existing sections in order
         // New Requests Section
         if (highlightedJob != null) {
-            item { SectionHeader("New Requests") }
+            item(key = "new_requests_header") { SectionHeader("New Requests") }
             HomeNewJobSection(
                 highlightedJob = highlightedJob,
                 hasOngoingJob = hasOngoingJob,
@@ -380,7 +414,7 @@ private fun HomeContent(
 
         // Ongoing Jobs Section
         if (ongoingJobs.isNotEmpty()) {
-            item { SectionHeader("Ongoing Jobs") }
+            item(key = "ongoing_jobs_header") { SectionHeader("Ongoing Jobs") }
             HomeOngoingSection(
                 ongoingJobs = ongoingJobs,
                 onOngoingJobClick = onOngoingJobClick
@@ -389,7 +423,7 @@ private fun HomeContent(
 
         // Today Section
         if (todayCompletedJobs.isNotEmpty()) {
-            item { SectionHeader("Today") }
+            item(key = "today_header") { SectionHeader("Today") }
             HomeTodaySection(
                 todayCompletedJobs = todayCompletedJobs,
                 onOngoingJobClick = onOngoingJobClick
@@ -397,34 +431,11 @@ private fun HomeContent(
         }
 
         // Today's Summary Section
-        item { SectionHeader("Today's Summary") }
+        item(key = "today_summary_header") { SectionHeader("Today's Summary") }
         HomeStatsSection(
             todayJobsCompleted = todayStats.first,
             todayEarnings = todayStats.second,
             isLoading = false
         )
-
-        // Error state with retry
-        item {
-            if (errorMessage != null && highlightedJob == null && ongoingJobs.isEmpty()) {
-                ErrorState(
-                    message = errorMessage ?: "An error occurred",
-                    onRetry = onRefresh,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-
-        // Empty state - only show after attempting to load data and when no jobs
-        item {
-            if (hasAttemptedDataLoad && highlightedJob == null && ongoingJobs.isEmpty() && errorMessage == null) {
-                EmptyState(
-                    icon = Icons.Default.Home,
-                    title = "No Jobs Available",
-                    description = "New job requests will appear here when available",
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
     }
 }

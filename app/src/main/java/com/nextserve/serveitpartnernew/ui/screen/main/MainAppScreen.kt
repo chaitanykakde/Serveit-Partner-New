@@ -80,6 +80,7 @@ fun MainAppScreen(
                 HomeScreen(
                     providerId = providerId,
                     viewModel = homeViewModel,
+                    parentPaddingValues = paddingValues,
                     onOngoingJobClick = { job ->
                         // Navigate to job details with full job information
                         // For ongoing jobs, bookingIndex may not be available, so use -1

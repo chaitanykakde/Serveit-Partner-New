@@ -1,5 +1,6 @@
 package com.nextserve.serveitpartnernew.ui.screen.main
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -20,7 +21,8 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onJobAccepted: (String) -> Unit = {},
     onViewAllJobs: () -> Unit = {},
-    onOngoingJobClick: (Job) -> Unit = {}
+    onOngoingJobClick: (Job) -> Unit = {},
+    parentPaddingValues: PaddingValues = PaddingValues()
 ) {
     HomeScreenNew(
         modifier = modifier,
@@ -28,6 +30,7 @@ fun HomeScreen(
         onJobAccepted = onJobAccepted,
         onViewAllJobs = onViewAllJobs,
         onOngoingJobClick = onOngoingJobClick,
-        viewModel = viewModel
+        viewModel = viewModel,
+        parentPaddingValues = parentPaddingValues
     )
 }
