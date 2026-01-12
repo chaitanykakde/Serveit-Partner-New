@@ -33,9 +33,9 @@ fun SectionHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = Color(0xFF0F172A), // slate-900
             fontSize = 17.sp,

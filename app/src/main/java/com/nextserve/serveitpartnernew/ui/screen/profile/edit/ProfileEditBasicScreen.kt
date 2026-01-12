@@ -73,41 +73,41 @@ fun ProfileEditBasicScreen(
     ) {
         // Full Name Field
         ProfileMinimalTextField(
-            value = fullName,
-            onValueChange = { fullName = it },
+                value = fullName,
+                onValueChange = { fullName = it },
             label = "Full Name",
             modifier = Modifier.padding(bottom = 24.dp)
-        )
+            )
 
         // Email Address Field
         ProfileMinimalTextField(
-            value = email,
-            onValueChange = { email = it },
+                value = email,
+                onValueChange = { email = it },
             label = "Email Address",
             keyboardType = KeyboardType.Email,
             modifier = Modifier.padding(bottom = 24.dp)
-        )
+            )
 
         // Gender Dropdown Field
         ProfileMinimalDropdownField(
-            value = gender,
-            onValueChange = { gender = it },
-            label = "Gender",
+                value = gender,
+                onValueChange = { gender = it },
+                label = "Gender",
             options = genderOptions,
             modifier = Modifier.padding(bottom = 32.dp)
-        )
+            )
 
-        if (state.errorMessage != null) {
-            Text(
-                text = state.errorMessage,
+            if (state.errorMessage != null) {
+                Text(
+                    text = state.errorMessage,
                 color = Color(0xFFD32F2F), // Error red
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
-            )
-        }
+                )
+            }
 
         // Save Changes Button - immediately after Gender field
         ProfileSaveButton(

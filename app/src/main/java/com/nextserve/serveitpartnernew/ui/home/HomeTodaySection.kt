@@ -73,11 +73,11 @@ fun LazyListScope.HomeTodaySection(
             exit = fadeOut()
         ) {
             Column {
-                TodayJobCard(
-                    job = job,
-                    onClick = { onOngoingJobClick(job) },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            TodayJobCard(
+                job = job,
+                onClick = { onOngoingJobClick(job) },
+                modifier = Modifier.fillMaxWidth()
+            )
                 // Divider between items (divide-y divide-slate-100)
                 if (index < todayCompletedJobs.size - 1) {
                     Box(

@@ -153,11 +153,11 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(
-                            text = when {
-                                providerName.isNotEmpty() -> "Welcome back, ${providerName.split(" ").firstOrNull() ?: providerName}!"
-                                else -> "Welcome to Serveit Partner!"
-                            },
+                    Text(
+                        text = when {
+                            providerName.isNotEmpty() -> "Welcome back, ${providerName.split(" ").firstOrNull() ?: providerName}!"
+                            else -> "Welcome to Serveit Partner!"
+                        },
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -167,7 +167,7 @@ fun HomeScreen(
                             text = "Ready for your next task?",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -193,25 +193,25 @@ fun HomeScreen(
         
         android.util.Log.d("HomeRender", "isLoading = $isLoading")
 
-        HomeContent(
+            HomeContent(
             scaffoldPaddingValues = scaffoldPaddingValues,
             parentBottomPadding = parentPaddingValues.calculateBottomPadding(),
             listState = listState,
             isLoading = isLoading,
-            highlightedJob = highlightedJob,
-            hasOngoingJob = hasOngoingJob,
-            acceptingJobId = acceptingJobId,
-            ongoingJobs = ongoingJobs,
-            todayCompletedJobs = todayCompletedJobs,
-            todayStats = todayStats,
-            errorMessage = errorMessage,
-            hasAttemptedDataLoad = hasAttemptedDataLoad,
-            onShowAcceptDialog = { showAcceptDialog = it },
-            onJobReject = { viewModel.rejectJob(it) },
-            onViewAllJobs = onViewAllJobs,
-            onOngoingJobClick = onOngoingJobClick,
-            onRefresh = { viewModel.refresh() }
-        )
+                highlightedJob = highlightedJob,
+                hasOngoingJob = hasOngoingJob,
+                acceptingJobId = acceptingJobId,
+                ongoingJobs = ongoingJobs,
+                todayCompletedJobs = todayCompletedJobs,
+                todayStats = todayStats,
+                errorMessage = errorMessage,
+                hasAttemptedDataLoad = hasAttemptedDataLoad,
+                onShowAcceptDialog = { showAcceptDialog = it },
+                onJobReject = { viewModel.rejectJob(it) },
+                onViewAllJobs = onViewAllJobs,
+                onOngoingJobClick = onOngoingJobClick,
+                onRefresh = { viewModel.refresh() }
+            )
     }
 
     // Accept job dialog
@@ -270,60 +270,60 @@ fun HomeScreen(
  */
 @Composable
 private fun SkeletonCardItem(alpha: Float) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-        ) {
-            // Circular avatar placeholder
-            Box(
+            Card(
                 modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                        CircleShape
-                    )
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Content structure simulation
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .fillMaxWidth()
+                    .height(120.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
+                )
             ) {
-                // Title line
-                Box(
+                Row(
                     modifier = Modifier
-                        .fillMaxWidth(0.8f)
-                        .height(14.dp)
-                        .background(
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                            MaterialTheme.shapes.small
-                        )
-                )
+                .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    // Circular avatar placeholder
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                CircleShape
+                            )
+                    )
 
-                // Subtitle line
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.6f)
-                        .height(12.dp)
-                        .background(
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                            MaterialTheme.shapes.small
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // Content structure simulation
+            Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Title line
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .height(14.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                    MaterialTheme.shapes.small
+                                )
                         )
-                )
+
+                        // Subtitle line
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.6f)
+                                .height(12.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                    MaterialTheme.shapes.small
+                                )
+                        )
             }
         }
     }

@@ -16,7 +16,7 @@ object TimeFormatUtils {
     /**
      * Format time for NEW REQUEST (Pending Job)
      * Uses createdAt timestamp
-     * Format: "Today · 6–7 PM" or "Tomorrow · 10–11 AM" or "12 Jan · 6–7 PM"
+     * Format: "Today 6:30 PM" or "Tomorrow 10:15 AM" or "12 Jan 6:30 PM"
      */
     fun formatNewRequestTime(createdAt: Timestamp?): String? {
         android.util.Log.d("TimeFormatUtils", "⏰ Formatting time for createdAt: $createdAt")
@@ -49,12 +49,10 @@ object TimeFormatUtils {
             else -> dateFormat.format(createdDate)
         }
 
-        // Format time range (using created time + 1 hour as estimate)
-        val startTime = timeRangeFormat.format(createdDate)
-        createdCalendar.add(Calendar.HOUR_OF_DAY, 1)
-        val endTime = timeRangeFormat.format(createdCalendar.time)
+        // Format single time value (no range)
+        val timeString = timeFormat.format(createdDate)
 
-        return "$dayLabel · $startTime–$endTime"
+        return "$dayLabel $timeString"
     }
 
     /**
@@ -71,11 +69,12 @@ object TimeFormatUtils {
     /**
      * Format time for COMPLETED JOB
      * Uses completedAt timestamp
-     * Returns null as time is not required on Home screen for completed jobs
+     * Returns simple time string for display on Today cards (e.g., "6:30 PM")
      */
     fun formatCompletedJobTime(completedAt: Timestamp?): String? {
-        // Time not required for completed jobs on Home screen per requirements
-        return null
+        if (completedAt == null) return null
+        val completedDate = completedAt.toDate()
+        return timeFormat.format(completedDate)
     }
 }
 

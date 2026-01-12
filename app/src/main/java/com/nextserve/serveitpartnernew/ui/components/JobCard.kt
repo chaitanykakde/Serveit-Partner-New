@@ -43,7 +43,7 @@ import com.nextserve.serveitpartnernew.utils.TimeFormatUtils
 
 /**
  * Helper function to extract local area name from full address or locationName
- * Returns first part of address (before first comma) or first 30 characters
+ * Returns first 1–2 parts of address (before commas) for concise local area display
  */
 fun getLocalAreaName(address: String?, locationName: String? = null): String? {
     android.util.Log.d("JobCard", "🏠 Extracting local area from address: ${address?.take(50)}, locationName: ${locationName?.take(50)}")
@@ -55,8 +55,16 @@ fun getLocalAreaName(address: String?, locationName: String? = null): String? {
         android.util.Log.w("JobCard", "⚠️ Both address and locationName are null or blank")
         return null
     }
-    // Split by comma and take first part, or take first 30 chars if no comma
-    val localArea = source.split(",").firstOrNull()?.trim()?.take(30) ?: source.take(30)
+    // Split by comma and take first 2 parts, or take first 40 chars if no comma
+    val parts = source.split(",")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+
+    val localArea = when {
+        parts.isEmpty() -> source.take(40)
+        parts.size == 1 -> parts.first().take(40)
+        else -> "${parts[0]}, ${parts[1]}".take(40)
+    }
     android.util.Log.d("JobCard", "✅ Extracted local area: $localArea")
     return localArea
 }
@@ -361,8 +369,8 @@ fun HighlightedJobCard(
                                 modifier = Modifier.size(20.dp),
                                 color = Color.White,
                                 strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Accepting...",
                                 style = MaterialTheme.typography.labelLarge.copy(
@@ -455,12 +463,12 @@ fun OngoingJobCard(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = getServiceIcon(job.serviceName),
-                        contentDescription = null,
+                Icon(
+                    imageVector = getServiceIcon(job.serviceName),
+                    contentDescription = null,
                         tint = Color(0xFF94A3B8), // slate-400
-                        modifier = Modifier.size(24.dp)
-                    )
+                    modifier = Modifier.size(24.dp)
+                )
                 }
 
                 Column {
@@ -468,13 +476,13 @@ fun OngoingJobCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = job.serviceName,
-                            style = MaterialTheme.typography.titleMedium,
+                    Text(
+                        text = job.serviceName,
+                        style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF0F172A), // slate-900
-                            fontSize = 16.sp
-                        )
+                        fontSize = 16.sp
+                    )
                         Text(
                             text = "• ${job.userName}",
                             style = MaterialTheme.typography.bodyMedium,
@@ -549,7 +557,7 @@ fun OngoingJobCard(
                                     )
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
-                                Text(
+                    Text(
                                     text = "IN PROGRESS",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color(0xFF059669), // emerald-600
@@ -564,12 +572,12 @@ fun OngoingJobCard(
             }
 
             // View details arrow - chevron_right style
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = "View details",
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = "View details",
                 tint = Color(0xFFCBD5E1), // slate-300
                 modifier = Modifier.size(24.dp)
-            )
+                )
         }
     }
 }
@@ -610,12 +618,12 @@ fun TodayJobCard(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = getServiceIcon(job.serviceName),
-                        contentDescription = null,
+                Icon(
+                    imageVector = getServiceIcon(job.serviceName),
+                    contentDescription = null,
                         tint = Color(0xFF94A3B8), // slate-400
-                        modifier = Modifier.size(20.dp)
-                    )
+                    modifier = Modifier.size(20.dp)
+                )
                 }
 
                 Column {
@@ -633,6 +641,16 @@ fun TodayJobCard(
                         color = Color(0xFF64748B), // slate-500
                         fontSize = 13.sp
                     )
+                    // Local area name (first 1–2 parts of address)
+                    getLocalAreaName(job.customerAddress, job.locationName)?.let { localArea ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = localArea,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF94A3B8), // slate-400
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
 
@@ -661,15 +679,17 @@ fun TodayJobCard(
             }
         }
 
-        // Distance and payment mode metadata - Below, indented (ml-[52px] in HTML)
+        // Distance, time and payment mode metadata - Below, indented (ml-[52px] in HTML)
         val hasDistance = job.distance != null && job.distance!! > 0
         val hasPaymentMode = job.paymentMode != null
+        val timeDisplay = TimeFormatUtils.formatCompletedJobTime(job.completedAt ?: job.createdAt)
+        val hasTime = !timeDisplay.isNullOrBlank()
         
-        if (hasDistance || hasPaymentMode) {
+        if (hasDistance || hasTime || hasPaymentMode) {
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.padding(start = 52.dp), // Align with content below icon
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Distance
@@ -693,8 +713,27 @@ fun TodayJobCard(
                         )
                     }
                 }
-                // Separator dot (slate-200)
-                if (hasDistance && hasPaymentMode) {
+                // Separator between distance and time
+                if (hasDistance && hasTime) {
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF94A3B8), // slate-400
+                        fontSize = 12.sp
+                    )
+                }
+                // Time display (completed or created time)
+                if (hasTime) {
+                    Text(
+                        text = timeDisplay ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF94A3B8), // slate-400
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                // Separator dot (slate-200) before payment mode if there is any previous metadata
+                if ((hasDistance || hasTime) && hasPaymentMode) {
                     Box(
                         modifier = Modifier
                             .size(4.dp)
@@ -713,18 +752,18 @@ fun TodayJobCard(
                             contentDescription = null,
                             tint = Color(0xFF94A3B8), // slate-400
                             modifier = Modifier.size(14.dp)
-                        )
-                        Text(
+                )
+                Text(
                             text = when (paymentMode.uppercase()) {
                                 "CASH" -> "Cash"
                                 "UPI_QR" -> "UPI"
                                 else -> paymentMode
                             },
-                            style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF94A3B8), // slate-400
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                    fontWeight = FontWeight.Medium
+                )
                     }
                 }
             }

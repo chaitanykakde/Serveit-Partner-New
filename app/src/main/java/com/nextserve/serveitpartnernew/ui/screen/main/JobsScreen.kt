@@ -151,7 +151,7 @@ fun JobsScreen(
             Column {
                 TopAppBar(
                     title = {
-                        Text(
+                            Text(
                             text = "Jobs",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Medium
@@ -159,14 +159,14 @@ fun JobsScreen(
                     },
                     actions = {
                         IconButton(
-                            onClick = {
-                                // Cycle through sort options
-                                val nextSort = when (uiState.sortBy) {
-                                    "distance" -> "price"
-                                    "price" -> "time"
-                                    else -> "distance"
-                                }
-                                viewModel.setSortBy(nextSort)
+                                    onClick = {
+                                        // Cycle through sort options
+                                        val nextSort = when (uiState.sortBy) {
+                                            "distance" -> "price"
+                                            "price" -> "time"
+                                            else -> "distance"
+                                        }
+                                        viewModel.setSortBy(nextSort)
                             }
                         ) {
                             Icon(
@@ -179,7 +179,7 @@ fun JobsScreen(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface,
                         titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
+                                    )
                 )
                 TabRow(selectedTabIndex = selectedTabIndex) {
                     Tab(
@@ -374,16 +374,16 @@ private fun NewJobsTab(
             // 1️⃣ LOADING STATE: Render skeleton placeholder items
             if (isLoading) {
                 items(3, key = { "skeleton_$it" }) {
-                    Box(
+                Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(120.dp)
                             .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
                 }
+            }
                 return@LazyColumn
             }
 
@@ -402,75 +402,75 @@ private fun NewJobsTab(
             // 3️⃣ EMPTY STATE: Render empty item (non-fullscreen)
             if (showEmpty) {
                 item(key = "empty_state") {
-                    EmptyState(
-                        icon = Icons.Default.List,
-                        title = "No New Jobs",
-                        description = "New job requests will appear here",
+                EmptyState(
+                    icon = Icons.Default.List,
+                    title = "No New Jobs",
+                    description = "New job requests will appear here",
                         modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                )
+            }
                 return@LazyColumn
             }
 
             // 4️⃣ NORMAL CONTENT: Render job cards
             // Ongoing job banner (if applicable)
-            if (hasOngoingJob) {
+                    if (hasOngoingJob) {
                 item(key = "ongoing_banner") {
-                    OngoingJobBanner(
+                        OngoingJobBanner(
                         modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                        )
+                    }
             }
 
-            // Show active filters indicator
-            if (searchQuery.isNotEmpty() ||
-                uiState.selectedServiceFilter != null ||
-                uiState.maxDistanceFilter != null ||
-                uiState.minPriceFilter != null ||
-                uiState.maxPriceFilter != null) {
+                            // Show active filters indicator
+                            if (searchQuery.isNotEmpty() ||
+                                uiState.selectedServiceFilter != null ||
+                                uiState.maxDistanceFilter != null ||
+                                uiState.minPriceFilter != null ||
+                                uiState.maxPriceFilter != null) {
                 item(key = "filter_indicator") {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Filters applied",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = "Clear",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.clickable { viewModel.clearFilters() }
-                            )
-                        }
-                    }
-                }
-            }
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Filters applied",
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                            Text(
+                                                text = "Clear",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.clickable { viewModel.clearFilters() }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
 
             // Job cards
-            items(
-                items = jobs,
-                key = { it.bookingId }
-            ) { job ->
-                NewJobCard(
-                    job = job,
-                    isAccepting = acceptingJobId == job.bookingId,
-                    isAcceptDisabled = hasOngoingJob,
-                    onJobClick = { onJobClick(job) },
-                    onAcceptClick = { onAcceptClick(job) },
-                    onRejectClick = { onRejectClick(job) },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                            items(
+                                items = jobs,
+                                key = { it.bookingId }
+                            ) { job ->
+                                NewJobCard(
+                                    job = job,
+                                    isAccepting = acceptingJobId == job.bookingId,
+                                    isAcceptDisabled = hasOngoingJob,
+                                    onJobClick = { onJobClick(job) },
+                                    onAcceptClick = { onAcceptClick(job) },
+                                    onRejectClick = { onRejectClick(job) },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
             }
         }
     }
@@ -549,52 +549,52 @@ private fun HistoryTab(
         }
 
         // 3️⃣ NORMAL CONTENT: Render job cards
-        items(
-            items = jobs,
-            key = { it.bookingId }
-        ) { job ->
-            CompletedJobCard(
-                job = job,
-                onClick = { onJobClick(job) },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+                    items(
+                        items = jobs,
+                        key = { it.bookingId }
+                    ) { job ->
+                        CompletedJobCard(
+                            job = job,
+                            onClick = { onJobClick(job) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
         // Pagination loading indicator
-        if (isLoadingMore) {
+                    if (isLoadingMore) {
             item(key = "pagination_loading") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                }
-            }
-        }
-        
-        // Show error message if pagination failed
-        if (!isLoadingMore && hasMore && errorMessage != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+                    
+                    // Show error message if pagination failed
+                    if (!isLoadingMore && hasMore && errorMessage != null) {
             item(key = "pagination_error") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = errorMessage,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center
-                    )
-                    Button(
-                        onClick = onLoadMore,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Retry")
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = errorMessage,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    textAlign = TextAlign.Center
+                                )
+                                Button(
+                                    onClick = onLoadMore,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Retry")
                     }
                 }
             }

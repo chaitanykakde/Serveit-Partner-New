@@ -459,16 +459,22 @@ class HomeViewModel(
                         set(java.util.Calendar.SECOND, 0)
                         set(java.util.Calendar.MILLISECOND, 0)
                     }.timeInMillis
-                    
+
                     val todayJobs = jobs.filter { job ->
                         job.completedAt?.toDate()?.time?.let { it >= today } == true
                     }
-                    
+
+                    // Enrich completed jobs with addresses (like new/ongoing jobs)
+                    android.util.Log.d("HomeViewModel", "🏠 Enriching addresses for ${todayJobs.size} completed jobs")
+                    val todayJobsWithAddresses = todayJobs.map { job ->
+                        enrichJobWithAddress(job)
+                    }
+
                     _uiState.value = _uiState.value.copy(
-                        todayCompletedJobs = todayJobs,
+                        todayCompletedJobs = todayJobsWithAddresses,
                         todayStats = Pair(
-                            todayJobs.size,
-                            todayJobs.sumOf { it.totalPrice }
+                            todayJobsWithAddresses.size,
+                            todayJobsWithAddresses.sumOf { it.totalPrice }
                         )
                     )
                 },

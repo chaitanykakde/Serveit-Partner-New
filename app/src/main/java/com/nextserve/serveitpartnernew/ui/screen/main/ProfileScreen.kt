@@ -198,58 +198,58 @@ fun ProfileScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(scrollState)
+            .verticalScroll(scrollState)
                 .padding(scaffoldPaddingValues)
                 .background(Color.White)
-        ) {
-            Spacer(modifier = Modifier.height(8.dp))
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
 
             // Horizontal Profile Header: Icon on left, Info on right
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
                 // Profile Photo with Edit Button Overlay (left side)
                 Box(
                     modifier = Modifier.size(100.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
+            Box(
+                modifier = Modifier
                             .size(100.dp)
-                            .clip(CircleShape)
-                            .clickable(onClick = { imagePicker.launch("image/*") }),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (providerData?.profilePhotoUrl?.isNotEmpty() == true) {
-                            AsyncImage(
-                                model = providerData.profilePhotoUrl,
-                                contentDescription = null,
+                    .clip(CircleShape)
+                    .clickable(onClick = { imagePicker.launch("image/*") }),
+                contentAlignment = Alignment.Center
+            ) {
+                if (providerData?.profilePhotoUrl?.isNotEmpty() == true) {
+                    AsyncImage(
+                        model = providerData.profilePhotoUrl,
+                        contentDescription = null,
                                 modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
+                    )
+                } else {
                             Surface(
                                 modifier = Modifier.fillMaxSize(),
                                 shape = CircleShape,
                                 color = Color.Black.copy(alpha = 0.1f)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = providerData?.fullName?.firstOrNull()?.uppercase() ?: "U",
+                    Text(
+                        text = providerData?.fullName?.firstOrNull()?.uppercase() ?: "U",
                                         style = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp),
                                         color = Color.Black,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
-                        }
-                    }
-                    
+            }
+        }
+
                     // Small Edit Button Overlay (bottom-right)
                     Surface(
-                        modifier = Modifier
+            modifier = Modifier
                             .size(28.dp)
                             .offset(x = 6.dp, y = 6.dp)
                             .clip(CircleShape)
@@ -272,7 +272,7 @@ fun ProfileScreen(
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+        ) {
                     // Name
                     Text(
                         text = providerData?.fullName ?: "—",
@@ -314,21 +314,21 @@ fun ProfileScreen(
                                     tint = Color.Black
                                 )
                             }
-                            Text(
+                    Text(
                                 text = badgeText,
                                 style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
                                 fontWeight = FontWeight.Medium,
                                 color = Color.Black
-                            )
-                        }
-                    }
+                    )
                 }
+            }
+        }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-
+        
             // Settings Section Header
-            Text(
+        Text(
                 text = "Settings",
                 style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
                 fontWeight = FontWeight.Bold,
@@ -336,7 +336,7 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+        )
 
             // Settings Options (consolidated from all sections)
         FlatOptionRow(

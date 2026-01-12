@@ -86,7 +86,7 @@ fun ProfileEditDocumentsScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column {
-                        Text(
+            Text(
                             text = "AADHAAR FRONT",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             color = androidx.compose.ui.graphics.Color(0xFF9E9E9E),
@@ -105,7 +105,7 @@ fun ProfileEditDocumentsScreen(
             } else {
                 // Show upload button only if document not uploaded
                 Button(
-                    onClick = { frontPicker.launch("image/*") },
+                onClick = { frontPicker.launch("image/*") },
                     enabled = !state.isSaving,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp)
@@ -145,7 +145,7 @@ fun ProfileEditDocumentsScreen(
             } else {
                 // Show upload button only if document not uploaded
                 Button(
-                    onClick = { backPicker.launch("image/*") },
+                onClick = { backPicker.launch("image/*") },
                     enabled = !state.isSaving,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp)
