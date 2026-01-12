@@ -80,7 +80,7 @@ fun ProfileEditAddressScreen(
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Use current location button - styled like ProfileSaveButton
             ProfileSaveButton(
@@ -104,21 +104,21 @@ fun ProfileEditAddressScreen(
                         if (!hasLocationPermission) requestLocationPermission()
                     }
                 },
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             )
 
             ProfileMinimalTextField(
                 value = stateText,
                 onValueChange = { stateText = it },
                 label = "State",
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             )
 
             ProfileMinimalTextField(
                 value = city,
                 onValueChange = { city = it },
                 label = "City",
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             )
 
             ProfileMinimalTextField(
@@ -126,7 +126,7 @@ fun ProfileEditAddressScreen(
                 onValueChange = { address = it },
                 label = "Area / Locality / Landmark",
                 singleLine = false,
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             )
 
             ProfileMinimalTextField(
@@ -134,7 +134,7 @@ fun ProfileEditAddressScreen(
                 onValueChange = { fullAddress = it },
                 label = "Full address",
                 singleLine = false,
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             )
 
             ProfileMinimalTextField(
@@ -142,20 +142,21 @@ fun ProfileEditAddressScreen(
                 onValueChange = { pincode = it },
                 label = "Pincode",
                 keyboardType = KeyboardType.Number,
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             )
 
             Text(
                 text = "Service radius: ${serviceRadius.toInt()} km",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
             Slider(
                 value = serviceRadius,
                 onValueChange = { serviceRadius = it },
                 valueRange = 3f..10f,
                 steps = 6,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
             )
 
             ProfileSaveButton(

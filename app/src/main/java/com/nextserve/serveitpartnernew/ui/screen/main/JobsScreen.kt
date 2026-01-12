@@ -70,6 +70,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
@@ -81,6 +82,7 @@ import com.nextserve.serveitpartnernew.data.model.Job
 import com.nextserve.serveitpartnernew.data.repository.JobsRepository
 import com.nextserve.serveitpartnernew.ui.components.EmptyState
 import com.nextserve.serveitpartnernew.ui.components.ErrorState
+import com.nextserve.serveitpartnernew.ui.components.*
 import com.nextserve.serveitpartnernew.ui.viewmodel.JobsViewModel
 import com.nextserve.serveitpartnernew.utils.NetworkMonitor
 import kotlinx.coroutines.launch
@@ -151,54 +153,35 @@ fun JobsScreen(
             Column {
                 TopAppBar(
                     title = {
-                            Text(
+                        Text(
                             text = "Jobs",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.SemiBold
                         )
                     },
                     actions = {
-                        IconButton(
-                                    onClick = {
-                                        // Cycle through sort options
-                                        val nextSort = when (uiState.sortBy) {
-                                            "distance" -> "price"
-                                            "price" -> "time"
-                                            else -> "distance"
-                                        }
-                                        viewModel.setSortBy(nextSort)
-                            }
-                        ) {
+                        IconButton(onClick = { /* Settings */ }) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
-                                contentDescription = "Sort",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                contentDescription = "Settings",
+                                tint = Color(0xFF374151) // gray-700
                             )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                                    )
+                        containerColor = Color.White,
+                        titleContentColor = Color(0xFF1F2937) // gray-800
+                    )
                 )
-                TabRow(selectedTabIndex = selectedTabIndex) {
-                    Tab(
-                        selected = selectedTabIndex == 0,
-                        onClick = { 
-                            selectedTabIndex = 0
-                            coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                        },
-                        text = { Text("New Jobs") }
-                    )
-                    Tab(
-                        selected = selectedTabIndex == 1,
-                        onClick = { 
-                            selectedTabIndex = 1
-                            coroutineScope.launch { pagerState.animateScrollToPage(1) }
-                        },
-                        text = { Text("History") }
-                    )
-                }
+
+                // Tab row matching HTML design
+                JobsTabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    onTabSelected = { index ->
+                        selectedTabIndex = index
+                        coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                    }
+                )
             }
         },
         snackbarHost = {
@@ -357,12 +340,12 @@ private fun NewJobsTab(
         LazyColumn(
             state = listState,
             contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 16.dp,
-                bottom = 16.dp + parentBottomPadding
+                start = 12.dp,
+                end = 12.dp,
+                top = 12.dp,
+                bottom = 12.dp + parentBottomPadding
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = modifier.fillMaxWidth()
         ) {
             // UI state priority (strict order, early returns):
@@ -416,10 +399,11 @@ private fun NewJobsTab(
             // Ongoing job banner (if applicable)
                     if (hasOngoingJob) {
                 item(key = "ongoing_banner") {
-                        OngoingJobBanner(
+                    InfoBanner(
+                        text = "Complete ongoing job to accept new requests",
                         modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                    )
+                }
             }
 
                             // Show active filters indicator
@@ -458,19 +442,19 @@ private fun NewJobsTab(
                             }
 
             // Job cards
-                            items(
-                                items = jobs,
-                                key = { it.bookingId }
-                            ) { job ->
-                                NewJobCard(
-                                    job = job,
-                                    isAccepting = acceptingJobId == job.bookingId,
-                                    isAcceptDisabled = hasOngoingJob,
-                                    onJobClick = { onJobClick(job) },
-                                    onAcceptClick = { onAcceptClick(job) },
-                                    onRejectClick = { onRejectClick(job) },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+            items(
+                items = jobs,
+                key = { it.bookingId }
+            ) { job ->
+                NewJobItem(
+                    job = job,
+                    onJobClick = onJobClick,
+                    onAcceptClick = onAcceptClick,
+                    onRejectClick = onRejectClick,
+                    hasOngoingJob = hasOngoingJob,
+                    isAccepting = acceptingJobId == job.bookingId,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -504,17 +488,17 @@ private fun HistoryTab(
     // Determine content state (priority: loading > empty > content)
     val showEmpty = !isLoading && jobs.isEmpty()
 
-    LazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
-            top = 16.dp,
-            bottom = 16.dp + parentBottomPadding
-        ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = modifier.fillMaxWidth()
-    ) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 12.dp,
+                bottom = 16.dp + parentBottomPadding
+            ),
+            verticalArrangement = Arrangement.spacedBy(8.dp), // gap-2 in HTML
+            modifier = modifier.fillMaxWidth()
+        ) {
         // UI state priority (strict order, early returns):
         // 1. Loading - Loading indicator item
         // 2. Empty - Empty state placeholder
@@ -548,14 +532,14 @@ private fun HistoryTab(
             return@LazyColumn
         }
 
-        // 3️⃣ NORMAL CONTENT: Render job cards
+        // 3️⃣ NORMAL CONTENT: Render job items
                     items(
                         items = jobs,
                         key = { it.bookingId }
                     ) { job ->
-                        CompletedJobCard(
+                        HistoryJobItem(
                             job = job,
-                            onClick = { onJobClick(job) },
+                            onJobClick = onJobClick,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -602,617 +586,9 @@ private fun HistoryTab(
     }
 }
 
-/**
- * New Job Card - Modern Material Design 3 UI
- */
-@Composable
-private fun NewJobCard(
-    job: Job,
-    isAccepting: Boolean,
-    isAcceptDisabled: Boolean,
-    onJobClick: () -> Unit = {},
-    onAcceptClick: () -> Unit,
-    onRejectClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .clickable(onClick = onJobClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            // Header: Service name and price
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    // Service icon
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Build,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = job.serviceName,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        // Enhanced Status badge with better design
-                        androidx.compose.material3.Surface(
-                            modifier = Modifier.padding(top = 6.dp),
-                            color = when (job.status.lowercase()) {
-                                "pending" -> MaterialTheme.colorScheme.secondaryContainer
-                                "accepted" -> MaterialTheme.colorScheme.primaryContainer
-                                else -> MaterialTheme.colorScheme.surfaceVariant
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            tonalElevation = 1.dp
-                        ) {
-                            Text(
-                                text = when (job.status.lowercase()) {
-                                    "pending" -> "Available"
-                                    "accepted" -> "Accepted"
-                                    else -> job.status.capitalize()
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = when (job.status.lowercase()) {
-                                    "pending" -> MaterialTheme.colorScheme.onSecondaryContainer
-                                    "accepted" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
 
-                        // Priority badge for high-priority jobs
-                        if (job.notes == "High Priority") {
-                            Row(
-                                modifier = Modifier.padding(top = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                                Text(
-                                    text = "High Priority",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                        // Expiry indicator for pending jobs
-                        job.expiresAt?.let { expiry ->
-                            if (job.status == "pending") {
-                                val timeRemaining = job.getTimeRemainingMinutes()
-                                if (timeRemaining != null && timeRemaining > 0) {
-                                    Row(
-                                        modifier = Modifier.padding(top = 4.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Warning,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(12.dp),
-                                            tint = if (timeRemaining <= 5) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
-                                        )
-                                        Text(
-                                            text = if (timeRemaining <= 5) {
-                                                "Expires in $timeRemaining min"
-                                            } else {
-                                                "$timeRemaining min left"
-                                            },
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = if (timeRemaining <= 5) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                } else if (job.isExpired()) {
-                                    Row(
-                                        modifier = Modifier.padding(top = 4.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(12.dp),
-                                            tint = MaterialTheme.colorScheme.error
-                                        )
-                                        Text(
-                                            text = "Expired",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                // Price
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "₹${job.totalPrice.toInt()}",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Total",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
 
-            // Customer information
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = job.userName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Location and distance
-            if (job.locationName != null || job.distance != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        if (job.locationName != null) {
-                            Text(
-                                text = job.locationName!!,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1
-                            )
-                        }
-                        if (job.distance != null) {
-                            Text(
-                                text = "${String.format("%.1f", job.distance)} km away",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            // Sub-services preview
-            job.subServicesSelected?.let { subServices ->
-                if (subServices.isNotEmpty()) {
-                    val serviceNames = subServices.keys.take(3).joinToString(", ")
-                    val moreCount = subServices.size - 3
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = if (moreCount > 0) {
-                                "$serviceNames +$moreCount more"
-                            } else {
-                                serviceNames
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            }
-
-            // Timestamp
-            job.createdAt?.let { timestamp ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DateRange,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = formatRelativeTime(timestamp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            } ?: Spacer(modifier = Modifier.height(4.dp))
-
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 4.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // View Details button
-            OutlinedButton(
-                onClick = onJobClick,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("View Details")
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Action buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onRejectClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    enabled = !isAccepting,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Reject",
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Reject", fontWeight = FontWeight.Medium)
-                }
-
-                Button(
-                    onClick = onAcceptClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    enabled = !isAcceptDisabled && !isAccepting,
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    if (isAccepting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = "Accept",
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Accept", fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-/**
- * Status Badge Component
- */
-@Composable
-private fun StatusBadge(
-    status: String,
-    modifier: Modifier = Modifier
-) {
-    val (color, text, icon) = when (status.lowercase()) {
-        "pending" -> Triple(
-            MaterialTheme.colorScheme.secondary,
-            "Pending",
-            Icons.Default.Warning
-        )
-        "accepted" -> Triple(
-            MaterialTheme.colorScheme.primary,
-            "Accepted",
-            Icons.Default.CheckCircle
-        )
-        "arrived" -> Triple(
-            MaterialTheme.colorScheme.tertiary,
-            "Arrived",
-            Icons.Default.LocationOn
-        )
-        "in_progress" -> Triple(
-            MaterialTheme.colorScheme.primaryContainer,
-            "In Progress",
-            Icons.Default.Build
-        )
-        "payment_pending" -> Triple(
-            MaterialTheme.colorScheme.secondaryContainer,
-            "Payment Pending",
-            Icons.Default.Info
-        )
-        "completed" -> Triple(
-            MaterialTheme.colorScheme.primary,
-            "Completed",
-            Icons.Default.CheckCircle
-        )
-        else -> Triple(
-            MaterialTheme.colorScheme.onSurfaceVariant,
-            status,
-            Icons.Default.Info
-        )
-    }
-
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(alpha = 0.15f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(12.dp),
-            tint = color
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium,
-            color = color
-        )
-    }
-}
-
-/**
- * Completed Job Card - Modern Material Design 3 UI
- */
-@Composable
-private fun CompletedJobCard(
-    job: Job,
-    onClick: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            // Header: Service name and price
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    // Service icon with completed indicator
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = job.serviceName,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        // Completed badge
-                        StatusBadge(
-                            status = "completed",
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-                // Price
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "₹${job.totalPrice.toInt()}",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Total",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Customer information
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = job.userName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Location
-            if (job.locationName != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = job.locationName!!,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            // Completion date
-            job.completedAt?.let { completedAt ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DateRange,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Completed: ${formatRelativeTime(completedAt)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            } ?: Spacer(modifier = Modifier.height(4.dp))
-
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 4.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // View Details button
-            OutlinedButton(
-                onClick = onClick,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("View Details")
-            }
-        }
-    }
-}
-
-/**
- * Ongoing Job Banner
- */
-@Composable
-private fun OngoingJobBanner(
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .padding(12.dp)
-    ) {
-        Text(
-            text = "Complete ongoing job to accept new requests",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
 
 /**
  * Accept Job Dialog

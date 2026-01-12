@@ -64,6 +64,38 @@ class JobsViewModel(
 
     private var lastHistoryDocument: com.google.firebase.firestore.DocumentSnapshot? = null
 
+    /**
+     * Enrich job with customer address if not available
+     */
+    private suspend fun enrichJobWithAddress(job: Job): Job {
+        // If address already exists, return as is
+        if (!job.customerAddress.isNullOrBlank()) {
+            android.util.Log.d("JobsViewModel", "✅ Job ${job.bookingId} already has address: ${job.customerAddress?.take(30)}")
+            return job
+        }
+
+        // Try to fetch from serveit_users
+        android.util.Log.d("JobsViewModel", "🔍 Job ${job.bookingId} missing address, fetching from serveit_users/${job.customerPhoneNumber}")
+        val address = jobsRepository.fetchCustomerAddress(job.customerPhoneNumber)
+
+        if (address != null) {
+            android.util.Log.d("JobsViewModel", "✅ Fetched address for job ${job.bookingId}: ${address.take(50)}")
+            return job.copy(customerAddress = address)
+        } else {
+            android.util.Log.w("JobsViewModel", "⚠️ Could not fetch address for job ${job.bookingId} from serveit_users")
+            return job
+        }
+    }
+
+    /**
+     * Enrich list of jobs with customer addresses
+     */
+    private suspend fun enrichJobsWithAddresses(jobs: List<Job>): List<Job> {
+        return jobs.map { job ->
+            enrichJobWithAddress(job)
+        }
+    }
+
     init {
         // Monitor network connectivity
         networkMonitor?.let { monitor ->
@@ -154,9 +186,12 @@ class JobsViewModel(
                     // Filter out rejected jobs
                     val rejectedIds = _uiState.value.rejectedJobIds
                     val filteredJobs = jobs.filter { it.bookingId !in rejectedIds }
-                    
+
+                    // Enrich jobs with customer addresses
+                    val enrichedJobs = enrichJobsWithAddresses(filteredJobs)
+
                     _uiState.value = _uiState.value.copy(
-                        newJobs = filteredJobs,
+                        newJobs = enrichedJobs,
                         isLoadingNewJobs = false,
                         errorMessage = null
                     )
@@ -202,11 +237,14 @@ class JobsViewModel(
             val result = jobsRepository.getCompletedJobs(providerId, limit = 20)
             result.fold(
                 onSuccess = { (jobs, lastDoc) ->
+                    // Enrich jobs with customer addresses
+                    val enrichedJobs = enrichJobsWithAddresses(jobs)
+
                     lastHistoryDocument = lastDoc
                     _uiState.value = _uiState.value.copy(
-                        completedJobs = jobs,
+                        completedJobs = enrichedJobs,
                         isLoadingHistory = false,
-                        hasMoreHistory = jobs.isNotEmpty() && lastDoc != null,
+                        hasMoreHistory = enrichedJobs.isNotEmpty() && lastDoc != null,
                         errorMessage = null
                     )
                 },
@@ -254,12 +292,15 @@ class JobsViewModel(
 
             result.fold(
                 onSuccess = { (jobs, lastDoc) ->
+                    // Enrich jobs with customer addresses
+                    val enrichedJobs = enrichJobsWithAddresses(jobs)
+
                     lastHistoryDocument = lastDoc
                     val currentJobs = _uiState.value.completedJobs
                     _uiState.value = _uiState.value.copy(
-                        completedJobs = currentJobs + jobs,
+                        completedJobs = currentJobs + enrichedJobs,
                         isLoadingMoreHistory = false,
-                        hasMoreHistory = jobs.isNotEmpty() && lastDoc != null,
+                        hasMoreHistory = enrichedJobs.isNotEmpty() && lastDoc != null,
                         errorMessage = null
                     )
                 },

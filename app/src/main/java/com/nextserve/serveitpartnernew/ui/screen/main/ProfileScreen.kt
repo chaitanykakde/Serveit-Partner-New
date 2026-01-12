@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -68,6 +69,7 @@ private fun FlatOptionRow(
     title: String,
     subtitle: String? = null,
     showDivider: Boolean = true,
+    languageChip: String? = null,
     onClick: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -75,46 +77,82 @@ private fun FlatOptionRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .heightIn(min = 56.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(28.dp),
-                tint = Color.Black
-            )
-
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp),
-                    color = Color.Black,
-                    fontWeight = FontWeight.Normal
+            // Icon in soft rounded container
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            // Title and subtitle
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    languageChip?.let {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            )
+                        ) {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
                 subtitle?.let {
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                        color = Color.Black.copy(alpha = 0.6f)
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
+            // Chevron right
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = Color.Black
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
         }
 
         if (showDivider) {
             androidx.compose.material3.HorizontalDivider(
-                color = Color.Black.copy(alpha = 0.1f),
-                thickness = 1.dp,
-                modifier = Modifier.padding(start = 60.dp)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                thickness = 1.dp
             )
         }
     }
@@ -166,9 +204,8 @@ fun ProfileScreen(
                 title = {
                     Text(
                         text = "Profile",
-                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
                     )
                 },
                 actions = {
@@ -177,19 +214,19 @@ fun ProfileScreen(
                     ) {
                         Text(
                             text = "Logout",
-                            color = Color.Black,
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            fontWeight = FontWeight.Medium
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = Color.Black
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         },
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         modifier = modifier
     ) { scaffoldPaddingValues ->
         // Calculate bottom padding for bottom navigation
@@ -200,26 +237,26 @@ fun ProfileScreen(
                 .fillMaxWidth()
             .verticalScroll(scrollState)
                 .padding(scaffoldPaddingValues)
-                .background(Color.White)
+                .background(MaterialTheme.colorScheme.surface)
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Horizontal Profile Header: Icon on left, Info on right
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
                 // Profile Photo with Edit Button Overlay (left side)
                 Box(
-                    modifier = Modifier.size(100.dp)
+                    modifier = Modifier.size(80.dp)
                 ) {
             Box(
                 modifier = Modifier
-                            .size(100.dp)
-                    .clip(CircleShape)
+                            .size(80.dp)
+                    .clip(RoundedCornerShape(16.dp))
                     .clickable(onClick = { imagePicker.launch("image/*") }),
                 contentAlignment = Alignment.Center
             ) {
@@ -232,14 +269,14 @@ fun ProfileScreen(
                 } else {
                             Surface(
                                 modifier = Modifier.fillMaxSize(),
-                                shape = CircleShape,
-                                color = Color.Black.copy(alpha = 0.1f)
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = providerData?.fullName?.firstOrNull()?.uppercase() ?: "U",
-                                        style = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp),
-                                        color = Color.Black,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -250,19 +287,20 @@ fun ProfileScreen(
                     // Small Edit Button Overlay (bottom-right)
                     Surface(
             modifier = Modifier
-                            .size(28.dp)
-                            .offset(x = 6.dp, y = 6.dp)
+                            .size(24.dp)
+                            .offset(x = (-4).dp, y = (-4).dp)
                             .clip(CircleShape)
                             .clickable(onClick = { imagePicker.launch("image/*") }),
-                        color = Color.Black,
-                        shape = CircleShape
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = CircleShape,
+                        shadowElevation = 4.dp
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Edit",
-                                modifier = Modifier.size(14.dp),
-                                tint = Color.White
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                     }
@@ -271,21 +309,21 @@ fun ProfileScreen(
                 // Name, ID, and Badge (right side, vertically stacked)
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
                     // Name
                     Text(
                         text = providerData?.fullName ?: "—",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp),
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     // ID Number
                     Text(
                         text = "ID No: ${providerData?.uid?.takeLast(10) ?: "—"}",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
-                        color = Color.Black.copy(alpha = 0.6f)
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     // Verified Badge
@@ -295,47 +333,52 @@ fun ProfileScreen(
                         "REJECTED" -> "Review Required"
                         else -> "Incomplete Profile"
                     }
-                    
+
+                    val (badgeColor, badgeTextColor) = when (providerData?.approvalStatus) {
+                        "APPROVED" -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
                     Surface(
-                        modifier = Modifier.padding(top = 4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.Black.copy(alpha = 0.05f)
+                        modifier = Modifier.padding(top = 6.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        color = badgeColor
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (providerData?.approvalStatus == "APPROVED") {
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = Color.Black
+                                    modifier = Modifier.size(12.dp),
+                                    tint = badgeTextColor
                                 )
                             }
                     Text(
                                 text = badgeText,
-                                style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
-                                fontWeight = FontWeight.Medium,
-                                color = Color.Black
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = badgeTextColor
                     )
                 }
             }
         }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-        
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Settings Section Header
         Text(
-                text = "Settings",
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
+                text = "Settings".uppercase(),
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
         )
 
             // Settings Options (consolidated from all sections)
@@ -370,7 +413,8 @@ fun ProfileScreen(
         FlatOptionRow(
             icon = ProfileIcons.Language,
             title = stringResource(R.string.language),
-            subtitle = LanguageManager.getLanguageDisplayName(LanguageManager.getSavedLanguage(context), context),
+            subtitle = "App interface language",
+            languageChip = "EN",
             showDivider = true,
             onClick = { navController.navigate("profile/edit/preferences") }
         )
