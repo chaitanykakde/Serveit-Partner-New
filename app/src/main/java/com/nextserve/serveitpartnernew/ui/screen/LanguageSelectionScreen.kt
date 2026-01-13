@@ -60,13 +60,8 @@ fun LanguageSelectionScreen(
     val isTablet = screenWidth >= 600.dp
     val scrollState = rememberScrollState()
 
-    // Auto-navigate if language is already selected (skip this screen)
-    LaunchedEffect(uiState.selectedLanguageCode) {
-        if (viewModel.isLanguageSelected() && uiState.selectedLanguageCode != null) {
-            kotlinx.coroutines.delay(500) // Brief show of screen
-            onNavigateToOnboarding()
-        }
-    }
+    // Note: Removed auto-navigation to allow user language selection
+    // Continue button will handle navigation when clicked
 
     // Light gradient background (matching Login & OTP screens)
     val backgroundGradient = Brush.verticalGradient(

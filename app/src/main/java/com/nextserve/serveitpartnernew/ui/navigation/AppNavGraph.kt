@@ -17,6 +17,7 @@ import com.nextserve.serveitpartnernew.ui.screen.WaitingScreen
 import com.nextserve.serveitpartnernew.ui.screen.auth.MobileNumberScreen
 import com.nextserve.serveitpartnernew.ui.screen.auth.OtpVerificationScreen
 import com.nextserve.serveitpartnernew.ui.screen.welcome.WelcomeScreen
+import com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingViewModelFactory
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -98,7 +99,9 @@ fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com
     }
 
     composable(Screen.Onboarding.route) {
-        val onboardingViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+        val onboardingViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+            factory = OnboardingViewModelFactory(androidx.compose.ui.platform.LocalContext.current)
+        )
         OnboardingScreen(
             uiState = onboardingViewModel.uiState,
             onUpdateFullName = onboardingViewModel::updateFullName,
