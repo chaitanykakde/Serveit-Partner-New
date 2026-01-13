@@ -102,11 +102,11 @@ class FirestoreRepository(
             // Transform flat update map to nested Firestore structure
             val firestoreUpdate = ProviderFirestoreMapper.toFirestoreUpdate(data)
             partnersCollection.document(uid)
-                .update(firestoreUpdate)
+                .set(firestoreUpdate, com.google.firebase.firestore.SetOptions.merge())
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
-            android.util.Log.e("FirestoreRepository", "Failed to get provider data for uid: $uid", e)
+            android.util.Log.e("FirestoreRepository", "Failed to update provider data for uid: $uid", e)
             Result.failure(Exception("Failed to load profile data. Please check your connection and try again."))
         }
     }
@@ -286,16 +286,21 @@ class FirestoreRepository(
 
             val data = document.data ?: return Result.success(emptyList())
 
-            // Extract sub-service names from subServices Map
+            // Extract sub-service names from subServices field
             val subServiceNames = when (val subServices = data["subServices"]) {
                 is Map<*, *> -> {
                     // subServices is a Map<String, Map<String, Any>>
                     // Keys are sub-service names
                     (subServices as Map<String, *>).keys.toList()
                 }
+                is List<*> -> {
+                    // subServices is a List<String>
+                    // Items are sub-service names
+                    (subServices as List<*>).mapNotNull { it as? String }
+                }
                 else -> {
                     // No sub-services or malformed data
-                    android.util.Log.w("FirestoreRepository", "No subServices Map found for service: $mainServiceName")
+                    android.util.Log.w("FirestoreRepository", "No subServices field found for service: $mainServiceName")
                     emptyList<String>()
                 }
             }
