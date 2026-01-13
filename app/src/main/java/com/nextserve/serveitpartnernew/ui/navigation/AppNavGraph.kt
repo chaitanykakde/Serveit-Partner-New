@@ -10,21 +10,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.nextserve.serveitpartnernew.ui.screen.HomeScreen
 import com.nextserve.serveitpartnernew.ui.screen.LanguageSelectionScreen
-import com.nextserve.serveitpartnernew.ui.screen.LoginScreen
 import com.nextserve.serveitpartnernew.ui.screen.OnboardingScreen
-import com.nextserve.serveitpartnernew.ui.screen.OtpScreen
 import com.nextserve.serveitpartnernew.ui.screen.RejectionScreen
 import com.nextserve.serveitpartnernew.ui.screen.SplashScreen
 import com.nextserve.serveitpartnernew.ui.screen.WaitingScreen
+import com.nextserve.serveitpartnernew.ui.screen.auth.MobileNumberScreen
+import com.nextserve.serveitpartnernew.ui.screen.auth.OtpVerificationScreen
 import com.nextserve.serveitpartnernew.ui.screen.welcome.WelcomeScreen
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Welcome : Screen("welcome")
-    object Login : Screen("login")
-    object Otp : Screen("otp/{phoneNumber}/{verificationId}") {
-        fun createRoute(phoneNumber: String, verificationId: String) = "otp/$phoneNumber/$verificationId"
-    }
+    object MobileNumber : Screen("mobile_number")
+    object OtpVerification : Screen("otp_verification")
     object LanguageSelection : Screen("language_selection")
     object Onboarding : Screen("onboarding")
     object Waiting : Screen("waiting")
@@ -34,50 +32,50 @@ sealed class Screen(val route: String) {
     object Home : Screen("home")
 }
 
-fun NavGraphBuilder.appNavGraph(navController: NavController) {
+fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel) {
     composable(Screen.Splash.route) {
         SplashScreen()
+        // Auto-navigate to mobile number screen after splash
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(1500) // Minimum splash time
+            navController.navigate(Screen.MobileNumber.route) {
+                popUpTo(Screen.Splash.route) { inclusive = true }
+            }
+        }
     }
     
     composable(Screen.Welcome.route) {
         WelcomeScreen(
             onJoinClick = {
-                navController.navigate(Screen.Login.route) {
+                navController.navigate(Screen.MobileNumber.route) {
                     popUpTo(Screen.Welcome.route) { inclusive = true }
                 }
             }
         )
     }
-    
-    composable(Screen.Login.route) {
-        val authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
-        LoginScreen(authViewModel = authViewModel)
-    }
 
-    composable(
-        route = Screen.Otp.route,
-        arguments = listOf(
-            navArgument("phoneNumber") {
-                type = NavType.StringType
+    composable(Screen.MobileNumber.route) {
+        MobileNumberScreen(
+            onOtpRequested = {
+                navController.navigate(Screen.OtpVerification.route)
             },
-            navArgument("verificationId") {
-                type = NavType.StringType
-            }
-        )
-    ) { backStackEntry ->
-        val phoneNumber = backStackEntry.arguments?.getString("phoneNumber") ?: ""
-        val verificationId = backStackEntry.arguments?.getString("verificationId") ?: ""
-        val authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
-        OtpScreen(
-            phoneNumber = phoneNumber,
-            verificationId = verificationId,
-            authViewModel = authViewModel,
-            onNavigateBack = {
-                navController.popBackStack()
-            }
+            authViewModel = authViewModel
         )
     }
 
+    composable(Screen.OtpVerification.route) {
+        OtpVerificationScreen(
+            onVerificationSuccess = {
+                navController.navigate(Screen.LanguageSelection.route) {
+                    popUpTo(Screen.MobileNumber.route) { inclusive = true }
+                }
+            },
+            onBackToPhone = {
+                navController.popBackStack()
+            },
+            authViewModel = authViewModel
+        )
+    }
     composable(Screen.LanguageSelection.route) {
         LanguageSelectionScreen(
             onNavigateToOnboarding = {
@@ -90,7 +88,6 @@ fun NavGraphBuilder.appNavGraph(navController: NavController) {
     }
 
     composable(Screen.Onboarding.route) {
-        val authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
         OnboardingScreen(
             authViewModel = authViewModel
         )

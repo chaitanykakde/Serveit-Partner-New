@@ -51,7 +51,8 @@ fun OnboardingScreen(
         return
     }
 
-    // Use the existing OnboardingViewModel with AuthViewModel coordination
+    // Use the existing OnboardingViewModel with old AuthViewModel coordination
+    val oldAuthViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModelFactory())
     val onboardingViewModel: OnboardingViewModel = remember(currentUid) {
         OnboardingViewModel(
             uid = currentUid,
@@ -61,10 +62,11 @@ fun OnboardingScreen(
 
     val uiState = onboardingViewModel.uiState
 
-    // Sync onboarding step changes with AuthViewModel
-    LaunchedEffect(uiState.currentStep) {
-        authViewModel.updateOnboardingStep(currentUid, uiState.currentStep)
-    }
+    // TODO: Sync onboarding step changes with AuthViewModel when needed
+    // For now, onboarding works independently
+    // LaunchedEffect(uiState.currentStep) {
+    //     oldAuthViewModel.updateOnboardingStep(currentUid, uiState.currentStep)
+    // }
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val isTablet = screenWidth >= 600.dp
@@ -249,8 +251,8 @@ fun OnboardingScreen(
                                 onEditDocuments = { onboardingViewModel.navigateToStep(4) },
                                 onSubmit = {
                                     onboardingViewModel.submitOnboarding()
-                                    // Update AuthState after successful submission
-                                    authViewModel.completeOnboarding(currentUid)
+                                    // TODO: Update AuthState after successful submission
+                                    // oldAuthViewModel.completeOnboarding(currentUid)
                                 },
                                 isLoading = uiState.isLoading,
                                 errorMessage = uiState.errorMessage,

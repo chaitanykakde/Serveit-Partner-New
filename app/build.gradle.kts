@@ -69,6 +69,7 @@ dependencies {
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-functions")
+    implementation("com.google.firebase:firebase-appcheck-debug")
     
     // Google Play Services Location
     implementation("com.google.android.gms:play-services-location:21.3.0")

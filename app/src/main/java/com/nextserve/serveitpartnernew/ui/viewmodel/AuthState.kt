@@ -1,20 +1,53 @@
 package com.nextserve.serveitpartnernew.ui.viewmodel
 
 /**
- * Single source of truth for authentication state.
- * Controls all navigation and UI behavior throughout the app.
+ * ULTRA-STRICT OTP authentication state machine.
+ * ONLY 5 phases with explicit navigation rules:
+ *
+ * IDLE: Initial state, no navigation
+ * OTP_REQUESTED: OTP being requested, no navigation
+ * OTP_SENT: OTP sent successfully - SCREEN MUST REMAIN STABLE
+ * OTP_VERIFYING: OTP being verified - SCREEN MUST REMAIN STABLE
+ * AUTHENTICATED: SUCCESS - ONLY STATE THAT TRIGGERS NAVIGATION AWAY
+ *
+ * Navigation Rules:
+ * - TO OTP screen: ONLY when state becomes OTP_SENT
+ * - AWAY from OTP screen: ONLY when state becomes AUTHENTICATED
+ * - STAY on OTP screen: For OTP_SENT and OTP_VERIFYING phases
  */
 sealed class AuthState {
-    object Uninitialized : AuthState()
-    object LoggedOut : AuthState()
-    data class PhoneEntered(val phoneNumber: String) : AuthState()
-    data class OtpSent(val phoneNumber: String, val verificationId: String) : AuthState()
-    data class VerifyingOtp(val phoneNumber: String, val verificationId: String) : AuthState()
-    data class Authenticated(val uid: String) : AuthState()
-    data class Onboarding(val uid: String, val currentStep: Int) : AuthState()
-    data class PendingApproval(val uid: String) : AuthState()
-    data class Rejected(val uid: String, val reason: String?) : AuthState()
-    object Approved : AuthState()
-    data class Error(val message: String, val canRetry: Boolean = true) : AuthState()
-    object Loading : AuthState()
+
+    // Phase 1: Initial idle state
+    object Idle : AuthState()
+
+    // Phase 2: Phone validation (no navigation)
+    object PhoneValidating : AuthState()
+    data class PhoneError(val message: String) : AuthState()
+
+    // Phase 3: OTP being requested (no navigation)
+    object OtpSending : AuthState()
+    data class OtpSendError(
+        val message: String,
+        val canRetry: Boolean = true
+    ) : AuthState()
+
+    // Phase 4: OTP successfully sent - SCREEN SHOULD BE STABLE HERE
+    data class OtpSent(
+        val phoneNumber: String,
+        val canResendAt: Long = 0L
+    ) : AuthState()
+
+    // Phase 5: OTP being verified (screen should remain stable)
+    object OtpVerifying : AuthState()
+    data class OtpVerificationError(
+        val message: String,
+        val attemptsRemaining: Int,
+        val canRetry: Boolean = true
+    ) : AuthState()
+
+    // Phase 6: SUCCESS - ONLY PHASE THAT TRIGGERS NAVIGATION AWAY
+    object Authenticated : AuthState()
+
+    // General error state (fallback)
+    data class Error(val message: String) : AuthState()
 }

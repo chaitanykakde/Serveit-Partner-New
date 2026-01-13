@@ -1,8 +1,7 @@
-package com.nextserve.serveitpartnernew.ui.screen
+package com.nextserve.serveitpartnernew.ui.screen.auth
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,18 +22,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -46,98 +38,62 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.components.ErrorDisplay
-import com.nextserve.serveitpartnernew.ui.components.OfflineIndicator
+import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
-import com.nextserve.serveitpartnernew.ui.screen.login.LoginComponents
 import com.nextserve.serveitpartnernew.ui.theme.OrangeAccent
 import com.nextserve.serveitpartnernew.ui.util.Dimens
-import com.nextserve.serveitpartnernew.ui.viewmodel.LoginViewModel
-import com.nextserve.serveitpartnernew.utils.NetworkMonitor
+import com.nextserve.serveitpartnernew.ui.viewmodel.AuthState
+import com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel
 
 /**
- * UI state for Login screen to maintain compatibility with existing UI.
+ * Mobile number input screen.
+ * Pure UI - observes AuthState, triggers ViewModel events.
  */
-data class LoginUiState(
-    val phoneNumber: String = "",
-    val isPhoneNumberValid: Boolean = false,
-    val errorMessage: String? = null,
-    val isSendingOtp: Boolean = false,
-    val verificationId: String? = null,
-    val resendToken: com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken? = null,
-    val isOffline: Boolean = false
-)
-
 @Composable
-fun LoginScreen(
-    authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel
+fun MobileNumberScreen(
+    onOtpRequested: () -> Unit,
+    authViewModel: AuthViewModel
 ) {
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? android.app.Activity
 
-    val focusRequester = remember { FocusRequester() }
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val isTablet = screenWidth >= 600.dp
     val scrollState = rememberScrollState()
 
-    // Local phone number state for immediate UI updates
-    var phoneNumber by remember { mutableStateOf(authViewModel.getCurrentPhoneNumber()) }
-    var isSendingOtp by remember { mutableStateOf(false) }
+    // Local UI state - survives recomposition
+    var phoneNumber by remember { mutableStateOf("") }
 
-    // Derive error and loading states from authState
-    val errorMessage = remember(authState) {
-        when (val currentState = authState) {
-            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Error -> currentState.message
-            else -> null
+    // React to state changes
+    when (authState) {
+        is AuthState.OtpSent -> {
+            // Navigate to OTP screen
+            onOtpRequested()
         }
+        else -> { /* Handle other states in UI */ }
     }
 
-    val isLoading = remember(authState) {
-        authState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Loading
-    }
-
-    // Update local state when auth state changes
-    LaunchedEffect(authState) {
-        when (authState) {
-            is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Loading -> {
-                isSendingOtp = true
-            }
-            else -> {
-                isSendingOtp = false
-            }
-        }
-    }
-
-    val isPhoneNumberValid = remember(phoneNumber) {
-        com.nextserve.serveitpartnernew.utils.PhoneNumberFormatter.isValidIndianPhoneNumber(phoneNumber)
-    }
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    // Background with image and gradient overlay
+    // Background
     Box(
         modifier = Modifier
             .fillMaxSize()
             .systemBarsPadding()
     ) {
-        // Background Image - Fill entire screen
+        // Background Image
         Image(
             painter = painterResource(id = R.drawable.serveit_partner_flow_bg),
             contentDescription = "Background",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
-        
-        // Light gradient overlay for readability (reduced opacity)
+
+        // Gradient overlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -163,19 +119,16 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.height(if (isTablet) 60.dp else 48.dp))
 
-            // Offline indicator (show when offline)
-            val offlineCheckState = authState
-            if (offlineCheckState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Error &&
-                offlineCheckState.message.contains("internet", ignoreCase = true)) {
-                OfflineIndicator(modifier = Modifier.padding(bottom = 16.dp))
-            }
-
             // Logo
-            LoginComponents.ServeitLogo()
+            Image(
+                painter = painterResource(id = R.drawable.serveit_partner_logo_light),
+                contentDescription = "Serveit Logo",
+                modifier = Modifier.size(80.dp)
+            )
 
             Spacer(modifier = Modifier.height(Dimens.spacingXxl))
 
-            // Title - Centered
+            // Title
             Text(
                 text = "Welcome back",
                 style = MaterialTheme.typography.displayMedium,
@@ -187,7 +140,7 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(Dimens.spacingSm))
 
-            // Subtitle - Centered
+            // Subtitle
             Text(
                 text = "Login using your registered mobile number",
                 style = MaterialTheme.typography.bodyLarge,
@@ -199,47 +152,39 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(Dimens.spacingXxl))
 
-            // Phone Number Input with +91 prefix
-            LoginComponents.PhoneNumberInput(
+            // Phone Number Input
+            PhoneNumberInput(
                 phoneNumber = phoneNumber,
                 onPhoneNumberChange = { newValue ->
-                    phoneNumber = newValue.filter { it.isDigit() }.take(10) // Only allow digits, max 10
-                    authViewModel.updatePhoneNumber(newValue)
-                    if (authState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Error) {
-                        authViewModel.clearError()
-                    }
+                    phoneNumber = newValue.filter { it.isDigit() }.take(10)
+                    authViewModel.validatePhoneNumber(newValue)
                 },
-                isError = errorMessage != null,
-                errorMessage = errorMessage,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
+                isError = authState is AuthState.PhoneError,
+                errorMessage = (authState as? AuthState.PhoneError)?.message,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(Dimens.spacingXl))
 
             // Send OTP Button
             PrimaryButton(
-                text = if (isSendingOtp) stringResource(R.string.sending) else stringResource(R.string.send_otp),
+                text = when (authState) {
+                    is AuthState.OtpSending -> stringResource(R.string.sending)
+                    else -> stringResource(R.string.send_otp)
+                },
                 onClick = {
-                    if (isPhoneNumberValid && !isSendingOtp) {
-                        authViewModel.sendOtp(activity)
+                    if (phoneNumber.length == 10 && activity != null) {
+                        authViewModel.sendOtp(phoneNumber, activity)
                     }
                 },
-                enabled = isPhoneNumberValid && !isSendingOtp,
-                isLoading = isSendingOtp,
-                modifier = Modifier.fillMaxWidth(),
-                trailingIcon = {
-                    androidx.compose.material3.Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
+                enabled = phoneNumber.length == 10 &&
+                         authState !is AuthState.OtpSending &&
+                         authState !is AuthState.PhoneError,
+                isLoading = authState is AuthState.OtpSending,
+                modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(Dimens.spacingMd))
+            Spacer(modifier = Modifier.height(Dimens.spacingSm))
 
             // Helper Text
             Text(
@@ -250,37 +195,49 @@ fun LoginScreen(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            // Error display for AuthState errors
-            if (errorMessage != null) {
-                Spacer(modifier = Modifier.height(Dimens.spacingSm))
-                ErrorDisplay(
-                    error = com.nextserve.serveitpartnernew.ui.viewmodel.UiError(
-                        message = errorMessage,
-                        canRetry = true
-                    ),
-                    onRetry = { authViewModel.clearError() },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            // Error Display
+            when (authState) {
+                is AuthState.OtpSendError -> {
+                    Spacer(modifier = Modifier.height(Dimens.spacingSm))
+                    ErrorDisplay(
+                        error = com.nextserve.serveitpartnernew.ui.viewmodel.UiError(
+                            message = (authState as AuthState.OtpSendError).message,
+                            canRetry = (authState as AuthState.OtpSendError).canRetry
+                        ),
+                        onRetry = { authViewModel.clearError() },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                is AuthState.PhoneError -> {
+                    Spacer(modifier = Modifier.height(Dimens.spacingSm))
+                    ErrorDisplay(
+                        error = com.nextserve.serveitpartnernew.ui.viewmodel.UiError(
+                            message = (authState as AuthState.PhoneError).message,
+                            canRetry = false
+                        ),
+                        onRetry = { authViewModel.clearError() },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                else -> { /* No error to show */ }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Footer - Two rows
+            // Footer
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = Dimens.spacingXl),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Row 1: "By continuing, you agree to our" (unbolded)
                 Text(
                     text = "By continuing, you agree to our",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
-                
-                // Row 2: "Terms and Privacy Policy" (bolded)
+
                 TextButton(
                     onClick = { /* Handle Terms & Privacy click */ },
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
@@ -293,6 +250,52 @@ fun LoginScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Phone number input with +91 prefix.
+ */
+@Composable
+private fun PhoneNumberInput(
+    phoneNumber: String,
+    onPhoneNumberChange: (String) -> Unit,
+    isError: Boolean,
+    errorMessage: String?,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = stringResource(R.string.mobile_number),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(bottom = Dimens.spacingXs)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // +91 Prefix
+            Text(
+                text = "+91",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(end = Dimens.spacingSm)
+            )
+
+            // Phone Input
+            OutlinedInputField(
+                value = phoneNumber,
+                onValueChange = onPhoneNumberChange,
+                placeholder = "Enter 10-digit number",
+                keyboardType = KeyboardType.Phone,
+                modifier = Modifier.weight(1f),
+                isError = isError,
+                errorMessage = errorMessage
+            )
         }
     }
 }

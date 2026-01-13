@@ -11,70 +11,161 @@ import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit
 
 /**
- * Repository for Firebase Authentication operations.
- * Handles OTP sending, verification, and resending.
+ * Firebase PhoneAuth operations only.
+ * No state storage, no UI knowledge.
+ * Production-grade for 1M+ users.
  */
 class AuthRepository(
-    private val auth: FirebaseAuth,
-    private val activity: Activity? = null
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) {
-    private var verificationId: String? = null
-    private var resendToken: PhoneAuthProvider.ForceResendingToken? = null
 
     /**
-     * Sends OTP to the specified phone number.
-     * @param phoneNumber The phone number (with or without +91 prefix)
-     * @param onVerificationComplete Callback when auto-verification completes
-     * @param onCodeSent Callback when OTP code is sent
-     * @param onError Callback when error occurs
+     * Send OTP to phone number.
+     * Returns verificationId and resendToken for persistence.
      */
     suspend fun sendOtp(
         phoneNumber: String,
-        onVerificationComplete: (PhoneAuthCredential) -> Unit,
-        onCodeSent: (String, PhoneAuthProvider.ForceResendingToken?) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        val formattedPhone = if (phoneNumber.startsWith("+91")) {
-            phoneNumber
-        } else {
-            "+91$phoneNumber"
+        activity: Activity
+    ): Result<OtpSession> {
+        return try {
+            val formattedPhone = formatPhoneNumber(phoneNumber)
+
+            var session: OtpSession? = null
+            var error: Exception? = null
+
+            val options = PhoneAuthOptions.newBuilder(auth)
+                .setPhoneNumber(formattedPhone)
+                .setTimeout(60L, TimeUnit.SECONDS)
+                .setActivity(activity)
+                .setCallbacks(object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+                    override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+                        // Auto-verification - return credential for immediate use
+                        session = OtpSession(
+                            phoneNumber = phoneNumber,
+                            verificationId = null,
+                            resendToken = null,
+                            autoCredential = credential
+                        )
+                    }
+
+                    override fun onCodeSent(
+                        verificationId: String,
+                        token: PhoneAuthProvider.ForceResendingToken
+                    ) {
+                        session = OtpSession(
+                            phoneNumber = phoneNumber,
+                            verificationId = verificationId,
+                            resendToken = token,
+                            autoCredential = null
+                        )
+                    }
+
+                    override fun onVerificationFailed(e: FirebaseException) {
+                        error = e
+                    }
+                })
+                .build()
+
+            PhoneAuthProvider.verifyPhoneNumber(options)
+
+            // Wait for callback or timeout
+            val startTime = System.currentTimeMillis()
+            while (session == null && error == null) {
+                if (System.currentTimeMillis() - startTime > 65000) { // 65 seconds timeout
+                    return Result.failure(Exception("OTP request timeout"))
+                }
+                kotlinx.coroutines.delay(100)
+            }
+
+            when {
+                error != null -> Result.failure(error!!)
+                session != null -> Result.success(session!!)
+                else -> Result.failure(Exception("Unknown error during OTP request"))
+            }
+
+        } catch (e: Exception) {
+            Result.failure(e)
         }
-
-        val optionsBuilder = PhoneAuthOptions.newBuilder(auth)
-            .setPhoneNumber(formattedPhone)
-            .setTimeout(60L, TimeUnit.SECONDS)
-            .setCallbacks(object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
-                override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                    onVerificationComplete(credential)
-                }
-
-                override fun onVerificationFailed(e: FirebaseException) {
-                    val friendlyError = ErrorMapper.getErrorMessage(e)
-                    onError(friendlyError)
-                }
-
-                override fun onCodeSent(
-                    id: String,
-                    token: PhoneAuthProvider.ForceResendingToken
-                ) {
-                    verificationId = id
-                    resendToken = token
-                    onCodeSent(id, token)
-                }
-            })
-        
-        activity?.let { optionsBuilder.setActivity(it) }
-        val options = optionsBuilder.build()
-
-        PhoneAuthProvider.verifyPhoneNumber(options)
     }
 
-    suspend fun verifyOtp(code: String): Result<String> {
+    /**
+     * Resend OTP using existing token.
+     */
+    suspend fun resendOtp(
+        phoneNumber: String,
+        resendToken: PhoneAuthProvider.ForceResendingToken,
+        activity: Activity
+    ): Result<OtpSession> {
         return try {
-            val credential = verificationId?.let {
-                PhoneAuthProvider.getCredential(it, code)
-            } ?: return Result.failure(IllegalStateException("No verification ID"))
+            val formattedPhone = formatPhoneNumber(phoneNumber)
 
+            var session: OtpSession? = null
+            var error: Exception? = null
+
+            val options = PhoneAuthOptions.newBuilder(auth)
+                .setPhoneNumber(formattedPhone)
+                .setTimeout(60L, TimeUnit.SECONDS)
+                .setActivity(activity)
+                .setForceResendingToken(resendToken)
+                .setCallbacks(object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+                    override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+                        session = OtpSession(
+                            phoneNumber = phoneNumber,
+                            verificationId = null,
+                            resendToken = resendToken,
+                            autoCredential = credential
+                        )
+                    }
+
+                    override fun onCodeSent(
+                        verificationId: String,
+                        token: PhoneAuthProvider.ForceResendingToken
+                    ) {
+                        session = OtpSession(
+                            phoneNumber = phoneNumber,
+                            verificationId = verificationId,
+                            resendToken = token,
+                            autoCredential = null
+                        )
+                    }
+
+                    override fun onVerificationFailed(e: FirebaseException) {
+                        error = e
+                    }
+                })
+                .build()
+
+            PhoneAuthProvider.verifyPhoneNumber(options)
+
+            // Wait for callback
+            val startTime = System.currentTimeMillis()
+            while (session == null && error == null) {
+                if (System.currentTimeMillis() - startTime > 65000) {
+                    return Result.failure(Exception("OTP resend timeout"))
+                }
+                kotlinx.coroutines.delay(100)
+            }
+
+            when {
+                error != null -> Result.failure(error!!)
+                session != null -> Result.success(session!!)
+                else -> Result.failure(Exception("Unknown error during OTP resend"))
+            }
+
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Verify OTP code.
+     */
+    suspend fun verifyOtp(
+        verificationId: String,
+        otpCode: String
+    ): Result<String> {
+        return try {
+            val credential = PhoneAuthProvider.getCredential(verificationId, otpCode)
             val result = auth.signInWithCredential(credential).await()
             val uid = result.user?.uid ?: return Result.failure(Exception("User ID is null"))
             Result.success(uid)
@@ -83,7 +174,12 @@ class AuthRepository(
         }
     }
 
-    suspend fun verifyOtpWithCredential(credential: PhoneAuthCredential): Result<String> {
+    /**
+     * Verify with auto-obtained credential.
+     */
+    suspend fun verifyWithCredential(
+        credential: PhoneAuthCredential
+    ): Result<String> {
         return try {
             val result = auth.signInWithCredential(credential).await()
             val uid = result.user?.uid ?: return Result.failure(Exception("User ID is null"))
@@ -94,69 +190,32 @@ class AuthRepository(
     }
 
     /**
-     * Resends OTP to the specified phone number.
-     * @param phoneNumber The phone number (with or without +91 prefix)
-     * @param resendToken The resend token from previous OTP send (optional)
-     * @param onCodeSent Callback when OTP code is sent
-     * @param onError Callback when error occurs
+     * Sign out current user.
      */
-    suspend fun resendOtp(
-        phoneNumber: String,
-        resendToken: com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken? = null,
-        onCodeSent: (String, com.google.firebase.auth.PhoneAuthProvider.ForceResendingToken?) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        val formattedPhone = if (phoneNumber.startsWith("+91")) {
-            phoneNumber
-        } else {
-            "+91$phoneNumber"
-        }
-
-        val token = resendToken ?: this.resendToken
-        if (token != null) {
-            val optionsBuilder = PhoneAuthOptions.newBuilder(auth)
-                .setPhoneNumber(formattedPhone)
-                .setTimeout(60L, TimeUnit.SECONDS)
-                .setCallbacks(object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
-                    override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                        // Auto-verification handled
-                    }
-
-                    override fun onVerificationFailed(e: FirebaseException) {
-                        val friendlyError = ErrorMapper.getErrorMessage(e)
-                        onError(friendlyError)
-                    }
-
-                    override fun onCodeSent(
-                        id: String,
-                        token: PhoneAuthProvider.ForceResendingToken
-                    ) {
-                        verificationId = id
-                        this@AuthRepository.resendToken = token
-                        onCodeSent(id, token)
-                    }
-                })
-                .setForceResendingToken(token)
-            
-            activity?.let { optionsBuilder.setActivity(it) }
-            val options = optionsBuilder.build()
-
-            PhoneAuthProvider.verifyPhoneNumber(options)
-        } else {
-            // First time send (no resend token available)
-            sendOtp(
-                formattedPhone,
-                {}, // onVerificationComplete
-                onCodeSent, // onCodeSent
-                onError
-            )
-        }
-    }
-
-    fun getCurrentUserId(): String? = auth.currentUser?.uid
-
     fun signOut() {
         auth.signOut()
     }
+
+    /**
+     * Get current user ID if authenticated.
+     */
+    fun getCurrentUserId(): String? = auth.currentUser?.uid
+
+    /**
+     * Format phone number for Firebase.
+     */
+    private fun formatPhoneNumber(phoneNumber: String): String {
+        val cleaned = phoneNumber.replace(Regex("[^0-9]"), "")
+        return if (cleaned.startsWith("91")) "+$cleaned" else "+91$cleaned"
+    }
 }
 
+/**
+ * OTP session data returned by Firebase.
+ */
+data class OtpSession(
+    val phoneNumber: String,
+    val verificationId: String?,
+    val resendToken: PhoneAuthProvider.ForceResendingToken?,
+    val autoCredential: PhoneAuthCredential?
+)
