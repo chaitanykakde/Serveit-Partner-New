@@ -10,6 +10,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nextserve.serveitpartnernew.data.model.MainService
 import com.nextserve.serveitpartnernew.data.model.ProviderData
+import com.nextserve.serveitpartnernew.data.model.LocationData
+import com.nextserve.serveitpartnernew.data.repository.LocationRepository
 import com.nextserve.serveitpartnernew.data.repository.OnboardingRepository
 import com.nextserve.serveitpartnernew.domain.onboarding.OnboardingStatus
 import com.nextserve.serveitpartnernew.domain.onboarding.OnboardingStep
@@ -25,7 +27,8 @@ import kotlinx.coroutines.launch
 class OnboardingViewModel(
     private val uid: String,
     private val context: Context,
-    private val repository: OnboardingRepository = OnboardingRepository(context)
+    private val repository: OnboardingRepository = OnboardingRepository(context),
+    private val locationRepository: LocationRepository = LocationRepository(context, com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context))
 ) : ViewModel() {
 
     var uiState by mutableStateOf(OnboardingUiState())
@@ -286,6 +289,62 @@ class OnboardingViewModel(
     fun updateServiceRadius(radius: Float) {
         uiState = uiState.copy(serviceRadius = radius)
         saveStep3Data()
+    }
+
+    fun useCurrentLocation() {
+        uiState = uiState.copy(isLocationLoading = true)
+
+        viewModelScope.launch {
+            val locationResult = locationRepository.getCurrentLocation()
+            locationResult.onSuccess { location ->
+                val addressResult = locationRepository.getDetailedAddressFromLocation(
+                    location.latitude,
+                    location.longitude
+                )
+                addressResult.onSuccess { address ->
+                    // Extract individual address components with fallbacks
+                    val city = address.locality ?: address.subAdminArea ?: ""
+                    val state = address.adminArea ?: ""
+                    val pincode = address.postalCode ?: ""
+                    val areaLocality = address.thoroughfare ?: address.featureName ?: ""
+
+                    // Build full address string
+                    val fullAddressParts = mutableListOf<String>()
+                    address.featureName?.let { fullAddressParts.add(it) }
+                    address.thoroughfare?.let { fullAddressParts.add(it) }
+                    address.locality?.let { fullAddressParts.add(it) }
+                    address.adminArea?.let { fullAddressParts.add(it) }
+                    address.postalCode?.let { fullAddressParts.add(it) }
+                    address.countryName?.let { fullAddressParts.add(it) }
+                    val fullAddress = fullAddressParts.joinToString(", ")
+
+                    // Update UI state
+                    uiState = uiState.copy(
+                        state = state,
+                        city = city,
+                        address = areaLocality,
+                        fullAddress = fullAddress,
+                        locationPincode = pincode,
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                        isLocationLoading = false
+                    )
+
+                    // Save to Firestore
+                    saveStep3Data()
+                }.onFailure { error ->
+                    uiState = uiState.copy(
+                        isLocationLoading = false,
+                        errorMessage = "Failed to get address: ${error.message}"
+                    )
+                }
+            }.onFailure { error ->
+                uiState = uiState.copy(
+                    isLocationLoading = false,
+                    errorMessage = "Failed to get location: ${error.message}"
+                )
+            }
+        }
     }
 
     private fun saveStep3Data() {

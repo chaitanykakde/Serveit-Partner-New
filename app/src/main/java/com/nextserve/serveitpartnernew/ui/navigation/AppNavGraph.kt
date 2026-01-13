@@ -120,7 +120,7 @@ fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com
             onUpdateFullAddress = onboardingViewModel::updateFullAddress,
             onUpdateLocationPincode = onboardingViewModel::updateLocationPincode,
             onUpdateServiceRadius = onboardingViewModel::updateServiceRadius,
-            onUseCurrentLocation = { _, _ -> /* TODO: Implement location */ },
+            onUseCurrentLocation = onboardingViewModel::useCurrentLocation,
             onUploadAadhaarFront = onboardingViewModel::uploadAadhaarFront,
             onUploadAadhaarBack = onboardingViewModel::uploadAadhaarBack,
             onUploadProfilePhoto = onboardingViewModel::uploadProfilePhoto,

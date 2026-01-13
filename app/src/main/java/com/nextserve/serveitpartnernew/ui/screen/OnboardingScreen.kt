@@ -31,6 +31,7 @@ import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step2ServiceSelectio
 import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step3Location
 import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step4Verification
 import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step5Review
+import com.nextserve.serveitpartnernew.ui.utils.rememberLocationPermissionState
 import com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingUiState
 import com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingViewModel
 
@@ -57,7 +58,7 @@ fun OnboardingScreen(
     onUpdateFullAddress: (String) -> Unit,
     onUpdateLocationPincode: (String) -> Unit,
     onUpdateServiceRadius: (Float) -> Unit,
-    onUseCurrentLocation: (hasPermission: Boolean, requestPermission: () -> Unit) -> Unit,
+    onUseCurrentLocation: () -> Unit,
     onUploadAadhaarFront: (android.net.Uri) -> Unit,
     onUploadAadhaarBack: (android.net.Uri) -> Unit,
     onUploadProfilePhoto: (android.net.Uri) -> Unit,
@@ -73,6 +74,7 @@ fun OnboardingScreen(
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val isTablet = screenWidth >= 600.dp
+    val (hasLocationPermission, requestLocationPermission) = rememberLocationPermissionState()
 
     BottomStickyButtonContainer(
         button = {
@@ -191,7 +193,13 @@ fun OnboardingScreen(
                                 onServiceRadiusChange = onUpdateServiceRadius,
                                 isLocationLoading = uiState.isLocationLoading,
                                 errorMessage = uiState.errorMessage,
-                                onUseCurrentLocation = onUseCurrentLocation,
+                                onUseCurrentLocation = { hasPermission, requestPermission ->
+                                    if (hasPermission) {
+                                        onUseCurrentLocation()
+                                    } else {
+                                        requestPermission()
+                                    }
+                                },
                                 onPrevious = onPreviousStep,
                                 onNext = onNextStep,
                                 modifier = Modifier.fillMaxSize()
