@@ -1,5 +1,6 @@
 package com.nextserve.serveitpartnernew.ui.viewmodel
 
+import com.nextserve.serveitpartnernew.data.model.MainService
 import com.nextserve.serveitpartnernew.domain.onboarding.OnboardingStatus
 import com.nextserve.serveitpartnernew.domain.onboarding.OnboardingStep
 
@@ -19,6 +20,7 @@ data class OnboardingUiState(
     val primaryService: String = "",
     val email: String = "",
     val language: String = "en",
+    val mainServices: List<MainService> = emptyList(),
     val isLoadingServices: Boolean = false,
 
     // Step 2 data

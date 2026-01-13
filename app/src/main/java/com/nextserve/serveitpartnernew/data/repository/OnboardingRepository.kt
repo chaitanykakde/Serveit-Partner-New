@@ -119,28 +119,18 @@ class OnboardingRepository(
 
     /**
      * Load main services from Firestore.
+     * Delegates to FirestoreRepository for actual implementation.
      */
-    suspend fun loadMainServices(): Result<List<MainService>> {
-        return try {
-            // This would typically load from a services collection
-            // For now, return empty list as this is handled elsewhere
-            Result.success(emptyList())
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    suspend fun loadMainServices(gender: String): Result<List<MainService>> {
+        return firestoreRepository.getMainServices(gender)
     }
 
     /**
      * Load sub-services for a given gender and main service.
+     * Delegates to FirestoreRepository for actual implementation.
      */
     suspend fun loadSubServices(gender: String, mainService: String): Result<List<String>> {
-        return try {
-            // This would typically query Firestore for sub-services
-            // For now, return empty list as this is handled elsewhere
-            Result.success(emptyList())
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return firestoreRepository.getSubServices(gender, mainService)
     }
 
     /**

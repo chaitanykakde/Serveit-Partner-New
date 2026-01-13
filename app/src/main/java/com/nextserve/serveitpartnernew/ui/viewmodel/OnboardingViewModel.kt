@@ -94,10 +94,14 @@ class OnboardingViewModel(
             isSubmitted = onboardingStatus == OnboardingStatus.SUBMITTED
         )
 
-        // Load sub-services if primary service is set
-        if (providerData.primaryService.isNotEmpty() && providerData.gender.isNotEmpty()) {
-            uiState = uiState.copy(selectedMainService = providerData.primaryService)
-            loadSubServices(providerData.gender, providerData.primaryService)
+        // Load services if gender is set
+        if (providerData.gender.isNotEmpty()) {
+            loadMainServices(providerData.gender)
+            // Load sub-services if primary service is set
+            if (providerData.primaryService.isNotEmpty()) {
+                uiState = uiState.copy(selectedMainService = providerData.primaryService)
+                loadSubServices(providerData.gender, providerData.primaryService)
+            }
         }
     }
 
@@ -134,8 +138,9 @@ class OnboardingViewModel(
     }
 
     fun updateGender(gender: String) {
-        uiState = uiState.copy(gender = gender, primaryService = "")
+        uiState = uiState.copy(gender = gender, primaryService = "", isLoadingServices = true)
         saveStep1Data()
+        loadMainServices(gender)
     }
 
     fun updatePrimaryService(service: String) {
@@ -204,6 +209,25 @@ class OnboardingViewModel(
         saveStep2Data()
     }
 
+    fun loadMainServices(gender: String) {
+        if (gender.isEmpty()) return
+
+        viewModelScope.launch {
+            repository.loadMainServices(gender).onSuccess { mainServices ->
+                uiState = uiState.copy(
+                    mainServices = mainServices,
+                    isLoadingServices = false
+                )
+            }.onFailure {
+                uiState = uiState.copy(
+                    mainServices = emptyList(),
+                    isLoadingServices = false,
+                    errorMessage = "Failed to load services"
+                )
+            }
+        }
+    }
+
     fun loadSubServices(gender: String, mainService: String) {
         uiState = uiState.copy(isLoadingSubServices = true)
 
@@ -214,7 +238,10 @@ class OnboardingViewModel(
                     isLoadingSubServices = false
                 )
             }.onFailure {
-                uiState = uiState.copy(isLoadingSubServices = false)
+                uiState = uiState.copy(
+                    isLoadingSubServices = false,
+                    errorMessage = "Failed to load sub-services"
+                )
             }
         }
     }

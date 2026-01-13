@@ -142,7 +142,7 @@ fun OnboardingScreen(
                                 onGenderChange = onUpdateGender,
                                 primaryService = uiState.primaryService,
                                 onPrimaryServiceChange = onUpdatePrimaryService,
-                                primaryServices = emptyList(), // TODO: Pass from parent
+                                primaryServices = uiState.mainServices,
                                 isLoadingServices = uiState.isLoadingServices,
                                 email = uiState.email,
                                 onEmailChange = onUpdateEmail,
