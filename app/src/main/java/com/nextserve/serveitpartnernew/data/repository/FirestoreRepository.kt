@@ -294,9 +294,24 @@ class FirestoreRepository(
                     (subServices as Map<String, *>).keys.toList()
                 }
                 is List<*> -> {
-                    // subServices is a List<String>
-                    // Items are sub-service names
-                    (subServices as List<*>).mapNotNull { it as? String }
+                    // Check if it's a List of Maps (each map has a "name" field)
+                    val firstItem = subServices.firstOrNull()
+                    when (firstItem) {
+                        is Map<*, *> -> {
+                            // List of Maps - extract "name" field from each map
+                            subServices.mapNotNull { item ->
+                                (item as? Map<*, *>)?.get("name") as? String
+                            }
+                        }
+                        is String -> {
+                            // List of Strings - direct sub-service names
+                            (subServices as List<*>).mapNotNull { it as? String }
+                        }
+                        else -> {
+                            android.util.Log.w("FirestoreRepository", "Unknown subServices list format for service: $mainServiceName")
+                            emptyList<String>()
+                        }
+                    }
                 }
                 else -> {
                     // No sub-services or malformed data
