@@ -24,12 +24,41 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.util.Dimens
+import com.nextserve.serveitpartnernew.ui.viewmodel.AuthState
+import com.nextserve.serveitpartnernew.utils.LanguageManager
 import kotlinx.coroutines.delay
 
 @Composable
-fun SplashScreen() {
-    // Splash screen just shows loading - navigation is handled by MainActivity based on auth state
-    // No LaunchedEffect with navigation logic here
+fun SplashScreen(
+    authState: AuthState,
+    onNavigateToMobileNumber: () -> Unit,
+    onNavigateToLanguageSelection: () -> Unit,
+    onNavigateToOnboarding: () -> Unit
+) {
+    val context = LocalContext.current
+
+    // Handle navigation based on auth state after minimum splash time
+    LaunchedEffect(authState) {
+        delay(1500) // Minimum splash time
+
+        when (authState) {
+            is AuthState.Authenticated -> {
+                // User is already authenticated, check if language is selected
+                val savedLanguage = LanguageManager.getSavedLanguage(context)
+                if (savedLanguage.isNotEmpty() && savedLanguage != "en") {
+                    // Language already selected, go directly to onboarding
+                    onNavigateToOnboarding()
+                } else {
+                    // No language selected, go to language selection
+                    onNavigateToLanguageSelection()
+                }
+            }
+            else -> {
+                // User not authenticated, start login flow
+                onNavigateToMobileNumber()
+            }
+        }
+    }
     
     Box(
         modifier = Modifier

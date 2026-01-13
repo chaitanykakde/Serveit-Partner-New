@@ -34,7 +34,9 @@ class AuthViewModel(
     private val resendCooldownMs = 30_000L // 30 seconds
 
     init {
-        // Restore state on process death
+        // Check FirebaseAuth state first
+        checkFirebaseAuthState()
+        // Then restore OTP session state if needed
         restoreAuthState()
     }
 
@@ -346,14 +348,29 @@ class AuthViewModel(
         sessionStore.clearAttemptCount()
     }
 
+    /**
+     * Check FirebaseAuth state on app startup.
+     */
+    private fun checkFirebaseAuthState() {
+        val currentUser = authRepository.getCurrentUserId()
+        if (currentUser != null) {
+            // User is already authenticated - set to authenticated state
+            _authState.value = AuthState.Authenticated
+        }
+        // If not authenticated, stay in Idle state (default)
+    }
+
     private fun restoreAuthState() {
-        val session = sessionStore.getSession()
-        if (session != null) {
-            // Restore to OTP requested state
-            _authState.value = AuthState.OtpSent(
-                phoneNumber = session.phoneNumber,
-                canResendAt = session.canResendAt
-            )
+        // Only restore OTP session if not already authenticated
+        if (_authState.value != AuthState.Authenticated) {
+            val session = sessionStore.getSession()
+            if (session != null) {
+                // Restore to OTP requested state
+                _authState.value = AuthState.OtpSent(
+                    phoneNumber = session.phoneNumber,
+                    canResendAt = session.canResendAt
+                )
+            }
         }
     }
 }

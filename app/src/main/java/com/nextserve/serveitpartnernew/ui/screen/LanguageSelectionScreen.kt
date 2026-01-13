@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
 import com.nextserve.serveitpartnernew.ui.viewmodel.LanguageSelectionViewModel
 import com.nextserve.serveitpartnernew.ui.viewmodel.LanguageSelectionViewModelFactory
+import kotlinx.coroutines.delay
 
 /**
  * Language Selection Screen.
@@ -57,6 +59,14 @@ fun LanguageSelectionScreen(
     val screenWidth = configuration.screenWidthDp.dp
     val isTablet = screenWidth >= 600.dp
     val scrollState = rememberScrollState()
+
+    // Auto-navigate if language is already selected (skip this screen)
+    LaunchedEffect(uiState.selectedLanguageCode) {
+        if (viewModel.isLanguageSelected() && uiState.selectedLanguageCode != null) {
+            kotlinx.coroutines.delay(500) // Brief show of screen
+            onNavigateToOnboarding()
+        }
+    }
 
     // Light gradient background (matching Login & OTP screens)
     val backgroundGradient = Brush.verticalGradient(

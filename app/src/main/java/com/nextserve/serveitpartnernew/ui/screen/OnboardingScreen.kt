@@ -12,22 +12,17 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nextserve.serveitpartnernew.R
-import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
+import com.nextserve.serveitpartnernew.domain.onboarding.OnboardingStep
 import com.nextserve.serveitpartnernew.ui.components.BottomStickyButtonContainer
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
 import com.nextserve.serveitpartnernew.ui.components.StepperHeader
@@ -36,37 +31,45 @@ import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step2ServiceSelectio
 import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step3Location
 import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step4Verification
 import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step5Review
+import com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingUiState
 import com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingViewModel
 
+/**
+ * Pure UI composable for onboarding flow.
+ * Only emits events, no Firebase logic or business logic.
+ */
 @Composable
 fun OnboardingScreen(
-    uid: String? = null,
-    authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel
+    uiState: OnboardingUiState,
+    onUpdateFullName: (String) -> Unit,
+    onUpdateGender: (String) -> Unit,
+    onUpdatePrimaryService: (String) -> Unit,
+    onUpdateEmail: (String) -> Unit,
+    onUpdateLanguage: (String) -> Unit,
+    onUpdateSelectedMainService: (String) -> Unit,
+    onToggleSubService: (String) -> Unit,
+    onToggleSelectAll: () -> Unit,
+    onUpdateOtherService: (String) -> Unit,
+    onLoadSubServices: (String, String) -> Unit,
+    onUpdateState: (String) -> Unit,
+    onUpdateCity: (String) -> Unit,
+    onUpdateAddress: (String) -> Unit,
+    onUpdateFullAddress: (String) -> Unit,
+    onUpdateLocationPincode: (String) -> Unit,
+    onUpdateServiceRadius: (Float) -> Unit,
+    onUseCurrentLocation: (hasPermission: Boolean, requestPermission: () -> Unit) -> Unit,
+    onUploadAadhaarFront: (android.net.Uri) -> Unit,
+    onUploadAadhaarBack: (android.net.Uri) -> Unit,
+    onUploadProfilePhoto: (android.net.Uri) -> Unit,
+    onDeleteAadhaarFront: () -> Unit,
+    onDeleteAadhaarBack: () -> Unit,
+    onDeleteProfilePhoto: () -> Unit,
+    onNextStep: () -> Unit,
+    onPreviousStep: () -> Unit,
+    onNavigateToStep: (Int) -> Unit,
+    onSubmit: () -> Unit,
+    onReset: () -> Unit
 ) {
-    val currentUid = uid ?: FirebaseProvider.auth.currentUser?.uid
-    val context = LocalContext.current
-
-    if (currentUid == null) {
-        // Show error state
-        return
-    }
-
-    // Use the existing OnboardingViewModel with old AuthViewModel coordination
-    val oldAuthViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModelFactory())
-    val onboardingViewModel: OnboardingViewModel = remember(currentUid) {
-        OnboardingViewModel(
-            uid = currentUid,
-            context = context
-        )
-    }
-
-    val uiState = onboardingViewModel.uiState
-
-    // TODO: Sync onboarding step changes with AuthViewModel when needed
-    // For now, onboarding works independently
-    // LaunchedEffect(uiState.currentStep) {
-    //     oldAuthViewModel.updateOnboardingStep(currentUid, uiState.currentStep)
-    // }
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val isTablet = screenWidth >= 600.dp
@@ -74,14 +77,13 @@ fun OnboardingScreen(
     BottomStickyButtonContainer(
         button = {
             // Steps 2, 3, 4, and 5 have their own buttons
-            if (uiState.currentStep != 2 && uiState.currentStep != 3 && uiState.currentStep != 4 && uiState.currentStep != 5) {
+            if (uiState.currentStep.stepNumber != 2 &&
+                uiState.currentStep.stepNumber != 3 &&
+                uiState.currentStep.stepNumber != 4 &&
+                uiState.currentStep.stepNumber != 5) {
                 PrimaryButton(
                     text = stringResource(R.string.continue_button),
-                    onClick = {
-                        if (uiState.currentStep < 5) {
-                            onboardingViewModel.nextStep()
-                        }
-                    },
+                    onClick = onNextStep,
                     enabled = !uiState.isLoading
                 )
             }
@@ -122,7 +124,7 @@ fun OnboardingScreen(
                 ) {
                     // Stepper Header
                     StepperHeader(
-                        currentStep = uiState.currentStep,
+                        currentStep = uiState.currentStep.stepNumber,
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -133,29 +135,29 @@ fun OnboardingScreen(
                             .weight(1f)
                     ) {
                         when (uiState.currentStep) {
-                            1 -> Step1BasicInfo(
+                            OnboardingStep.BASIC_INFO -> Step1BasicInfo(
                                 fullName = uiState.fullName,
-                                onFullNameChange = { onboardingViewModel.updateFullName(it) },
+                                onFullNameChange = onUpdateFullName,
                                 gender = uiState.gender,
-                                onGenderChange = { onboardingViewModel.updateGender(it) },
+                                onGenderChange = onUpdateGender,
                                 primaryService = uiState.primaryService,
-                                onPrimaryServiceChange = { onboardingViewModel.updatePrimaryService(it) },
-                                primaryServices = onboardingViewModel.mainServices.value,
+                                onPrimaryServiceChange = onUpdatePrimaryService,
+                                primaryServices = emptyList(), // TODO: Pass from parent
                                 isLoadingServices = uiState.isLoadingServices,
                                 email = uiState.email,
-                                onEmailChange = { onboardingViewModel.updateEmail(it) },
+                                onEmailChange = onUpdateEmail,
                                 language = uiState.language,
-                                onLanguageChange = { onboardingViewModel.updateLanguage(it) },
+                                onLanguageChange = onUpdateLanguage,
                                 errorMessage = uiState.errorMessage,
                                 modifier = Modifier.fillMaxSize()
                             )
-                            2 -> {
+                            OnboardingStep.SERVICE_SELECTION -> {
                                 // Load sub-services when entering Step 2 if not already loaded
-                                LaunchedEffect(uiState.primaryService, uiState.gender) {
-                                    if (uiState.availableSubServices.isEmpty() && 
-                                        uiState.primaryService.isNotEmpty() && 
+                                androidx.compose.runtime.LaunchedEffect(uiState.primaryService, uiState.gender) {
+                                    if (uiState.availableSubServices.isEmpty() &&
+                                        uiState.primaryService.isNotEmpty() &&
                                         uiState.gender.isNotEmpty()) {
-                                        onboardingViewModel.loadSubServices(uiState.gender, uiState.primaryService)
+                                        onLoadSubServices(uiState.gender, uiState.primaryService)
                                     }
                                 }
                                 Step2ServiceSelection(
@@ -165,38 +167,36 @@ fun OnboardingScreen(
                                     isSelectAllChecked = uiState.isSelectAllChecked,
                                     isLoadingSubServices = uiState.isLoadingSubServices,
                                     otherService = uiState.otherService,
-                                    onSubServiceToggle = { onboardingViewModel.toggleSubService(it) },
-                                    onSelectAllToggle = { onboardingViewModel.toggleSelectAll() },
-                                    onOtherServiceChange = { onboardingViewModel.updateOtherService(it) },
-                                    onPrevious = { onboardingViewModel.previousStep() },
-                                    onNext = { onboardingViewModel.nextStep() },
+                                    onSubServiceToggle = onToggleSubService,
+                                    onSelectAllToggle = onToggleSelectAll,
+                                    onOtherServiceChange = onUpdateOtherService,
+                                    onPrevious = onPreviousStep,
+                                    onNext = onNextStep,
                                     errorMessage = uiState.errorMessage,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
-                            3 -> Step3Location(
+                            OnboardingStep.LOCATION -> Step3Location(
                                 state = uiState.state,
-                                onStateChange = { onboardingViewModel.updateState(it) },
+                                onStateChange = onUpdateState,
                                 city = uiState.city,
-                                onCityChange = { onboardingViewModel.updateCity(it) },
+                                onCityChange = onUpdateCity,
                                 address = uiState.address,
-                                onAddressChange = { onboardingViewModel.updateAddress(it) },
+                                onAddressChange = onUpdateAddress,
                                 fullAddress = uiState.fullAddress,
-                                onFullAddressChange = { onboardingViewModel.updateFullAddress(it) },
+                                onFullAddressChange = onUpdateFullAddress,
                                 locationPincode = uiState.locationPincode,
-                                onLocationPincodeChange = { onboardingViewModel.updateLocationPincode(it) },
+                                onLocationPincodeChange = onUpdateLocationPincode,
                                 serviceRadius = uiState.serviceRadius,
-                                onServiceRadiusChange = { onboardingViewModel.updateServiceRadius(it) },
+                                onServiceRadiusChange = onUpdateServiceRadius,
                                 isLocationLoading = uiState.isLocationLoading,
                                 errorMessage = uiState.errorMessage,
-                                onUseCurrentLocation = { hasPermission, requestPermission ->
-                                    onboardingViewModel.useCurrentLocation(hasPermission, requestPermission)
-                                },
-                                onPrevious = { onboardingViewModel.previousStep() },
-                                onNext = { onboardingViewModel.nextStep() },
+                                onUseCurrentLocation = onUseCurrentLocation,
+                                onPrevious = onPreviousStep,
+                                onNext = onNextStep,
                                 modifier = Modifier.fillMaxSize()
                             )
-                            4 -> Step4Verification(
+                            OnboardingStep.VERIFICATION -> Step4Verification(
                                 aadhaarFrontUploaded = uiState.aadhaarFrontUploaded,
                                 aadhaarBackUploaded = uiState.aadhaarBackUploaded,
                                 aadhaarFrontUrl = uiState.aadhaarFrontUrl,
@@ -206,29 +206,17 @@ fun OnboardingScreen(
                                 isUploading = uiState.isUploading,
                                 uploadProgress = uiState.uploadProgress,
                                 errorMessage = uiState.errorMessage,
-                                onAadhaarFrontUpload = { imageUri ->
-                                    onboardingViewModel.uploadAadhaarFront(imageUri)
-                                },
-                                onAadhaarBackUpload = { imageUri ->
-                                    onboardingViewModel.uploadAadhaarBack(imageUri)
-                                },
-                                onProfilePhotoUpload = { imageUri ->
-                                    onboardingViewModel.uploadProfilePhoto(imageUri)
-                                },
-                                onAadhaarFrontDelete = {
-                                    onboardingViewModel.deleteAadhaarFront()
-                                },
-                                onAadhaarBackDelete = {
-                                    onboardingViewModel.deleteAadhaarBack()
-                                },
-                                onProfilePhotoDelete = {
-                                    onboardingViewModel.deleteProfilePhoto()
-                                },
-                                onPrevious = { onboardingViewModel.previousStep() },
-                                onNext = { onboardingViewModel.nextStep() },
+                                onAadhaarFrontUpload = onUploadAadhaarFront,
+                                onAadhaarBackUpload = onUploadAadhaarBack,
+                                onProfilePhotoUpload = onUploadProfilePhoto,
+                                onAadhaarFrontDelete = onDeleteAadhaarFront,
+                                onAadhaarBackDelete = onDeleteAadhaarBack,
+                                onProfilePhotoDelete = onDeleteProfilePhoto,
+                                onPrevious = onPreviousStep,
+                                onNext = onNextStep,
                                 modifier = Modifier.fillMaxSize()
                             )
-                            5 -> Step5Review(
+                            OnboardingStep.REVIEW -> Step5Review(
                                 fullName = uiState.fullName,
                                 gender = uiState.gender,
                                 email = uiState.email,
@@ -245,15 +233,11 @@ fun OnboardingScreen(
                                 aadhaarFrontUploaded = uiState.aadhaarFrontUploaded,
                                 aadhaarBackUploaded = uiState.aadhaarBackUploaded,
                                 isSubmitted = uiState.isSubmitted,
-                                onEditBasicInfo = { onboardingViewModel.navigateToStep(1) },
-                                onEditServices = { onboardingViewModel.navigateToStep(2) },
-                                onEditLocation = { onboardingViewModel.navigateToStep(3) },
-                                onEditDocuments = { onboardingViewModel.navigateToStep(4) },
-                                onSubmit = {
-                                    onboardingViewModel.submitOnboarding()
-                                    // TODO: Update AuthState after successful submission
-                                    // oldAuthViewModel.completeOnboarding(currentUid)
-                                },
+                                onEditBasicInfo = { onNavigateToStep(1) },
+                                onEditServices = { onNavigateToStep(2) },
+                                onEditLocation = { onNavigateToStep(3) },
+                                onEditDocuments = { onNavigateToStep(4) },
+                                onSubmit = onSubmit,
                                 isLoading = uiState.isLoading,
                                 errorMessage = uiState.errorMessage,
                                 modifier = Modifier.fillMaxSize()

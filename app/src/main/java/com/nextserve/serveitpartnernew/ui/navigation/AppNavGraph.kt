@@ -34,14 +34,24 @@ sealed class Screen(val route: String) {
 
 fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel) {
     composable(Screen.Splash.route) {
-        SplashScreen()
-        // Auto-navigate to mobile number screen after splash
-        androidx.compose.runtime.LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(1500) // Minimum splash time
-            navController.navigate(Screen.MobileNumber.route) {
-                popUpTo(Screen.Splash.route) { inclusive = true }
+        SplashScreen(
+            authState = authViewModel.authState.value,
+            onNavigateToMobileNumber = {
+                navController.navigate(Screen.MobileNumber.route) {
+                    popUpTo(Screen.Splash.route) { inclusive = true }
+                }
+            },
+            onNavigateToLanguageSelection = {
+                navController.navigate(Screen.LanguageSelection.route) {
+                    popUpTo(Screen.Splash.route) { inclusive = true }
+                }
+            },
+            onNavigateToOnboarding = {
+                navController.navigate(Screen.Onboarding.route) {
+                    popUpTo(Screen.Splash.route) { inclusive = true }
+                }
             }
-        }
+        )
     }
     
     composable(Screen.Welcome.route) {
@@ -88,8 +98,37 @@ fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com
     }
 
     composable(Screen.Onboarding.route) {
+        val onboardingViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
         OnboardingScreen(
-            authViewModel = authViewModel
+            uiState = onboardingViewModel.uiState,
+            onUpdateFullName = onboardingViewModel::updateFullName,
+            onUpdateGender = onboardingViewModel::updateGender,
+            onUpdatePrimaryService = onboardingViewModel::updatePrimaryService,
+            onUpdateEmail = onboardingViewModel::updateEmail,
+            onUpdateLanguage = onboardingViewModel::updateLanguage,
+            onUpdateSelectedMainService = onboardingViewModel::updateSelectedMainService,
+            onToggleSubService = onboardingViewModel::toggleSubService,
+            onToggleSelectAll = onboardingViewModel::toggleSelectAll,
+            onUpdateOtherService = onboardingViewModel::updateOtherService,
+            onLoadSubServices = onboardingViewModel::loadSubServices,
+            onUpdateState = onboardingViewModel::updateState,
+            onUpdateCity = onboardingViewModel::updateCity,
+            onUpdateAddress = onboardingViewModel::updateAddress,
+            onUpdateFullAddress = onboardingViewModel::updateFullAddress,
+            onUpdateLocationPincode = onboardingViewModel::updateLocationPincode,
+            onUpdateServiceRadius = onboardingViewModel::updateServiceRadius,
+            onUseCurrentLocation = { _, _ -> /* TODO: Implement location */ },
+            onUploadAadhaarFront = onboardingViewModel::uploadAadhaarFront,
+            onUploadAadhaarBack = onboardingViewModel::uploadAadhaarBack,
+            onUploadProfilePhoto = onboardingViewModel::uploadProfilePhoto,
+            onDeleteAadhaarFront = onboardingViewModel::deleteAadhaarFront,
+            onDeleteAadhaarBack = onboardingViewModel::deleteAadhaarBack,
+            onDeleteProfilePhoto = onboardingViewModel::deleteProfilePhoto,
+            onNextStep = onboardingViewModel::nextStep,
+            onPreviousStep = onboardingViewModel::previousStep,
+            onNavigateToStep = onboardingViewModel::navigateToStep,
+            onSubmit = onboardingViewModel::submitOnboarding,
+            onReset = onboardingViewModel::resetOnboarding
         )
     }
 
