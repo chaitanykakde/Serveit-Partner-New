@@ -35,6 +35,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -162,6 +164,7 @@ private fun FlatOptionRow(
 @Composable
 fun ProfileScreen(
     navController: NavController,
+    authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel,
     parentPaddingValues: PaddingValues = PaddingValues(),
     modifier: Modifier = Modifier
 ) {
@@ -178,12 +181,25 @@ fun ProfileScreen(
     )
     var uploadProgress by remember { mutableStateOf(0.0) }
 
+    // Helper function to convert URI to ByteArray immediately
+    fun uriToByteArray(uri: Uri): ByteArray? {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                inputStream.readBytes()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let {
-            editViewModel.uploadProfilePhoto(it) { progress ->
-                uploadProgress = progress
+        uri?.let { selectedUri ->
+            uriToByteArray(selectedUri)?.let { bytes ->
+                editViewModel.uploadProfilePhoto(bytes) { progress ->
+                    uploadProgress = progress
+                }
             }
         }
     }
@@ -197,6 +213,7 @@ fun ProfileScreen(
 
     val providerData = uiState.providerData
     val scrollState = rememberScrollState()
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -210,7 +227,10 @@ fun ProfileScreen(
                 },
                 actions = {
                     TextButton(
-                        onClick = { FirebaseProvider.auth.signOut() }
+                        onClick = {
+                            android.util.Log.d("ProfileScreen", "🚪 Logout button clicked")
+                            showLogoutDialog = true
+                        }
                     ) {
                         Text(
                             text = "Logout",
@@ -442,5 +462,41 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(16.dp + parentBottomPadding))
         }
+    }
+
+    // Logout confirmation dialog
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = {
+                Text(
+                    text = "Logout",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to logout?",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutDialog = false
+                        android.util.Log.d("ProfileScreen", "🚪 Logout confirmed")
+                        authViewModel.signOut()
+                    }
+                ) {
+                    Text("Logout")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

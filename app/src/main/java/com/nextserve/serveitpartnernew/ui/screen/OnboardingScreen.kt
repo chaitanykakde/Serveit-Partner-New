@@ -1,6 +1,5 @@
 package com.nextserve.serveitpartnernew.ui.screen
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,21 +10,16 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.domain.onboarding.OnboardingStep
-import com.nextserve.serveitpartnernew.ui.components.BottomStickyButtonContainer
-import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
-import com.nextserve.serveitpartnernew.ui.components.StepperHeader
+import com.nextserve.serveitpartnernew.ui.components.OnboardingStepIndicator
 import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step1BasicInfo
 import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step2ServiceSelection
 import com.nextserve.serveitpartnernew.ui.screen.onboarding.Step3Location
@@ -59,9 +53,9 @@ fun OnboardingScreen(
     onUpdateLocationPincode: (String) -> Unit,
     onUpdateServiceRadius: (Float) -> Unit,
     onUseCurrentLocation: () -> Unit,
-    onUploadAadhaarFront: (android.net.Uri) -> Unit,
-    onUploadAadhaarBack: (android.net.Uri) -> Unit,
-    onUploadProfilePhoto: (android.net.Uri) -> Unit,
+    onUploadAadhaarFront: (ByteArray) -> Unit,
+    onUploadAadhaarBack: (ByteArray) -> Unit,
+    onUploadProfilePhoto: (ByteArray) -> Unit,
     onDeleteAadhaarFront: () -> Unit,
     onDeleteAadhaarBack: () -> Unit,
     onDeleteProfilePhoto: () -> Unit,
@@ -69,73 +63,69 @@ fun OnboardingScreen(
     onPreviousStep: () -> Unit,
     onNavigateToStep: (Int) -> Unit,
     onSubmit: () -> Unit,
-    onReset: () -> Unit
+    onReset: () -> Unit,
+    onEditRejectedProfile: () -> Unit,
+    onContactSupport: (() -> Unit)? = null,
+    onLogout: (() -> Unit)? = null
 ) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val isTablet = screenWidth >= 600.dp
     val (hasLocationPermission, requestLocationPermission) = rememberLocationPermissionState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
-    BottomStickyButtonContainer(
-        button = {
-            // Steps 2, 3, 4, and 5 have their own buttons
-            if (uiState.currentStep.stepNumber != 2 &&
-                uiState.currentStep.stepNumber != 3 &&
-                uiState.currentStep.stepNumber != 4 &&
-                uiState.currentStep.stepNumber != 5) {
-                PrimaryButton(
-                    text = stringResource(R.string.continue_button),
-                    onClick = onNextStep,
-                    enabled = !uiState.isLoading
-                )
+    // Helper function to convert URI to ByteArray immediately
+    fun uriToByteArray(uri: android.net.Uri): ByteArray? {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                inputStream.readBytes()
             }
-        },
-        content = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .systemBarsPadding()
-            ) {
-                // Background Image - Same as Login Screen
-                Image(
-                    painter = painterResource(id = R.drawable.serveit_partner_flow_bg),
-                    contentDescription = "Background",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                
-                // Light gradient overlay for readability
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // Wrapper functions that convert URI to ByteArray before calling viewModel
+    val uploadAadhaarFrontWrapper: (android.net.Uri) -> Unit = { uri ->
+        uriToByteArray(uri)?.let { bytes ->
+            onUploadAadhaarFront(bytes)
+        }
+    }
+
+    val uploadAadhaarBackWrapper: (android.net.Uri) -> Unit = { uri ->
+        uriToByteArray(uri)?.let { bytes ->
+            onUploadAadhaarBack(bytes)
+        }
+    }
+
+    val uploadProfilePhotoWrapper: (android.net.Uri) -> Unit = { uri ->
+        uriToByteArray(uri)?.let { bytes ->
+            onUploadProfilePhoto(bytes)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .systemBarsPadding()
+    ) {
+                // Step Content - Use a Box that fills available space without weight constraints
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xFFE3F2FD).copy(alpha = 0.3f),
-                                    Color(0xFFFFFFFF).copy(alpha = 0.4f)
-                                )
-                            )
-                        )
-                )
-                
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .widthIn(max = if (isTablet) 600.dp else screenWidth)
                         .align(Alignment.TopCenter)
                 ) {
-                    // Stepper Header
-                    StepperHeader(
-                        currentStep = uiState.currentStep.stepNumber,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        // Stepper Header - Use minimalist progress bar for all steps
+                        OnboardingStepIndicator(
+                            currentStep = uiState.currentStep.stepNumber,
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
-                    // Step Content
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f)
-                    ) {
+                        // Step Content - No weight constraints, let content size itself
                         when (uiState.currentStep) {
                             OnboardingStep.BASIC_INFO -> Step1BasicInfo(
                                 fullName = uiState.fullName,
@@ -151,7 +141,8 @@ fun OnboardingScreen(
                                 language = uiState.language,
                                 onLanguageChange = onUpdateLanguage,
                                 errorMessage = uiState.errorMessage,
-                                modifier = Modifier.fillMaxSize()
+                                onContinue = onNextStep,
+                                modifier = Modifier.fillMaxWidth()
                             )
                             OnboardingStep.SERVICE_SELECTION -> {
                                 // Load sub-services when entering Step 2 if not already loaded
@@ -175,7 +166,7 @@ fun OnboardingScreen(
                                     onPrevious = onPreviousStep,
                                     onNext = onNextStep,
                                     errorMessage = uiState.errorMessage,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                             OnboardingStep.LOCATION -> Step3Location(
@@ -202,7 +193,7 @@ fun OnboardingScreen(
                                 },
                                 onPrevious = onPreviousStep,
                                 onNext = onNextStep,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxWidth()
                             )
                             OnboardingStep.VERIFICATION -> Step4Verification(
                                 aadhaarFrontUploaded = uiState.aadhaarFrontUploaded,
@@ -213,16 +204,17 @@ fun OnboardingScreen(
                                 profilePhotoUrl = uiState.profilePhotoUrl,
                                 isUploading = uiState.isUploading,
                                 uploadProgress = uiState.uploadProgress,
+                                uploadingDocumentType = uiState.uploadingDocumentType,
                                 errorMessage = uiState.errorMessage,
-                                onAadhaarFrontUpload = onUploadAadhaarFront,
-                                onAadhaarBackUpload = onUploadAadhaarBack,
-                                onProfilePhotoUpload = onUploadProfilePhoto,
+                                onAadhaarFrontUpload = uploadAadhaarFrontWrapper,
+                                onAadhaarBackUpload = uploadAadhaarBackWrapper,
+                                onProfilePhotoUpload = uploadProfilePhotoWrapper,
                                 onAadhaarFrontDelete = onDeleteAadhaarFront,
                                 onAadhaarBackDelete = onDeleteAadhaarBack,
                                 onProfilePhotoDelete = onDeleteProfilePhoto,
                                 onPrevious = onPreviousStep,
                                 onNext = onNextStep,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxWidth()
                             )
                             OnboardingStep.REVIEW -> Step5Review(
                                 fullName = uiState.fullName,
@@ -240,21 +232,26 @@ fun OnboardingScreen(
                                 serviceRadius = uiState.serviceRadius,
                                 aadhaarFrontUploaded = uiState.aadhaarFrontUploaded,
                                 aadhaarBackUploaded = uiState.aadhaarBackUploaded,
+                                profilePhotoUploaded = uiState.profilePhotoUploaded,
                                 isSubmitted = uiState.isSubmitted,
+                                verificationStatus = uiState.verificationStatus,
+                                rejectionReason = uiState.rejectionReason,
+                                submittedAt = uiState.submittedAt,
                                 onEditBasicInfo = { onNavigateToStep(1) },
                                 onEditServices = { onNavigateToStep(2) },
                                 onEditLocation = { onNavigateToStep(3) },
                                 onEditDocuments = { onNavigateToStep(4) },
                                 onSubmit = onSubmit,
+                                onEditRejectedProfile = onEditRejectedProfile,
+                                onContactSupport = onContactSupport,
+                                onLogout = onLogout,
                                 isLoading = uiState.isLoading,
                                 errorMessage = uiState.errorMessage,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
-                    }
-                }
-            }
-        }
-    )
+                    } // Close Column
+                } // Close Box
+    }
 }
 

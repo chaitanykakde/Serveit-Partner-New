@@ -1,5 +1,6 @@
 package com.nextserve.serveitpartnernew.ui.screen
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -22,40 +24,55 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nextserve.serveitpartnernew.R
 import com.nextserve.serveitpartnernew.ui.util.Dimens
-import com.nextserve.serveitpartnernew.ui.viewmodel.AuthState
-import com.nextserve.serveitpartnernew.utils.LanguageManager
+import com.nextserve.serveitpartnernew.ui.viewmodel.AppStartDestination
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
-    authState: AuthState,
+    authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel,
     onNavigateToMobileNumber: () -> Unit,
     onNavigateToLanguageSelection: () -> Unit,
-    onNavigateToOnboarding: () -> Unit
+    onNavigateToOnboarding: () -> Unit,
+    onNavigateToWaiting: () -> Unit,
+    onNavigateToRejection: (String) -> Unit,
+    onNavigateToHome: () -> Unit
 ) {
-    val context = LocalContext.current
+    // Observe the single source of truth for navigation destination
+    val destination by authViewModel.startDestination.collectAsStateWithLifecycle()
+    val authState by authViewModel.authState.collectAsStateWithLifecycle()
+    val currentUserId = authViewModel.getCurrentUserId()
 
-    // Handle navigation based on auth state after minimum splash time
-    LaunchedEffect(authState) {
+    // Handle navigation based on destination after minimum splash time
+    LaunchedEffect(destination) {
+        Log.d("SplashScreen", "🚀 SplashScreen LaunchedEffect triggered with destination: $destination")
+
         delay(1500) // Minimum splash time
 
-        when (authState) {
-            is AuthState.Authenticated -> {
-                // User is already authenticated, check if language is selected
-                val savedLanguage = LanguageManager.getSavedLanguage(context)
-                if (savedLanguage.isNotEmpty() && savedLanguage != "en") {
-                    // Language already selected, go directly to onboarding
-                    onNavigateToOnboarding()
-                } else {
-                    // No language selected, go to language selection
-                    onNavigateToLanguageSelection()
-                }
+        Log.d("SplashScreen", "⏰ Splash delay complete, processing navigation for destination: $destination")
+
+        when (destination) {
+            AppStartDestination.Splash -> {
+                // Stay on splash - waiting for state resolution
+                Log.d("SplashScreen", "⏳ Waiting for state resolution...")
             }
-            else -> {
-                // User not authenticated, start login flow
+            AppStartDestination.MobileNumber -> {
+                Log.d("SplashScreen", "📱 Navigating to mobile number (login)")
                 onNavigateToMobileNumber()
+            }
+            AppStartDestination.LanguageSelection -> {
+                Log.d("SplashScreen", "🌐 Navigating to language selection")
+                onNavigateToLanguageSelection()
+            }
+            AppStartDestination.Onboarding -> {
+                Log.d("SplashScreen", "📝 Navigating to onboarding (or step 5 for pending verification)")
+                onNavigateToOnboarding()
+            }
+            AppStartDestination.Home -> {
+                Log.d("SplashScreen", "🏠 Navigating to home")
+                onNavigateToHome()
             }
         }
     }

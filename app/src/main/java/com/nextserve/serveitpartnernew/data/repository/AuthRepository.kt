@@ -1,11 +1,16 @@
 package com.nextserve.serveitpartnernew.data.repository
 
 import android.app.Activity
+import android.util.Log
 import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.messaging.FirebaseMessaging
+import com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider
 import com.nextserve.serveitpartnernew.utils.ErrorMapper
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit
@@ -16,7 +21,8 @@ import java.util.concurrent.TimeUnit
  * Production-grade for 1M+ users.
  */
 class AuthRepository(
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val firestore: FirebaseFirestore = FirebaseProvider.firestore
 ) {
 
     /**
@@ -207,6 +213,49 @@ class AuthRepository(
     private fun formatPhoneNumber(phoneNumber: String): String {
         val cleaned = phoneNumber.replace(Regex("[^0-9]"), "")
         return if (cleaned.startsWith("91")) "+$cleaned" else "+91$cleaned"
+    }
+
+    /**
+     * Save FCM token to Firestore.
+     * 
+     * CRITICAL: Uses exact structure required by Cloud Functions:
+     * - Collection: partners
+     * - Document: {partnerId}
+     * - Field: fcmToken (root-level string)
+     * 
+     * Uses SetOptions.merge() to avoid overwriting other document fields.
+     * Idempotent - safe to call multiple times.
+     * 
+     * @param partnerId The partner/user ID (Firebase Auth UID)
+     * @return Result<Unit> Success if token saved, failure otherwise
+     */
+    suspend fun saveFcmToken(partnerId: String): Result<Unit> {
+        return try {
+            // Fetch FCM token
+            val token = FirebaseMessaging.getInstance().token.await()
+            
+            if (token.isNullOrBlank()) {
+                Log.w("AuthRepository", "FCM token is null or blank, cannot save")
+                return Result.failure(Exception("FCM token is null or blank"))
+            }
+
+            // Write to Firestore using exact structure Cloud Functions expect
+            // partners/{partnerId}.fcmToken = token
+            firestore
+                .collection("partners")
+                .document(partnerId)
+                .set(
+                    mapOf("fcmToken" to token),
+                    SetOptions.merge()
+                )
+                .await()
+
+            Log.d("AuthRepository", "✅ FCM token saved successfully to partners/$partnerId.fcmToken")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("AuthRepository", "❌ Failed to save FCM token to Firestore", e)
+            Result.failure(e)
+        }
     }
 }
 

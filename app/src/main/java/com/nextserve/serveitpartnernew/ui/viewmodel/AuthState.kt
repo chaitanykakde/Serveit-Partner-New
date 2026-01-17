@@ -17,8 +17,13 @@ package com.nextserve.serveitpartnernew.ui.viewmodel
  */
 sealed class AuthState {
 
-    // Phase 1: Initial idle state
+    // Phase 0: Initial state
     object Idle : AuthState()
+
+    // Phase 1: Firebase authentication check
+    object Authenticating : AuthState()
+    object LoggedOut : AuthState()
+    object Authenticated : AuthState()  // Firebase auth success (NOT terminal state)
 
     // Phase 2: Phone validation (no navigation)
     object PhoneValidating : AuthState()
@@ -45,8 +50,11 @@ sealed class AuthState {
         val canRetry: Boolean = true
     ) : AuthState()
 
-    // Phase 6: SUCCESS - ONLY PHASE THAT TRIGGERS NAVIGATION AWAY
-    object Authenticated : AuthState()
+    // Phase 6: Provider verification states (AFTER authentication)
+    object ProviderOnboarding : AuthState()      // Needs to complete onboarding
+    object ProviderPending : AuthState()         // Submitted, waiting for approval
+    data class ProviderRejected(val reason: String?) : AuthState()  // Rejected by admin
+    object ProviderApproved : AuthState()        // Approved, can use app
 
     // General error state (fallback)
     data class Error(val message: String) : AuthState()

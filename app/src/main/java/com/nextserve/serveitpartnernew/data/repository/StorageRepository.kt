@@ -16,7 +16,7 @@ class StorageRepository(
     suspend fun uploadAadhaarDocument(
         uid: String,
         documentType: String, // "front" or "back"
-        imageUri: Uri,
+        imageBytes: ByteArray,
         onProgress: (Double) -> Unit
     ): Result<String> {
         return try {
@@ -25,8 +25,8 @@ class StorageRepository(
                 return Result.failure(Exception("User not authenticated. Please login again."))
             }
 
-            val compressedBitmap = compressImage(imageUri)
-            val byteArray = bitmapToByteArray(compressedBitmap)
+            // Compress the image bytes
+            val compressedByteArray = compressImageBytes(imageBytes)
 
             val path = "providers/$uid/documents/aadhaar_$documentType.jpg"
             val storageRef = storage.reference.child(path)
@@ -36,7 +36,7 @@ class StorageRepository(
                 .setContentType("image/jpeg")
                 .build()
 
-            val uploadTask = storageRef.putBytes(byteArray, metadata)
+            val uploadTask = storageRef.putBytes(compressedByteArray, metadata)
 
             // Monitor progress
             uploadTask.addOnProgressListener { taskSnapshot ->
@@ -87,7 +87,7 @@ class StorageRepository(
             }
 
             val compressedBitmap = compressImageFromFile(imageFile)
-            val byteArray = bitmapToByteArray(compressedBitmap)
+            val compressedByteArray = bitmapToByteArray(compressedBitmap)
 
             val path = "providers/$uid/documents/aadhaar_$documentType.jpg"
             val storageRef = storage.reference.child(path)
@@ -97,7 +97,7 @@ class StorageRepository(
                 .setContentType("image/jpeg")
                 .build()
 
-            val uploadTask = storageRef.putBytes(byteArray, metadata)
+            val uploadTask = storageRef.putBytes(compressedByteArray, metadata)
 
             // Monitor progress
             uploadTask.addOnProgressListener { taskSnapshot ->
@@ -162,7 +162,7 @@ class StorageRepository(
         val maxDimension = 1920
         val width = originalBitmap.width
         val height = originalBitmap.height
-        
+
         val scaledBitmap = if (width > maxDimension || height > maxDimension) {
             val scale = minOf(
                 maxDimension.toFloat() / width,
@@ -179,7 +179,7 @@ class StorageRepository(
         var quality = 85
         var outputStream = ByteArrayOutputStream()
         scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-        
+
         while (outputStream.toByteArray().size > 1024 * 1024 && quality > 20) {
             quality -= 10
             outputStream = ByteArrayOutputStream()
@@ -187,6 +187,53 @@ class StorageRepository(
         }
 
         return scaledBitmap
+    }
+
+    private suspend fun compressImageBytes(imageBytes: ByteArray): ByteArray {
+        // Decode bytes to bitmap with memory optimization
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+
+        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options)
+
+        // Calculate optimal sample size for memory efficiency
+        options.inSampleSize = calculateInSampleSize(options, 1920, 1920)
+        options.inJustDecodeBounds = false
+        options.inPreferredConfig = Bitmap.Config.RGB_565 // Use less memory than ARGB_8888
+
+        val originalBitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options)
+            ?: throw Exception("Cannot decode image")
+
+        // Resize if too large (max 1920x1920)
+        val maxDimension = 1920
+        val width = originalBitmap.width
+        val height = originalBitmap.height
+
+        val scaledBitmap = if (width > maxDimension || height > maxDimension) {
+            val scale = minOf(
+                maxDimension.toFloat() / width,
+                maxDimension.toFloat() / height
+            )
+            val newWidth = (width * scale).toInt()
+            val newHeight = (height * scale).toInt()
+            Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+        } else {
+            originalBitmap
+        }
+
+        // Compress to max 1MB
+        var quality = 85
+        var outputStream = ByteArrayOutputStream()
+        scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+
+        while (outputStream.toByteArray().size > 1024 * 1024 && quality > 20) {
+            quality -= 10
+            outputStream = ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+        }
+
+        return outputStream.toByteArray()
     }
 
     private suspend fun compressImageFromFile(file: java.io.File): Bitmap {
@@ -295,16 +342,15 @@ class StorageRepository(
 
     suspend fun uploadProfilePhoto(
         uid: String,
-        imageUri: Uri,
+        imageBytes: ByteArray,
         onProgress: (Double) -> Unit
     ): Result<String> {
         return try {
             if (uid.isEmpty()) {
                 return Result.failure(Exception("User not authenticated. Please login again."))
             }
-            
-            val compressedBitmap = compressImage(imageUri)
-            val byteArray = bitmapToByteArray(compressedBitmap)
+
+            val compressedByteArray = compressImageBytes(imageBytes)
             
             val path = "providers/$uid/documents/profile_photo.jpg"
             val storageRef = storage.reference.child(path)
@@ -313,7 +359,7 @@ class StorageRepository(
                 .setContentType("image/jpeg")
                 .build()
             
-            val uploadTask = storageRef.putBytes(byteArray, metadata)
+            val uploadTask = storageRef.putBytes(compressedByteArray, metadata)
             
             uploadTask.addOnProgressListener { taskSnapshot ->
                 val progress = (100.0 * taskSnapshot.bytesTransferred) / taskSnapshot.totalByteCount
@@ -353,7 +399,7 @@ class StorageRepository(
             }
 
             val compressedBitmap = compressImageFromFile(imageFile)
-            val byteArray = bitmapToByteArray(compressedBitmap)
+            val compressedByteArray = bitmapToByteArray(compressedBitmap)
 
             val path = "providers/$uid/documents/profile_photo.jpg"
             val storageRef = storage.reference.child(path)
@@ -362,7 +408,7 @@ class StorageRepository(
                 .setContentType("image/jpeg")
                 .build()
 
-            val uploadTask = storageRef.putBytes(byteArray, metadata)
+            val uploadTask = storageRef.putBytes(compressedByteArray, metadata)
 
             uploadTask.addOnProgressListener { taskSnapshot ->
                 val progress = (100.0 * taskSnapshot.bytesTransferred) / taskSnapshot.totalByteCount

@@ -1,6 +1,5 @@
 package com.nextserve.serveitpartnernew.ui.screen.onboarding
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,14 +14,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
@@ -30,18 +24,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nextserve.serveitpartnernew.R
-import com.nextserve.serveitpartnernew.data.model.MainService
-import com.nextserve.serveitpartnernew.ui.components.BottomStickyButtonContainer
-import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
-import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
-import com.nextserve.serveitpartnernew.ui.components.SecondaryButton
-import com.nextserve.serveitpartnernew.ui.theme.CardShape
-import com.nextserve.serveitpartnernew.ui.util.Dimens
+import com.nextserve.serveitpartnernew.ui.components.ServiceSelector
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileMinimalTextField
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileSaveButton
 
 @Composable
 fun Step2ServiceSelection(
@@ -60,153 +51,160 @@ fun Step2ServiceSelection(
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val configuration = LocalConfiguration.current
-    val isTablet = configuration.screenWidthDp >= 600
-    val columns = if (isTablet) 3 else 2
+    val scrollState = rememberScrollState()
 
-    BottomStickyButtonContainer(
-        button = {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState)
+            .padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Title
+        Text(
+            text = stringResource(R.string.select_services_you_provide),
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = colorScheme.onSurface,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+
+        // Subtitle
+        Text(
+            text = stringResource(R.string.based_on_service, primaryServiceName),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Normal,
+            color = colorScheme.onSurfaceVariant
+        )
+
+        // Primary Service Selector
+        ServiceSelector(
+            selectedService = primaryServiceName,
+            services = listOf(primaryServiceName), // Display current selection
+            onServiceSelected = { /* Read-only in this step */ },
+            label = stringResource(R.string.primary_service),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Select All / Deselect All
+        if (availableSubServices.isNotEmpty()) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
             ) {
-                SecondaryButton(
-                    text = stringResource(R.string.previous),
-                    onClick = onPrevious,
-                    modifier = Modifier.weight(1f)
+                Checkbox(
+                    checked = isSelectAllChecked,
+                    onCheckedChange = { onSelectAllToggle() },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = colorScheme.primary
+                    )
                 )
-                PrimaryButton(
-                    text = stringResource(R.string.next),
-                    onClick = onNext,
-                    enabled = if (primaryServiceName == "Other Services") {
-                        otherService.isNotEmpty()
-                    } else {
-                        selectedSubServices.isNotEmpty()
-                    },
-                    modifier = Modifier.weight(1f)
+                Spacer(modifier = Modifier.size(12.dp))
+                Text(
+                    text = if (isSelectAllChecked) stringResource(R.string.deselect_all) else stringResource(R.string.select_all),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = colorScheme.onSurface,
+                    modifier = Modifier.clickable(onClick = onSelectAllToggle)
                 )
             }
-        },
-        content = {
-            Column(
+        }
+
+        // Sub-services Grid
+        if (isLoadingSubServices) {
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = Dimens.paddingLg)
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Spacer(modifier = Modifier.height(Dimens.spacingMd))
-                
-                // Title - Large and Bold
                 Text(
-                    text = stringResource(R.string.select_services_you_provide),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = Dimens.spacingXs)
+                    text = stringResource(R.string.loading_sub_services),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colorScheme.onSurfaceVariant
                 )
+            }
+        } else if (availableSubServices.isNotEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Group services into rows of 2
+                val serviceRows = availableSubServices.chunked(2)
 
-                // Subtitle
-                Text(
-                    text = stringResource(R.string.based_on_service, primaryServiceName),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Normal,
-                    color = colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = Dimens.spacingLg)
-                )
-
-                // Select All / Deselect All
-                if (availableSubServices.isNotEmpty()) {
+                serviceRows.forEach { rowServices ->
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = Dimens.spacingMd),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Start
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Checkbox(
-                            checked = isSelectAllChecked,
-                            onCheckedChange = { onSelectAllToggle() },
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = colorScheme.primary
-                            )
-                        )
-                        Spacer(modifier = Modifier.size(Dimens.spacingSm))
-                        Text(
-                            text = if (isSelectAllChecked) stringResource(R.string.deselect_all) else stringResource(R.string.select_all),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = colorScheme.onSurface,
-                            modifier = Modifier.clickable(onClick = onSelectAllToggle)
-                        )
-                    }
-                }
-
-                // Sub-services Grid - Scrollable
-                if (isLoadingSubServices) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.loading_sub_services),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else if (availableSubServices.isNotEmpty()) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        horizontalArrangement = Arrangement.spacedBy(Dimens.spacingMd),
-                        verticalArrangement = Arrangement.spacedBy(Dimens.spacingMd),
-                        contentPadding = PaddingValues(
-                            bottom = Dimens.spacingXl
-                        ),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f)
-                    ) {
-                        items(availableSubServices) { subServiceName ->
+                        rowServices.forEach { subServiceName ->
                             SubServiceCard(
                                 subService = subServiceName,
                                 isSelected = selectedSubServices.contains(subServiceName),
-                                onToggle = { onSubServiceToggle(subServiceName) }
+                                onToggle = { onSubServiceToggle(subServiceName) },
+                                modifier = Modifier.weight(1f)
                             )
                         }
+
+                        // Fill remaining space if odd number of items
+                        repeat(2 - rowServices.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
-                } else if (primaryServiceName == "Other Services") {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f)
-                    ) {
-                        OutlinedInputField(
-                            value = otherService,
-                            onValueChange = onOtherServiceChange,
-                            label = stringResource(R.string.specify_other_service),
-                            placeholder = stringResource(R.string.enter_service_name),
-                            modifier = Modifier.fillMaxWidth(),
-                            isError = errorMessage != null && otherService.isEmpty(),
-                            errorMessage = if (errorMessage != null && otherService.isEmpty()) errorMessage else null
-                        )
-                    }
-                }
-                
-                // Error message display
-                if (errorMessage != null && primaryServiceName != "Other Services") {
-                    Spacer(modifier = Modifier.height(Dimens.spacingSm))
-                    Text(
-                        text = errorMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Dimens.paddingXs)
-                    )
                 }
             }
+        } else if (primaryServiceName == "Other Services") {
+            // Other Service Input
+            ProfileMinimalTextField(
+                value = otherService,
+                onValueChange = onOtherServiceChange,
+                label = "Specify Other Service",
+                modifier = Modifier.fillMaxWidth()
+            )
         }
-    )
+
+        // Error message display
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage,
+                color = Color(0xFFD32F2F), // Error red - same as Step 1
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Navigation Buttons - Previous & Next side by side
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ProfileSaveButton(
+                text = "Previous",
+                onClick = onPrevious,
+                modifier = Modifier.weight(1f),
+                showTrailingArrow = false
+            )
+            ProfileSaveButton(
+                text = "Next",
+                onClick = onNext,
+                enabled = if (primaryServiceName == "Other Services") {
+                    otherService.isNotEmpty()
+                } else {
+                    selectedSubServices.isNotEmpty()
+                },
+                modifier = Modifier.weight(1f),
+                showTrailingArrow = true
+            )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
 }
 
 @Composable
@@ -240,12 +238,12 @@ private fun SubServiceCard(
                 shape = RoundedCornerShape(16.dp)
             )
             .clickable(onClick = onToggle)
-            .padding(Dimens.spacingMd),
+            .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spacingSm),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(

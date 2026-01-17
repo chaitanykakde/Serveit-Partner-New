@@ -2,6 +2,7 @@ package com.nextserve.serveitpartnernew.data.repository
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import com.nextserve.serveitpartnernew.data.mapper.ProviderFirestoreMapper
 import com.nextserve.serveitpartnernew.data.model.MainService
@@ -30,6 +31,39 @@ class FirestoreRepository(
         }
     }
 
+    /**
+     * Observe provider document changes in real-time.
+     * Returns a ListenerRegistration that should be removed when no longer needed.
+     */
+    fun observeProviderDocument(uid: String, onProviderDataChanged: (ProviderData?) -> Unit): ListenerRegistration {
+        android.util.Log.d("FirestoreRepository", "👂 Setting up Firestore listener for provider document: partners/$uid")
+
+        return partnersCollection.document(uid)
+            .addSnapshotListener { documentSnapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("FirestoreRepository", "❌ Error observing provider document for uid: $uid", error)
+                    return@addSnapshotListener
+                }
+
+                if (documentSnapshot != null && documentSnapshot.exists()) {
+                    android.util.Log.d("FirestoreRepository", "📄 Provider document exists for uid: $uid, parsing data...")
+                    try {
+                        // Use mapper to convert nested Firestore structure to flat app model
+                        val providerData = ProviderFirestoreMapper.fromFirestore(documentSnapshot, uid)
+                        android.util.Log.d("FirestoreRepository", "✅ Successfully parsed provider data: verificationStatus=${providerData?.verificationDetails?.status}, onboardingStatus=${providerData?.onboardingStatus}")
+                        onProviderDataChanged(providerData)
+                    } catch (e: Exception) {
+                        android.util.Log.e("FirestoreRepository", "❌ Error parsing provider data for uid: $uid", e)
+                        onProviderDataChanged(null)
+                    }
+                } else {
+                    // Document doesn't exist
+                    android.util.Log.d("FirestoreRepository", "📄 Provider document does NOT exist for uid: $uid")
+                    onProviderDataChanged(null)
+                }
+            }
+    }
+
     suspend fun createProviderDocument(uid: String, phoneNumber: String): Result<Unit> {
         return try {
             // Ensure phone number has +91 prefix
@@ -49,7 +83,8 @@ class FirestoreRepository(
                 createdAt = Timestamp.now(),
                 lastLoginAt = Timestamp.now(),
                 onboardingStatus = "IN_PROGRESS",
-                currentStep = 1
+                currentStep = 1,
+                verificationDetails = com.nextserve.serveitpartnernew.data.model.VerificationDetails.pending()
             )
 
             // Transform flat model to nested Firestore structure using mapper
@@ -173,10 +208,17 @@ class FirestoreRepository(
 
     suspend fun submitForVerification(uid: String): Result<Unit> {
         return try {
-            // Transform approvalStatus string to nested verificationDetails booleans
+            // Create verificationDetails with status="pending" (MANDATORY)
+            val verificationDetailsMap = mapOf(
+                "status" to "pending",
+                "rejectedReason" to null,
+                "verifiedBy" to null,
+                "verifiedAt" to null
+            )
+            
             val updateMap = mapOf(
                 "onboardingStatus" to "SUBMITTED",
-                "approvalStatus" to "PENDING", // Will be converted to booleans by mapper
+                "verificationDetails" to verificationDetailsMap,
                 "submittedAt" to Timestamp.now(),
                 "updatedAt" to Timestamp.now()
             )

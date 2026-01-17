@@ -47,12 +47,8 @@ data class ProviderData(
     @get:PropertyName("documentsUploadedAt") @set:PropertyName("documentsUploadedAt")
     var documentsUploadedAt: Timestamp? = null,
 
-    // Admin Review
-    val approvalStatus: String = "PENDING", // PENDING, APPROVED, REJECTED
-    val rejectionReason: String? = null,
-    @get:PropertyName("reviewedAt") @set:PropertyName("reviewedAt")
-    var reviewedAt: Timestamp? = null,
-    val reviewedBy: String? = null,
+    // Verification Details (SINGLE SOURCE OF TRUTH)
+    val verificationDetails: VerificationDetails = VerificationDetails.pending(),
     
     // FCM Token
     val fcmToken: String = "",
@@ -63,8 +59,24 @@ data class ProviderData(
     // Profile Photo
     val profilePhotoUrl: String = "",
     
-    // Cloud Functions Required Fields
-    val isVerified: Boolean = false, // Required by Cloud Functions at root level
+    // Cloud Functions Required Fields (for backward compatibility)
     val isOnline: Boolean = false // Required by Cloud Functions at root level
-)
+    
+    // DEPRECATED: approvalStatus, rejectionReason, reviewedAt, reviewedBy, isVerified
+    // Use verificationDetails.status instead
+) {
+    // Helper properties for backward compatibility
+    val approvalStatus: String
+        get() = when (verificationDetails.status) {
+            "verified" -> "APPROVED"
+            "rejected" -> "REJECTED"
+            else -> "PENDING"
+        }
+    
+    val rejectionReason: String?
+        get() = verificationDetails.rejectedReason
+    
+    val isVerified: Boolean
+        get() = verificationDetails.status == "verified"
+}
 

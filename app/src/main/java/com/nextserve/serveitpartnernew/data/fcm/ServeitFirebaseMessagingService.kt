@@ -15,9 +15,15 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.nextserve.serveitpartnernew.MainActivity
 import com.nextserve.serveitpartnernew.R
+import com.nextserve.serveitpartnernew.data.repository.AuthRepository
 import com.nextserve.serveitpartnernew.ui.screen.call.IncomingCallActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class ServeitFirebaseMessagingService : FirebaseMessagingService() {
+    
+    private val authRepository = AuthRepository()
     
     override fun onCreate() {
         super.onCreate()
@@ -47,10 +53,30 @@ class ServeitFirebaseMessagingService : FirebaseMessagingService() {
     
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        // Token will be saved when user logs in or opens app
+        android.util.Log.d("ServeitFirebaseMessagingService", "🔄 New FCM token received")
+        
+        // Get current logged-in user ID
         val uid = com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.auth.currentUser?.uid
+        
         if (uid != null) {
-            FcmTokenManager.refreshToken(uid)
+            // User is logged in - save token to Firestore using exact Cloud Functions structure
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val result = authRepository.saveFcmToken(uid)
+                    result.onSuccess {
+                        android.util.Log.d("ServeitFirebaseMessagingService", "✅ FCM token updated successfully in Firestore")
+                    }.onFailure { exception ->
+                        android.util.Log.w("ServeitFirebaseMessagingService", "⚠️ Failed to update FCM token in Firestore: ${exception.message}")
+                        // Non-critical error - token will be saved on next login
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("ServeitFirebaseMessagingService", "❌ Exception updating FCM token: ${e.message}", e)
+                    // Non-critical error - token will be saved on next login
+                }
+            }
+        } else {
+            android.util.Log.d("ServeitFirebaseMessagingService", "ℹ️ User not logged in, token will be saved on next login")
+            // User not logged in - token will be saved automatically on next login
         }
     }
     

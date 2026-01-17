@@ -2,11 +2,63 @@
  * Send Verification Notification
  * Firestore onUpdate trigger on partners/{partnerId}
  * 
+ * REFACTORED: Uses verificationDetails.status as primary source of truth
+ * Backward compatible with old boolean fields (isVerified, verificationDetails.verified, verificationDetails.rejected)
+ * 
  * Notification function - medium risk
  */
 
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+
+/**
+ * Extract verification status from document data.
+ * Uses NEW schema (verificationDetails.status) as primary source.
+ * Falls back to OLD schema (boolean fields) for backward compatibility.
+ * 
+ * @param {Object} data - Document data
+ * @returns {string} Status: "verified" | "pending" | "rejected"
+ */
+function extractVerificationStatus(data) {
+  // PRIMARY: Check new schema first (verificationDetails.status)
+  const status = data?.verificationDetails?.status;
+  if (status === "verified" || status === "pending" || status === "rejected") {
+    return status;
+  }
+
+  // FALLBACK: Check old boolean fields
+  const isVerified = data?.isVerified || data?.verificationDetails?.verified || false;
+  const isRejected = data?.verificationDetails?.rejected || false;
+
+  if (isVerified) {
+    return "verified";
+  }
+  if (isRejected) {
+    return "rejected";
+  }
+  return "pending";
+}
+
+/**
+ * Check if verification-related fields changed between before and after states.
+ * 
+ * @param {Object} before - Before document data
+ * @param {Object} after - After document data
+ * @returns {boolean} True if verification fields changed
+ */
+function didVerificationFieldsChange(before, after) {
+  // Check if verificationDetails object changed
+  const beforeVerificationDetails = before?.verificationDetails || {};
+  const afterVerificationDetails = after?.verificationDetails || {};
+  
+  const verificationDetailsChanged = 
+    JSON.stringify(beforeVerificationDetails) !== JSON.stringify(afterVerificationDetails);
+  
+  // Check if isVerified changed
+  const isVerifiedChanged = before?.isVerified !== after?.isVerified;
+  
+  return verificationDetailsChanged || isVerifiedChanged;
+}
 
 function createSendVerificationNotificationFunction(db, messaging) {
   return functions.firestore
@@ -16,57 +68,84 @@ function createSendVerificationNotificationFunction(db, messaging) {
       const after = change.after.data();
       const partnerId = context.params.partnerId;
 
-      console.log(`Function triggered for partner: ${partnerId}`);
-      console.log("Before data:", JSON.stringify(before, null, 2));
-      console.log("After data:", JSON.stringify(after, null, 2));
+      console.log(`[sendVerificationNotification] Function triggered for partner: ${partnerId}`);
 
-      // Check if verification status changed - check both isVerified and verificationDetails.verified
-      const beforeVerified = before.isVerified || before.verificationDetails?.verified || false;
-      const afterVerified = after.isVerified || after.verificationDetails?.verified || false;
+      // PERFORMANCE: Early return if verification fields didn't change
+      if (!didVerificationFieldsChange(before, after)) {
+        console.log(`[sendVerificationNotification] No verification field changes detected, skipping`);
+        return null;
+      }
 
-      // Check if rejection reason changed (indicates rejection)
-      const beforeRejection = before.verificationDetails?.rejectionReason;
-      const afterRejection = after.verificationDetails?.rejectionReason;
+      // Extract status using new schema with fallback
+      const beforeStatus = extractVerificationStatus(before);
+      const afterStatus = extractVerificationStatus(after);
 
-      // Check if rejected status changed
-      const beforeRejected = before.verificationDetails?.rejected || false;
-      const afterRejected = after.verificationDetails?.rejected || false;
+      // Determine which schema was used
+      const beforeUsesNewSchema = before?.verificationDetails?.status !== undefined;
+      const afterUsesNewSchema = after?.verificationDetails?.status !== undefined;
+      const schemaUsed = afterUsesNewSchema ? "NEW" : "OLD (fallback)";
 
-      console.log(`Verification status: ${beforeVerified} -> ${afterVerified}`);
-      console.log(`Rejected status: ${beforeRejected} -> ${afterRejected}`);
-      console.log(`Rejection reason: ${beforeRejection} -> ${afterRejection}`);
+      console.log(`[sendVerificationNotification] Status change: ${beforeStatus} → ${afterStatus} (Schema: ${schemaUsed})`);
+      console.log(`[sendVerificationNotification] Before verificationDetails:`, before?.verificationDetails);
+      console.log(`[sendVerificationNotification] After verificationDetails:`, after?.verificationDetails);
+
+      // Only send notification if status actually changed
+      if (beforeStatus === afterStatus) {
+        console.log(`[sendVerificationNotification] Status unchanged (${afterStatus}), no notification needed`);
+        return null;
+      }
 
       let notificationType = null;
       let title = "";
       let body = "";
 
-      // Determine notification type based on current verification state
-      if (!beforeRejected && afterRejected) {
-        // Application rejected
-        notificationType = "VERIFICATION_REJECTED";
-        title = "❌ Application Rejected";
-        body = `Your application has been rejected. ${afterRejection ? `Reason: ${afterRejection}` : "Please check your documents and resubmit."}`;
-        console.log("Detected application rejection");
-      } else if (!beforeVerified && afterVerified) {
-        // Verification successful
-        notificationType = "VERIFICATION_APPROVED";
-        title = "🎉 Verification Successful!";
-        body = "Congratulations! Your account has been verified successfully. You can now start accepting jobs and providing services.";
-        console.log("Detected verification success");
-      } else if (beforeVerified && !afterVerified && !afterRejected) {
-        // Under review (verified changed from true to false, but not rejected)
-        notificationType = "VERIFICATION_PENDING";
-        title = "⏳ Application Under Review";
-        body = "Your application is currently under review. We will notify you once the verification process is complete.";
-        console.log("Detected application under review");
+      // Determine notification type based on status transition
+      if (beforeStatus !== "verified" && afterStatus === "verified") {
+        // VERIFIED: Status changed to verified
+        notificationType = "VERIFIED";
+        title = "🎉 Profile Verified";
+        body = "Your profile has been verified. You can now start receiving jobs.";
+        
+        // Include verifiedBy and verifiedAt if available
+        const verifiedBy = after?.verificationDetails?.verifiedBy;
+        const verifiedAt = after?.verificationDetails?.verifiedAt;
+        if (verifiedBy) {
+          body += ` Verified by: ${verifiedBy}`;
+        }
+        
+        console.log(`[sendVerificationNotification] Detected VERIFIED transition`);
+      } else if (beforeStatus !== "rejected" && afterStatus === "rejected") {
+        // REJECTED: Status changed to rejected
+        notificationType = "REJECTED";
+        title = "❌ Profile Rejected";
+        
+        const rejectedReason = after?.verificationDetails?.rejectedReason || 
+                              after?.verificationDetails?.rejectionReason; // Support legacy field name
+        
+        if (rejectedReason) {
+          body = `Your profile was rejected. Reason: ${rejectedReason}`;
+        } else {
+          body = "Your profile was rejected. Please review and resubmit.";
+        }
+        
+        console.log(`[sendVerificationNotification] Detected REJECTED transition`);
+      } else if (beforeStatus === "rejected" && afterStatus === "pending") {
+        // PENDING (RESUBMITTED): Status changed from rejected to pending (Edit & Resubmit case)
+        notificationType = "PENDING";
+        title = "⏳ Profile Resubmitted";
+        body = "Your updated profile has been resubmitted for verification.";
+        
+        console.log(`[sendVerificationNotification] Detected RESUBMITTED transition (rejected → pending)`);
       } else {
-        console.log("No significant verification status change detected");
+        // Other transitions (e.g., pending → pending, verified → verified) - no notification
+        console.log(`[sendVerificationNotification] Status transition ${beforeStatus} → ${afterStatus} does not require notification`);
+        return null;
       }
 
-      // Send notification if status changed
+      // Send notification
       if (notificationType) {
         try {
-          console.log(`Attempting to send ${notificationType} notification`);
+          console.log(`[sendVerificationNotification] Attempting to send ${notificationType} notification`);
 
           // Get user's FCM token from partners collection
           const userDoc = await db
@@ -77,13 +156,14 @@ function createSendVerificationNotificationFunction(db, messaging) {
           const userData = userDoc.data();
           const fcmToken = userData?.fcmToken;
 
-          console.log(`FCM Token found: ${fcmToken ? "Yes" : "No"}`);
+          console.log(`[sendVerificationNotification] FCM Token found: ${fcmToken ? "Yes" : "No"}`);
 
           // Store notification in user-specific Firestore path FIRST
           const notificationData = {
             title: title,
             message: body,
             type: notificationType,
+            status: afterStatus, // Include current status
             timestamp: Date.now(),
             isRead: false,
             userId: partnerId,
@@ -101,10 +181,14 @@ function createSendVerificationNotificationFunction(db, messaging) {
               .collection("notifications")
               .add(notificationData);
 
-          console.log(`Notification stored in Firestore for user ${partnerId}`);
+          console.log(`[sendVerificationNotification] Notification stored in Firestore for user ${partnerId}`);
 
           // Send FCM notification if token exists
           if (fcmToken) {
+            // Determine icon and color based on notification type
+            const icon = notificationType === "VERIFIED" ? "ic_check_circle" : "ic_error";
+            const color = notificationType === "VERIFIED" ? "#4CAF50" : "#F44336";
+            
             const message = {
               token: fcmToken,
               notification: {
@@ -118,8 +202,8 @@ function createSendVerificationNotificationFunction(db, messaging) {
               },
               android: {
                 notification: {
-                  icon: notificationType === "verification_approved" ? "ic_check_circle" : "ic_error",
-                  color: notificationType === "verification_approved" ? "#4CAF50" : "#F44336",
+                  icon: icon,
+                  color: color,
                   channelId: "verification_notifications",
                   priority: "high",
                   defaultSound: true,
@@ -129,12 +213,12 @@ function createSendVerificationNotificationFunction(db, messaging) {
             };
 
             const result = await messaging.send(message);
-            console.log(`FCM notification sent successfully to partner ${partnerId}: ${notificationType}`, result);
+            console.log(`[sendVerificationNotification] FCM notification sent successfully to partner ${partnerId}: ${notificationType}`, result);
           } else {
-            console.log(`No FCM token found for partner ${partnerId}, but notification stored in Firestore`);
+            console.log(`[sendVerificationNotification] No FCM token found for partner ${partnerId}, but notification stored in Firestore`);
           }
         } catch (error) {
-          console.error("Error sending/storing notification:", error);
+          console.error(`[sendVerificationNotification] Error sending/storing notification:`, error);
         }
       }
 

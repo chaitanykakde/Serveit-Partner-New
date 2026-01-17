@@ -31,6 +31,8 @@ fun ProfileMinimalTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
     singleLine: Boolean = true
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+    
     Column(modifier = modifier.fillMaxWidth()) {
         // Label ABOVE field (ALL CAPS, small, light gray)
         Text(
@@ -39,7 +41,7 @@ fun ProfileMinimalTextField(
                 fontSize = 11.sp,
                 letterSpacing = 0.5.sp
             ),
-            color = Color(0xFF9E9E9E),
+            color = colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         
@@ -55,13 +57,13 @@ fun ProfileMinimalTextField(
             maxLines = if (singleLine) 1 else Int.MAX_VALUE,
             shape = RoundedCornerShape(18.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color(0xFF1C1C1C),
-                unfocusedTextColor = Color(0xFF1C1C1C),
-                focusedBorderColor = Color(0xFF2196F3), // Primary blue when focused
-                unfocusedBorderColor = Color(0xFFE0E0E0), // Light gray border
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                cursorColor = Color(0xFF2196F3)
+                focusedTextColor = colorScheme.onSurface,
+                unfocusedTextColor = colorScheme.onSurface,
+                focusedBorderColor = colorScheme.primary,
+                unfocusedBorderColor = colorScheme.outline,
+                focusedContainerColor = colorScheme.surface,
+                unfocusedContainerColor = colorScheme.surface,
+                cursorColor = colorScheme.primary
             ),
             textStyle = MaterialTheme.typography.bodyLarge.copy(
                 fontSize = 16.sp,

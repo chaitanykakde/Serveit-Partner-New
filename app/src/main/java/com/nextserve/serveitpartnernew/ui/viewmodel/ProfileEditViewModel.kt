@@ -168,13 +168,13 @@ class ProfileEditViewModel(
         }
     }
 
-    fun uploadProfilePhoto(imageUri: Uri, onProgress: (Double) -> Unit = {}) {
+    fun uploadProfilePhoto(imageBytes: ByteArray, onProgress: (Double) -> Unit = {}) {
         uiState = uiState.copy(isSaving = true, errorMessage = null, successMessage = null)
         viewModelScope.launch {
             try {
                 val photoUrl = storageRepository.uploadProfilePhoto(
                     uid = uid,
-                    imageUri = imageUri,
+                    imageBytes = imageBytes,
                     onProgress = onProgress
                 ).getOrThrow()
 
@@ -196,27 +196,27 @@ class ProfileEditViewModel(
         }
     }
 
-    fun uploadDocuments(frontUri: Uri?, backUri: Uri?) {
-        if (frontUri == null && backUri == null) return
+    fun uploadDocuments(frontBytes: ByteArray?, backBytes: ByteArray?) {
+        if (frontBytes == null && backBytes == null) return
         uiState = uiState.copy(isSaving = true, errorMessage = null, successMessage = null)
         viewModelScope.launch {
             try {
                 var frontUrl: String? = null
                 var backUrl: String? = null
 
-                if (frontUri != null) {
+                if (frontBytes != null) {
                     frontUrl = storageRepository.uploadAadhaarDocument(
                         uid = uid,
                         documentType = "front",
-                        imageUri = frontUri,
+                        imageBytes = frontBytes,
                         onProgress = {}
                     ).getOrThrow()
                 }
-                if (backUri != null) {
+                if (backBytes != null) {
                     backUrl = storageRepository.uploadAadhaarDocument(
                         uid = uid,
                         documentType = "back",
-                        imageUri = backUri,
+                        imageBytes = backBytes,
                         onProgress = {}
                     ).getOrThrow()
                 }

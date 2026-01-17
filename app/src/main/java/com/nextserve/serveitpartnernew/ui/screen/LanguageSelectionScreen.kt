@@ -49,6 +49,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun LanguageSelectionScreen(
     onNavigateToOnboarding: () -> Unit,
+    authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel? = null,
     viewModel: LanguageSelectionViewModel = viewModel(
         factory = LanguageSelectionViewModelFactory(LocalContext.current)
     )
@@ -136,7 +137,11 @@ fun LanguageSelectionScreen(
                 LanguageCard(
                     language = language,
                     isSelected = uiState.selectedLanguageCode == language.code,
-                    onClick = { viewModel.selectLanguage(language.code) },
+                    onClick = { 
+                        viewModel.selectLanguage(language.code)
+                        // Notify AuthViewModel that language is now selected
+                        authViewModel?.updateLanguageState(true)
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)

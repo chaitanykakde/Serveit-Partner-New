@@ -52,7 +52,11 @@ data class OnboardingUiState(
     val profilePhotoUploaded: Boolean = false,
     val uploadProgress: Float = 0f,
     val isUploading: Boolean = false,
+    val uploadingDocumentType: String? = null, // "front", "back", or "profile"
 
     // Step 5 data
-    val isSubmitted: Boolean = false
+    val isSubmitted: Boolean = false,
+    val verificationStatus: String? = null, // "pending", "rejected", "verified" - from verificationDetails.status
+    val rejectionReason: String? = null, // Reason if rejected
+    val submittedAt: Long? = null // Timestamp in milliseconds
 )

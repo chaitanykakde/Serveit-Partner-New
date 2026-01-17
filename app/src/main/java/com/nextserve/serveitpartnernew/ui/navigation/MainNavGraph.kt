@@ -13,7 +13,10 @@ import com.nextserve.serveitpartnernew.ui.screen.main.JobDetailsScreen
 import com.nextserve.serveitpartnernew.ui.screen.main.JobsScreen
 import com.nextserve.serveitpartnernew.ui.screen.main.ProfileScreen
 
-fun NavGraphBuilder.mainNavGraph(navController: NavController) {
+fun NavGraphBuilder.mainNavGraph(
+    navController: NavController,
+    authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel
+) {
     composable(BottomNavItem.Home.route) { backStackEntry ->
         val providerId = com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.auth.currentUser?.uid ?: ""
 
@@ -77,7 +80,10 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
     }
     
     composable(BottomNavItem.Profile.route) {
-        ProfileScreen(navController = navController)
+        ProfileScreen(
+            navController = navController,
+            authViewModel = authViewModel
+        )
     }
 }
 

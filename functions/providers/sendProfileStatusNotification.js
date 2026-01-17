@@ -2,7 +2,13 @@
  * Send Profile Status Notification
  * Firestore onUpdate trigger on providers/{uid}
  * 
- * Notification function - medium risk
+ * ⚠️ DEPRECATED: This function is deprecated.
+ * Verification notifications are now handled via sendVerificationNotification
+ * which monitors the partners/{partnerId} collection.
+ * 
+ * This function is kept for backward compatibility but returns early.
+ * 
+ * Notification function - medium risk (DEPRECATED)
  */
 
 const functions = require("firebase-functions");
@@ -12,9 +18,24 @@ function createSendProfileStatusNotificationFunction(db, messaging) {
   return functions.firestore
     .document("providers/{uid}")
     .onUpdate(async (change, context) => {
+      const uid = context.params.uid;
+
+      // DEPRECATION WARNING: Early return
+      console.warn(`[sendProfileStatusNotification] ⚠️ DEPRECATED: Verification notifications are now handled via partners collection.`);
+      console.warn(`[sendProfileStatusNotification] This function (providers/{uid}) is deprecated. Use sendVerificationNotification (partners/{partnerId}) instead.`);
+      console.warn(`[sendProfileStatusNotification] Returning early for uid: ${uid}`);
+      
+      // Early return - do not process notifications
+      return null;
+
+      // ============================================
+      // LEGACY CODE BELOW (NOT EXECUTED)
+      // Kept for reference only
+      // ============================================
+      
+      /*
       const before = change.before.data();
       const after = change.after.data();
-      const uid = context.params.uid;
 
       // Log the update for debugging
       console.log(`[${uid}] Document updated. Before:`, {
@@ -27,6 +48,7 @@ function createSendProfileStatusNotificationFunction(db, messaging) {
         hasFcmToken: !!after.fcmToken,
       });
 
+      // LEGACY CODE CONTINUED (NOT EXECUTED)
       // Get FCM token from the provider document
       const fcmToken = after.fcmToken;
 
@@ -150,6 +172,7 @@ function createSendProfileStatusNotificationFunction(db, messaging) {
 
         return null;
       }
+      */
     });
 }
 

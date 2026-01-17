@@ -106,11 +106,19 @@ class OnboardingRepository(
 
     /**
      * Submit complete onboarding application.
+     * Creates verificationDetails with status="pending" (MANDATORY).
      */
     suspend fun submitOnboarding(uid: String, finalData: Map<String, Any>): Result<Unit> {
+        val verificationDetailsMap = mapOf(
+            "status" to "pending",
+            "rejectedReason" to null,
+            "verifiedBy" to null,
+            "verifiedAt" to null
+        )
+        
         val submissionData = finalData.toMutableMap().apply {
             put("onboardingStatus", OnboardingStatus.SUBMITTED.statusString)
-            put("approvalStatus", "PENDING")
+            put("verificationDetails", verificationDetailsMap)
             put("submittedAt", Timestamp.now())
             put("currentStep", OnboardingStep.REVIEW.stepNumber)
         }
@@ -136,8 +144,12 @@ class OnboardingRepository(
     /**
      * Upload Aadhaar front image.
      */
-    suspend fun uploadAadhaarFront(uid: String, imageUri: android.net.Uri): Result<String> {
-        return storageRepository.uploadAadhaarDocument(uid, "front", imageUri) { _ -> }
+    suspend fun uploadAadhaarFront(
+        uid: String, 
+        imageBytes: ByteArray, 
+        onProgress: (Double) -> Unit
+    ): Result<String> {
+        return storageRepository.uploadAadhaarDocument(uid, "front", imageBytes, onProgress)
             .onSuccess { downloadUrl ->
                 firestoreRepository.updateProviderData(uid, mapOf("aadhaarFrontUrl" to downloadUrl))
             }
@@ -146,8 +158,12 @@ class OnboardingRepository(
     /**
      * Upload Aadhaar back image.
      */
-    suspend fun uploadAadhaarBack(uid: String, imageUri: android.net.Uri): Result<String> {
-        return storageRepository.uploadAadhaarDocument(uid, "back", imageUri) { _ -> }
+    suspend fun uploadAadhaarBack(
+        uid: String, 
+        imageBytes: ByteArray, 
+        onProgress: (Double) -> Unit
+    ): Result<String> {
+        return storageRepository.uploadAadhaarDocument(uid, "back", imageBytes, onProgress)
             .onSuccess { downloadUrl ->
                 firestoreRepository.updateProviderData(uid, mapOf("aadhaarBackUrl" to downloadUrl))
             }
@@ -156,8 +172,12 @@ class OnboardingRepository(
     /**
      * Upload profile photo.
      */
-    suspend fun uploadProfilePhoto(uid: String, imageUri: android.net.Uri): Result<String> {
-        return storageRepository.uploadProfilePhoto(uid, imageUri) { _ -> }
+    suspend fun uploadProfilePhoto(
+        uid: String, 
+        imageBytes: ByteArray, 
+        onProgress: (Double) -> Unit
+    ): Result<String> {
+        return storageRepository.uploadProfilePhoto(uid, imageBytes, onProgress)
             .onSuccess { downloadUrl ->
                 firestoreRepository.updateProviderData(uid, mapOf("profilePhotoUrl" to downloadUrl))
             }
@@ -215,6 +235,53 @@ class OnboardingRepository(
             "profilePhotoUrl" to "",
             "submittedAt" to null
         ).filterValues { it != null } as Map<String, Any>
+        return firestoreRepository.updateProviderData(uid, resetData)
+    }
+
+    /**
+     * Clear sub-service related data when primary service changes.
+     * This ensures Firestore consistency and prevents stale data.
+     */
+    suspend fun clearSubServiceData(uid: String): Result<Unit> {
+        val clearData = mapOf(
+            "selectedMainService" to "",
+            "selectedSubServices" to emptyList<String>(),
+            "otherService" to ""
+        )
+        return firestoreRepository.updateProviderData(uid, clearData)
+    }
+
+    /**
+     * Reset verification state and onboarding status when user clicks "Edit & Resubmit".
+     * This is called explicitly when user wants to edit a rejected profile.
+     * 
+     * CRITICAL: This resets Firestore verification state atomically to prevent infinite rejected loop.
+     * 
+     * Resets:
+     * - verificationDetails.status = "pending"
+     * - verificationDetails.rejectedReason = null
+     * - verificationDetails.verifiedBy = null
+     * - verificationDetails.verifiedAt = null
+     * - isVerified = false (for backward compatibility with Cloud Functions)
+     * - onboardingStatus = "IN_PROGRESS"
+     * - currentStep = 1
+     */
+    suspend fun resetVerificationAndOnboarding(uid: String): Result<Unit> {
+        // Create verificationDetails map with all fields reset to pending state
+        val verificationDetailsMap = mapOf(
+            "status" to "pending",
+            "rejectedReason" to null,
+            "verifiedBy" to null,
+            "verifiedAt" to null
+        )
+        
+        val resetData = mapOf(
+            "verificationDetails" to verificationDetailsMap,
+            "isVerified" to false, // Reset for backward compatibility with Cloud Functions
+            "onboardingStatus" to OnboardingStatus.IN_PROGRESS.statusString,
+            "currentStep" to OnboardingStep.BASIC_INFO.stepNumber
+        )
+        
         return firestoreRepository.updateProviderData(uid, resetData)
     }
 }

@@ -3,6 +3,7 @@ package com.nextserve.serveitpartnernew.data.mapper
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.nextserve.serveitpartnernew.data.model.ProviderData
+import com.nextserve.serveitpartnernew.data.model.VerificationDetails
 
 /**
  * Transformation layer to convert between:
@@ -78,30 +79,34 @@ object ProviderFirestoreMapper {
         }
 
         // ============================================
-        // VERIFICATION DETAILS (Nested)
-        // Convert approvalStatus string → booleans
+        // VERIFICATION DETAILS (Nested Map)
+        // SINGLE SOURCE OF TRUTH for verification status
         // ============================================
-        val verificationDetails = mutableMapOf<String, Any>()
+        val verificationDetailsMap = mutableMapOf<String, Any>()
+        verificationDetailsMap["status"] = providerData.verificationDetails.status
         
-        // Convert approvalStatus to booleans
-        val isApproved = providerData.approvalStatus == "APPROVED"
-        val isRejected = providerData.approvalStatus == "REJECTED"
-        
-        verificationDetails["verified"] = isApproved
-        verificationDetails["rejected"] = isRejected
-        
-        if (providerData.rejectionReason != null && providerData.rejectionReason!!.isNotEmpty()) {
-            verificationDetails["rejectionReason"] = providerData.rejectionReason!!
+        providerData.verificationDetails.rejectedReason?.let { reason ->
+            if (reason.isNotEmpty()) {
+                verificationDetailsMap["rejectedReason"] = reason
+            }
         }
         
-        firestoreData["verificationDetails"] = verificationDetails
+        providerData.verificationDetails.verifiedBy?.let { verifiedBy ->
+            verificationDetailsMap["verifiedBy"] = verifiedBy
+        }
+        
+        providerData.verificationDetails.verifiedAt?.let { verifiedAt ->
+            verificationDetailsMap["verifiedAt"] = verifiedAt
+        }
+        
+        firestoreData["verificationDetails"] = verificationDetailsMap
 
         // ============================================
         // ROOT LEVEL FIELDS
         // ============================================
         
-        // isVerified: boolean (root level)
-        firestoreData["isVerified"] = isApproved
+        // isVerified: boolean (root level - for backward compatibility with Cloud Functions)
+        firestoreData["isVerified"] = providerData.verificationDetails.status == "verified"
         
         // isOnline: boolean (default false)
         firestoreData["isOnline"] = false
@@ -133,7 +138,7 @@ object ProviderFirestoreMapper {
         providerData.submittedAt?.let { firestoreData["submittedAt"] = it }
         providerData.updatedAt?.let { firestoreData["updatedAt"] = it }
         providerData.documentsUploadedAt?.let { firestoreData["documentsUploadedAt"] = it }
-        providerData.reviewedAt?.let { firestoreData["reviewedAt"] = it }
+        providerData.verificationDetails.verifiedAt?.let { firestoreData["verifiedAt"] = it }
         
         // Additional fields for app functionality
         if (providerData.email.isNotEmpty()) {
@@ -163,9 +168,7 @@ object ProviderFirestoreMapper {
         if (providerData.aadhaarBackUrl.isNotEmpty()) {
             firestoreData["aadhaarBackUrl"] = providerData.aadhaarBackUrl
         }
-        if (providerData.reviewedBy != null && providerData.reviewedBy!!.isNotEmpty()) {
-            firestoreData["reviewedBy"] = providerData.reviewedBy!!
-        }
+        // reviewedBy is now in verificationDetails.verifiedBy (already handled above)
         if (providerData.profilePhotoUrl.isNotEmpty()) {
             firestoreData["profilePhotoUrl"] = providerData.profilePhotoUrl
         }
@@ -227,8 +230,10 @@ object ProviderFirestoreMapper {
 
         // Handle services array
         val services = mutableListOf<String>()
-        updateMap["primaryService"]?.let { primary ->
-            if (primary is String && primary.isNotEmpty()) {
+        // Use primaryService if available, otherwise use selectedMainService
+        val primaryService = (updateMap["primaryService"] as? String) ?: (updateMap["selectedMainService"] as? String)
+        primaryService?.let { primary ->
+            if (primary.isNotEmpty()) {
                 services.add(primary)
             }
         }
@@ -304,19 +309,32 @@ object ProviderFirestoreMapper {
         val primaryService = services?.firstOrNull() as? String ?: ""
         val selectedSubServices = services?.drop(1)?.filterIsInstance<String>() ?: emptyList()
 
-        // Extract nested verificationDetails and convert to approvalStatus string
-        val verificationDetails = data["verificationDetails"] as? Map<*, *>
-        // Check root level isVerified first (Cloud Functions primary), then nested
-        val isVerified = (data["isVerified"] as? Boolean) ?: (verificationDetails?.get("verified") as? Boolean) ?: false
-        val isRejected = verificationDetails?.get("rejected") as? Boolean ?: false
-        val rejectionReason = verificationDetails?.get("rejectionReason") as? String
+        // Extract verificationDetails map (SINGLE SOURCE OF TRUTH)
+        val verificationDetailsMap = data["verificationDetails"] as? Map<*, *>
         
-        // Convert booleans to approvalStatus string
-        val approvalStatus = when {
-            isVerified -> "APPROVED"
-            isRejected -> "REJECTED"
-            else -> "PENDING"
+        // Read status from verificationDetails.status (preferred) or fallback to legacy fields
+        val status = when {
+            verificationDetailsMap?.get("status") != null -> 
+                verificationDetailsMap["status"] as? String ?: "pending"
+            // Legacy fallback: Check root level isVerified and nested booleans
+            (data["isVerified"] as? Boolean) == true -> "verified"
+            verificationDetailsMap?.get("verified") as? Boolean == true -> "verified"
+            verificationDetailsMap?.get("rejected") as? Boolean == true -> "rejected"
+            else -> "pending"
         }
+        
+        // Try both field names: "rejectedReason" (current) and "rejectionReason" (legacy)
+        val rejectionReason = (verificationDetailsMap?.get("rejectedReason") as? String)
+            ?: (verificationDetailsMap?.get("rejectionReason") as? String)
+        val verifiedBy = verificationDetailsMap?.get("verifiedBy") as? String
+        val verifiedAt = verificationDetailsMap?.get("verifiedAt") as? Timestamp
+        
+        val verificationDetails = VerificationDetails(
+            status = status,
+            rejectedReason = rejectionReason,
+            verifiedBy = verifiedBy,
+            verifiedAt = verifiedAt
+        )
         
         // Extract isOnline from root level (Cloud Functions requirement)
         val isOnline = data["isOnline"] as? Boolean ?: false
@@ -348,14 +366,10 @@ object ProviderFirestoreMapper {
             aadhaarFrontUrl = data["aadhaarFrontUrl"] as? String ?: "",
             aadhaarBackUrl = data["aadhaarBackUrl"] as? String ?: "",
             documentsUploadedAt = data["documentsUploadedAt"] as? Timestamp,
-            approvalStatus = approvalStatus,
-            rejectionReason = rejectionReason,
-            reviewedAt = data["reviewedAt"] as? Timestamp,
-            reviewedBy = data["reviewedBy"] as? String,
+            verificationDetails = verificationDetails,
             fcmToken = data["fcmToken"] as? String ?: "",
             language = data["language"] as? String ?: "en",
             profilePhotoUrl = data["profilePhotoUrl"] as? String ?: "",
-            isVerified = isVerified,
             isOnline = isOnline
         )
     }

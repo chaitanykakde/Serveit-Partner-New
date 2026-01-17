@@ -1,5 +1,6 @@
 package com.nextserve.serveitpartnernew.ui.screen.profile.edit
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -42,19 +43,34 @@ fun ProfileEditDocumentsScreen(
     )
     val state = viewModel.uiState
 
+    // Helper function to convert URI to ByteArray immediately
+    fun uriToByteArray(uri: android.net.Uri): ByteArray? {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                inputStream.readBytes()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     val frontPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let {
-            viewModel.uploadDocuments(frontUri = it, backUri = null)
+        uri?.let { selectedUri ->
+            uriToByteArray(selectedUri)?.let { bytes ->
+                viewModel.uploadDocuments(frontBytes = bytes, backBytes = null)
+            }
         }
     }
 
     val backPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let {
-            viewModel.uploadDocuments(frontUri = null, backUri = it)
+        uri?.let { selectedUri ->
+            uriToByteArray(selectedUri)?.let { bytes ->
+                viewModel.uploadDocuments(frontBytes = null, backBytes = bytes)
+            }
         }
     }
 

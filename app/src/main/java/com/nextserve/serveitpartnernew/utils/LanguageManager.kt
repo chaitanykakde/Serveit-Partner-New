@@ -16,7 +16,15 @@ object LanguageManager {
     }
 
     fun getSavedLanguage(context: Context): String {
-        return getSharedPreferences(context).getString(KEY_LANGUAGE, DEFAULT_LANGUAGE) ?: DEFAULT_LANGUAGE
+        return getSharedPreferences(context).getString(KEY_LANGUAGE, "") ?: ""
+    }
+    
+    /**
+     * Check if a language has been explicitly selected by the user.
+     * Returns true if language exists in local storage (even if it's "en").
+     */
+    fun isLanguageSelected(context: Context): Boolean {
+        return getSharedPreferences(context).contains(KEY_LANGUAGE)
     }
 
     fun saveLanguage(context: Context, languageCode: String) {

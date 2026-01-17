@@ -39,6 +39,7 @@ fun ProfileMinimalDropdownField(
     options: List<String>,
     modifier: Modifier = Modifier
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     var expanded by remember { mutableStateOf(false) }
     
     Box(modifier = modifier.fillMaxWidth()) {
@@ -50,7 +51,7 @@ fun ProfileMinimalDropdownField(
                     fontSize = 11.sp,
                     letterSpacing = 0.5.sp
                 ),
-                color = Color(0xFF9E9E9E),
+                color = colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             
@@ -69,17 +70,17 @@ fun ProfileMinimalDropdownField(
                     Icon(
                         imageVector = Icons.Default.ArrowDropDown,
                         contentDescription = "Dropdown",
-                        tint = Color.Black
+                        tint = colorScheme.onSurfaceVariant
                     )
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color(0xFF1C1C1C),
-                    unfocusedTextColor = Color(0xFF1C1C1C),
-                    focusedBorderColor = Color(0xFF2196F3),
-                    unfocusedBorderColor = Color(0xFFE0E0E0),
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    cursorColor = Color(0xFF2196F3)
+                    focusedTextColor = colorScheme.onSurface,
+                    unfocusedTextColor = colorScheme.onSurface,
+                    focusedBorderColor = colorScheme.primary,
+                    unfocusedBorderColor = colorScheme.outline,
+                    focusedContainerColor = colorScheme.surface,
+                    unfocusedContainerColor = colorScheme.surface,
+                    cursorColor = colorScheme.primary
                 ),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontSize = 16.sp,

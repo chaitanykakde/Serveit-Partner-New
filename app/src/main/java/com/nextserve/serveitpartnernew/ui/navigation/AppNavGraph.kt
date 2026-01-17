@@ -1,5 +1,7 @@
 package com.nextserve.serveitpartnernew.ui.navigation
 
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
@@ -14,8 +16,8 @@ import com.nextserve.serveitpartnernew.ui.screen.OnboardingScreen
 import com.nextserve.serveitpartnernew.ui.screen.RejectionScreen
 import com.nextserve.serveitpartnernew.ui.screen.SplashScreen
 import com.nextserve.serveitpartnernew.ui.screen.WaitingScreen
-import com.nextserve.serveitpartnernew.ui.screen.auth.MobileNumberScreen
-import com.nextserve.serveitpartnernew.ui.screen.auth.OtpVerificationScreen
+import com.nextserve.serveitpartnernew.ui.screen.auth.LoginScreen
+import com.nextserve.serveitpartnernew.ui.screen.auth.OtpScreen
 import com.nextserve.serveitpartnernew.ui.screen.welcome.WelcomeScreen
 import com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingViewModelFactory
 
@@ -36,7 +38,7 @@ sealed class Screen(val route: String) {
 fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel) {
     composable(Screen.Splash.route) {
         SplashScreen(
-            authState = authViewModel.authState.value,
+            authViewModel = authViewModel,
             onNavigateToMobileNumber = {
                 navController.navigate(Screen.MobileNumber.route) {
                     popUpTo(Screen.Splash.route) { inclusive = true }
@@ -51,9 +53,25 @@ fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com
                 navController.navigate(Screen.Onboarding.route) {
                     popUpTo(Screen.Splash.route) { inclusive = true }
                 }
+            },
+            onNavigateToWaiting = {
+                navController.navigate(Screen.Waiting.route) {
+                    popUpTo(Screen.Splash.route) { inclusive = true }
+                }
+            },
+            onNavigateToRejection = { uid ->
+                navController.navigate(Screen.Rejection.createRoute(uid)) {
+                    popUpTo(Screen.Splash.route) { inclusive = true }
+                }
+            },
+            onNavigateToHome = {
+                navController.navigate(Screen.Home.route) {
+                    popUpTo(Screen.Splash.route) { inclusive = true }
+                }
             }
         )
     }
+
     
     composable(Screen.Welcome.route) {
         WelcomeScreen(
@@ -66,7 +84,7 @@ fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com
     }
 
     composable(Screen.MobileNumber.route) {
-        MobileNumberScreen(
+        LoginScreen(
             onOtpRequested = {
                 navController.navigate(Screen.OtpVerification.route)
             },
@@ -75,9 +93,9 @@ fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com
     }
 
     composable(Screen.OtpVerification.route) {
-        OtpVerificationScreen(
+        OtpScreen(
             onVerificationSuccess = {
-                navController.navigate(Screen.LanguageSelection.route) {
+                navController.navigate(Screen.Splash.route) {
                     popUpTo(Screen.MobileNumber.route) { inclusive = true }
                 }
             },
@@ -94,7 +112,8 @@ fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com
                     // Pop language selection after navigating to onboarding
                     popUpTo(Screen.LanguageSelection.route) { inclusive = true }
                 }
-            }
+            },
+            authViewModel = authViewModel
         )
     }
 
@@ -102,6 +121,22 @@ fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com
         val onboardingViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.OnboardingViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
             factory = OnboardingViewModelFactory(androidx.compose.ui.platform.LocalContext.current)
         )
+        
+        // Observe auth state to navigate when logged out
+        val authState by authViewModel.authState.collectAsStateWithLifecycle()
+        androidx.compose.runtime.LaunchedEffect(authState) {
+            if (authState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.LoggedOut) {
+                android.util.Log.d("AppNavGraph", "🚪 User logged out from onboarding, navigating to splash")
+                navController.navigate(Screen.Splash.route) {
+                    popUpTo(Screen.Onboarding.route) { inclusive = true }
+                }
+            }
+        }
+        
+        // REMOVED: Navigation logic from OnboardingScreen
+        // Navigation is now handled by SplashScreen based on startDestination
+        // Onboarding is an inner app flow - users can logout, edit, resubmit
+        
         OnboardingScreen(
             uiState = onboardingViewModel.uiState,
             onUpdateFullName = onboardingViewModel::updateFullName,
@@ -131,7 +166,14 @@ fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com
             onPreviousStep = onboardingViewModel::previousStep,
             onNavigateToStep = onboardingViewModel::navigateToStep,
             onSubmit = onboardingViewModel::submitOnboarding,
-            onReset = onboardingViewModel::resetOnboarding
+            onReset = onboardingViewModel::resetOnboarding,
+            onEditRejectedProfile = onboardingViewModel::editRejectedProfile,
+            onContactSupport = {
+                // TODO: Navigate to contact support screen or open support dialog
+            },
+            onLogout = {
+                authViewModel.signOut()
+            }
         )
     }
 
@@ -155,8 +197,22 @@ fun NavGraphBuilder.appNavGraph(navController: NavController, authViewModel: com
     }
 
     composable(Screen.Home.route) {
+        // Observe auth state to navigate when logged out
+        val authState by authViewModel.authState.collectAsStateWithLifecycle()
+        androidx.compose.runtime.LaunchedEffect(authState) {
+            if (authState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.LoggedOut ||
+                authState is com.nextserve.serveitpartnernew.ui.viewmodel.AuthState.Idle) {
+                android.util.Log.d("AppNavGraph", "🚪 User logged out, navigating to splash")
+                navController.navigate(Screen.Splash.route) {
+                    popUpTo(Screen.Home.route) { inclusive = true }
+                }
+            }
+        }
+        
         // Main app with bottom navigation will be shown here
-        com.nextserve.serveitpartnernew.ui.screen.main.MainAppScreen()
+        com.nextserve.serveitpartnernew.ui.screen.main.MainAppScreen(
+            authViewModel = authViewModel
+        )
     }
 }
 

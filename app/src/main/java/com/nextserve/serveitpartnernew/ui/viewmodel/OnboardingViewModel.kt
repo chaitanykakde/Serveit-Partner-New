@@ -18,6 +18,8 @@ import com.nextserve.serveitpartnernew.domain.onboarding.OnboardingStep
 import com.nextserve.serveitpartnernew.utils.LanguageManager
 import com.nextserve.serveitpartnernew.utils.ValidationUtils
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import com.google.firebase.firestore.ListenerRegistration
 
 /**
  * Thin ViewModel for onboarding UI state management.
@@ -34,9 +36,48 @@ class OnboardingViewModel(
     var uiState by mutableStateOf(OnboardingUiState())
         private set
 
+    // Provider document listener for real-time verification status updates
+    private var providerListener: ListenerRegistration? = null
+
     init {
         loadProviderData()
         loadLanguage()
+        // Start observing provider document for real-time verification status changes
+        startProviderObservation()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopProviderObservation()
+    }
+
+    /**
+     * Start observing provider document for real-time verification status updates.
+     */
+    private fun startProviderObservation() {
+        viewModelScope.launch {
+            val firestoreRepository = com.nextserve.serveitpartnernew.data.repository.FirestoreRepository(
+                com.nextserve.serveitpartnernew.data.firebase.FirebaseProvider.firestore
+            )
+            providerListener = firestoreRepository.observeProviderDocument(uid) { providerData ->
+                if (providerData != null) {
+                    // Update verification status in UI state
+                    uiState = uiState.copy(
+                        verificationStatus = providerData.verificationDetails.status,
+                        rejectionReason = providerData.verificationDetails.rejectedReason,
+                        isSubmitted = providerData.onboardingStatus == "SUBMITTED"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Stop observing provider document.
+     */
+    private fun stopProviderObservation() {
+        providerListener?.remove()
+        providerListener = null
     }
 
     /**
@@ -67,6 +108,14 @@ class OnboardingViewModel(
     private fun hydrateUiStateFromProviderData(providerData: ProviderData) {
         val onboardingStatus = OnboardingStatus.fromStatusString(providerData.onboardingStatus)
         val currentStep = determineCurrentStep(providerData, onboardingStatus)
+        
+        // Sync language from Firestore to local storage if Firestore has it but local doesn't
+        val firestoreLanguage = providerData.language.ifEmpty { "en" }
+        val localLanguage = LanguageManager.getSavedLanguage(context)
+        if (firestoreLanguage.isNotEmpty() && firestoreLanguage != "en" && (localLanguage.isEmpty() || localLanguage == "en")) {
+            // Firestore has a language but local doesn't - sync it
+            LanguageManager.applyLanguage(context, firestoreLanguage)
+        }
 
         uiState = uiState.copy(
             isLoading = false,
@@ -76,7 +125,7 @@ class OnboardingViewModel(
             gender = providerData.gender,
             primaryService = providerData.primaryService,
             email = providerData.email,
-            language = providerData.language.ifEmpty { "en" },
+            language = firestoreLanguage,
             selectedMainService = providerData.selectedMainService,
             selectedSubServices = providerData.selectedSubServices.toSet(),
             otherService = providerData.otherService,
@@ -94,16 +143,28 @@ class OnboardingViewModel(
             aadhaarBackUploaded = providerData.aadhaarBackUrl.isNotEmpty(),
             profilePhotoUrl = providerData.profilePhotoUrl,
             profilePhotoUploaded = providerData.profilePhotoUrl.isNotEmpty(),
-            isSubmitted = onboardingStatus == OnboardingStatus.SUBMITTED
+            isSubmitted = onboardingStatus == OnboardingStatus.SUBMITTED,
+            verificationStatus = providerData.verificationDetails.status,
+            rejectionReason = providerData.verificationDetails.rejectedReason,
+            submittedAt = providerData.submittedAt?.toDate()?.time
         )
 
         // Load services if gender is set
         if (providerData.gender.isNotEmpty()) {
             loadMainServices(providerData.gender)
+
             // Load sub-services if primary service is set
             if (providerData.primaryService.isNotEmpty()) {
                 uiState = uiState.copy(selectedMainService = providerData.primaryService)
-                loadSubServices(providerData.gender, providerData.primaryService)
+
+                // VALIDATE SUB-SERVICES: Ensure they belong to the current primary service
+                if (shouldValidateSubServices(providerData)) {
+                    // Sub-services exist but may be stale - validate them
+                    validateAndLoadSubServices(providerData.gender, providerData.primaryService, providerData.selectedSubServices)
+                } else {
+                    // Fresh load - no existing sub-services to validate
+                    loadSubServices(providerData.gender, providerData.primaryService)
+                }
             }
         }
     }
@@ -147,8 +208,35 @@ class OnboardingViewModel(
     }
 
     fun updatePrimaryService(service: String) {
-        uiState = uiState.copy(primaryService = service)
-        saveStep1Data()
+        // ENFORCE DEPENDENCY RULE: Primary service is the parent
+        // When primary service changes, sub-services must be reset
+        val previousService = uiState.primaryService
+
+        if (service != previousService) {
+            // PRIMARY SERVICE CHANGED - Clear all dependent data
+            uiState = uiState.copy(
+                primaryService = service,
+                selectedMainService = "",  // Clear dependent data
+                selectedSubServices = emptySet(),  // Clear sub-service selections
+                availableSubServices = emptyList(),  // Clear cached sub-services
+                otherService = ""  // Clear other service input
+            )
+
+            // Clear sub-service data in Firestore for consistency
+            clearSubServiceData()
+
+            // Save updated primary service
+            saveStep1Data()
+
+            // TRIGGER FRESH SUB-SERVICE LOAD for new primary service
+            if (service.isNotEmpty()) {
+                loadSubServices(uiState.gender, service)
+            }
+        } else {
+            // Same service selected, just update UI state
+            uiState = uiState.copy(primaryService = service)
+            saveStep1Data()
+        }
     }
 
     fun updateEmail(email: String) {
@@ -179,6 +267,41 @@ class OnboardingViewModel(
                 primaryService = uiState.primaryService
             )
         }
+    }
+
+    /**
+     * Clear sub-service data when primary service changes.
+     * This ensures Firestore consistency and prevents stale data.
+     */
+    private fun clearSubServiceData() {
+        viewModelScope.launch {
+            repository.clearSubServiceData(uid)
+        }
+    }
+
+    /**
+     * Check if sub-services need validation against primary service.
+     */
+    private fun shouldValidateSubServices(providerData: ProviderData): Boolean {
+        return providerData.selectedSubServices.isNotEmpty() ||
+               providerData.selectedMainService.isNotEmpty() ||
+               providerData.otherService.isNotEmpty()
+    }
+
+    /**
+     * Validate existing sub-services against primary service and load fresh data if needed.
+     * This prevents stale sub-service data from being used.
+     */
+    private fun validateAndLoadSubServices(gender: String, primaryService: String, existingSubServices: List<String>) {
+        // For now, we always reload fresh sub-services to ensure consistency
+        // In a more sophisticated implementation, we could validate if existing sub-services
+        // are still valid for the current primary service
+        loadSubServices(gender, primaryService)
+
+        // Note: If we wanted to preserve selections, we would need to:
+        // 1. Load fresh sub-services
+        // 2. Filter existing selections to only include valid ones
+        // 3. Update UI state with filtered selections
     }
 
     // Step 2: Service Selection
@@ -236,10 +359,24 @@ class OnboardingViewModel(
 
         viewModelScope.launch {
             repository.loadSubServices(gender, mainService).onSuccess { subServices ->
+                // Auto-select all sub-services by default when first loading (if none are currently selected)
+                val newSelection = if (uiState.selectedSubServices.isEmpty() && subServices.isNotEmpty()) {
+                    subServices.toSet() // Select all by default
+                } else {
+                    uiState.selectedSubServices // Keep existing selection
+                }
+                
                 uiState = uiState.copy(
                     availableSubServices = subServices,
+                    selectedSubServices = newSelection,
+                    isSelectAllChecked = newSelection.size == subServices.size && subServices.isNotEmpty(),
                     isLoadingSubServices = false
                 )
+                
+                // Save the auto-selected sub-services
+                if (newSelection != uiState.selectedSubServices) {
+                    saveStep2Data()
+                }
             }.onFailure {
                 uiState = uiState.copy(
                     isLoadingSubServices = false,
@@ -364,57 +501,96 @@ class OnboardingViewModel(
     }
 
     // Step 4: Document Upload
-    fun uploadAadhaarFront(imageUri: Uri) {
-        uiState = uiState.copy(isUploading = true)
+    fun uploadAadhaarFront(imageBytes: ByteArray) {
+        uiState = uiState.copy(
+            isUploading = true,
+            uploadingDocumentType = "front",
+            uploadProgress = 0f
+        )
 
         viewModelScope.launch {
-            repository.uploadAadhaarFront(uid, imageUri).onSuccess { downloadUrl ->
+            repository.uploadAadhaarFront(uid, imageBytes) { progress ->
+                // Update progress on main thread
+                viewModelScope.launch(Dispatchers.Main) {
+                    uiState = uiState.copy(uploadProgress = progress.toFloat())
+                }
+            }.onSuccess { downloadUrl ->
                 uiState = uiState.copy(
                     aadhaarFrontUrl = downloadUrl,
                     aadhaarFrontUploaded = true,
-                    isUploading = false
+                    isUploading = false,
+                    uploadingDocumentType = null,
+                    uploadProgress = 0f
                 )
             }.onFailure { exception ->
                 uiState = uiState.copy(
                     isUploading = false,
+                    uploadingDocumentType = null,
+                    uploadProgress = 0f,
                     errorMessage = "Failed to upload Aadhaar front: ${exception.message}"
                 )
             }
         }
     }
 
-    fun uploadAadhaarBack(imageUri: Uri) {
-        uiState = uiState.copy(isUploading = true)
+    fun uploadAadhaarBack(imageBytes: ByteArray) {
+        uiState = uiState.copy(
+            isUploading = true,
+            uploadingDocumentType = "back",
+            uploadProgress = 0f
+        )
 
         viewModelScope.launch {
-            repository.uploadAadhaarBack(uid, imageUri).onSuccess { downloadUrl ->
+            repository.uploadAadhaarBack(uid, imageBytes) { progress ->
+                // Update progress on main thread
+                viewModelScope.launch(Dispatchers.Main) {
+                    uiState = uiState.copy(uploadProgress = progress.toFloat())
+                }
+            }.onSuccess { downloadUrl ->
                 uiState = uiState.copy(
                     aadhaarBackUrl = downloadUrl,
                     aadhaarBackUploaded = true,
-                    isUploading = false
+                    isUploading = false,
+                    uploadingDocumentType = null,
+                    uploadProgress = 0f
                 )
             }.onFailure { exception ->
                 uiState = uiState.copy(
                     isUploading = false,
+                    uploadingDocumentType = null,
+                    uploadProgress = 0f,
                     errorMessage = "Failed to upload Aadhaar back: ${exception.message}"
                 )
             }
         }
     }
 
-    fun uploadProfilePhoto(imageUri: Uri) {
-        uiState = uiState.copy(isUploading = true)
+    fun uploadProfilePhoto(imageBytes: ByteArray) {
+        uiState = uiState.copy(
+            isUploading = true,
+            uploadingDocumentType = "profile",
+            uploadProgress = 0f
+        )
 
         viewModelScope.launch {
-            repository.uploadProfilePhoto(uid, imageUri).onSuccess { downloadUrl ->
+            repository.uploadProfilePhoto(uid, imageBytes) { progress ->
+                // Update progress on main thread
+                viewModelScope.launch(Dispatchers.Main) {
+                    uiState = uiState.copy(uploadProgress = progress.toFloat())
+                }
+            }.onSuccess { downloadUrl ->
                 uiState = uiState.copy(
                     profilePhotoUrl = downloadUrl,
                     profilePhotoUploaded = true,
-                    isUploading = false
+                    isUploading = false,
+                    uploadingDocumentType = null,
+                    uploadProgress = 0f
                 )
             }.onFailure { exception ->
                 uiState = uiState.copy(
                     isUploading = false,
+                    uploadingDocumentType = null,
+                    uploadProgress = 0f,
                     errorMessage = "Failed to upload profile photo: ${exception.message}"
                 )
             }
@@ -551,6 +727,40 @@ class OnboardingViewModel(
             }.onFailure { exception ->
                 uiState = uiState.copy(
                     errorMessage = "Failed to reset onboarding: ${exception.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Allow editing of rejected profile.
+     * Resets Firestore verification state and onboarding status to allow resubmission.
+     * 
+     * CRITICAL: This method MUST reset Firestore state, not just UI state.
+     * Without Firestore reset, the real-time listener will immediately restore rejected status,
+     * causing an infinite loop where user is stuck on rejected screen.
+     */
+    fun editRejectedProfile() {
+        uiState = uiState.copy(isLoading = true, errorMessage = null)
+        
+        viewModelScope.launch {
+            repository.resetVerificationAndOnboarding(uid).onSuccess {
+                // After successful Firestore reset, update UI state
+                uiState = uiState.copy(
+                    isLoading = false,
+                    isSubmitted = false,
+                    onboardingStatus = OnboardingStatus.IN_PROGRESS,
+                    currentStep = OnboardingStep.BASIC_INFO,
+                    verificationStatus = null,
+                    rejectionReason = null,
+                    errorMessage = null
+                )
+                // Navigate to Step 1
+                navigateToStep(OnboardingStep.BASIC_INFO.stepNumber)
+            }.onFailure { exception ->
+                uiState = uiState.copy(
+                    isLoading = false,
+                    errorMessage = "Failed to reset profile: ${exception.message ?: "Unknown error"}"
                 )
             }
         }

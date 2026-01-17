@@ -1,5 +1,6 @@
 package com.nextserve.serveitpartnernew.ui.screen.onboarding
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,12 +18,16 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nextserve.serveitpartnernew.R
-import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
-import com.nextserve.serveitpartnernew.ui.components.SecondaryButton
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileMinimalTextField
+import com.nextserve.serveitpartnernew.ui.components.profile.ProfileSaveButton
 import com.nextserve.serveitpartnernew.ui.utils.rememberLocationPermissionState
 
 @Composable
@@ -55,116 +60,81 @@ fun Step3Location(
             .fillMaxWidth()
             .verticalScroll(scrollState)
             .padding(horizontal = 24.dp),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Title
         Text(
             text = stringResource(R.string.where_provide_services),
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
             color = colorScheme.onSurface,
-            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+            modifier = Modifier.padding(bottom = 4.dp)
         )
 
         // Subtitle
         Text(
             text = stringResource(R.string.location_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 8.dp)
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Normal,
+            color = colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-
         // Use Current Location Button
-        PrimaryButton(
-            text = if (isLocationLoading) stringResource(R.string.getting_location) else stringResource(R.string.use_current_location),
+        ProfileSaveButton(
+            text = if (isLocationLoading) "Getting location..." else "Use current location",
             onClick = { onUseCurrentLocation(hasLocationPermission, requestLocationPermission) },
             isLoading = isLocationLoading,
-            leadingIcon = {
-                if (!isLocationLoading) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = stringResource(R.string.location),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            },
+            leadingIcon = Icons.Default.LocationOn,
+            showTrailingArrow = false,
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-
         // State
-        OutlinedInputField(
+        ProfileMinimalTextField(
             value = state,
             onValueChange = onStateChange,
-            label = stringResource(R.string.state),
-            placeholder = stringResource(R.string.state),
+            label = "State",
             modifier = Modifier.fillMaxWidth()
         )
 
         // City
-        OutlinedInputField(
+        ProfileMinimalTextField(
             value = city,
             onValueChange = onCityChange,
-            label = stringResource(R.string.city),
-            placeholder = stringResource(R.string.city),
+            label = "City",
             modifier = Modifier.fillMaxWidth()
         )
 
         // Address
-        OutlinedInputField(
+        ProfileMinimalTextField(
             value = address,
             onValueChange = onAddressChange,
-            label = stringResource(R.string.area_locality),
-            placeholder = stringResource(R.string.area_locality),
-            singleLine = false,
+            label = "Area / Locality / Landmark",
             modifier = Modifier.fillMaxWidth()
         )
 
         // Full Address
-        OutlinedInputField(
+        ProfileMinimalTextField(
             value = fullAddress,
             onValueChange = onFullAddressChange,
-            label = stringResource(R.string.full_address),
-            placeholder = stringResource(R.string.enter_full_address),
-            singleLine = false,
+            label = "Full Address",
             modifier = Modifier.fillMaxWidth()
         )
 
         // Pincode
-        OutlinedInputField(
+        ProfileMinimalTextField(
             value = locationPincode,
             onValueChange = onLocationPincodeChange,
-            label = stringResource(R.string.pincode),
-            placeholder = stringResource(R.string.pincode),
-            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+            label = "Pincode",
+            keyboardType = KeyboardType.Number,
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Error message
-        if (errorMessage != null) {
-            Text(
-                text = errorMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
-            )
-        }
-
-        // Helper text
-        Text(
-            text = stringResource(R.string.location_auto_filled),
-            style = MaterialTheme.typography.bodySmall,
-            color = colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
         // Service Radius
         Text(
-            text = stringResource(R.string.service_radius_info, serviceRadius.toInt()),
+            text = "Service radius: ${serviceRadius.toInt()} km",
             style = MaterialTheme.typography.titleMedium,
             color = colorScheme.primary,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -178,26 +148,44 @@ fun Step3Location(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Helper text
+        Text(
+            text = "Your address will be auto-filled when using current location",
+            style = MaterialTheme.typography.bodySmall,
+            color = colorScheme.onSurfaceVariant
+        )
 
-        // Navigation Buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
-        ) {
-            SecondaryButton(
-                text = stringResource(R.string.previous),
-                onClick = onPrevious,
-                modifier = Modifier.weight(1f)
-            )
-            PrimaryButton(
-                text = stringResource(R.string.next),
-                onClick = onNext,
-                modifier = Modifier.weight(1f)
+        // Error message
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage,
+                color = Color(0xFFD32F2F), // Error red - same as Step 1
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.fillMaxWidth()
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Navigation Buttons - Previous & Next side by side
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ProfileSaveButton(
+                text = "Previous",
+                onClick = onPrevious,
+                modifier = Modifier.weight(1f),
+                showTrailingArrow = false
+            )
+            ProfileSaveButton(
+                text = "Next",
+                onClick = onNext,
+                modifier = Modifier.weight(1f),
+                showTrailingArrow = true
+            )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 

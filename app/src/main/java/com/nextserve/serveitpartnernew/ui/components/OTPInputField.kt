@@ -1,13 +1,18 @@
 package com.nextserve.serveitpartnernew.ui.components
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -19,12 +24,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -34,7 +46,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nextserve.serveitpartnernew.ui.theme.OTPBoxShape
+import kotlinx.coroutines.delay
 
 /**
  * OTP input field with support for paste, SMS autofill, and improved backspace handling.
@@ -55,59 +67,113 @@ fun OTPInputField(
 
     LaunchedEffect(otpText) {
         onOtpChange(otpText)
+        // NEVER lock keyboard or block editing - allow full editability
+        // Optionally hide keyboard after delay when complete, but input remains editable
         if (otpText.length == otpLength) {
+            // Small delay before hiding keyboard (UX polish), but never block editing
+            delay(500)
             keyboardController?.hide()
         }
     }
 
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        repeat(otpLength) { index ->
+    // Responsive sizing: Calculate box width based on available space
+    // Formula: (availableWidth - (gaps * (otpLength - 1))) / otpLength
+    // Ensure boxes are at least 56dp but never exceed screen width
+    BoxWithConstraints(modifier = modifier) {
+        val availableWidth = maxWidth - (32.dp * 2) // Account for screen padding (32dp each side)
+        val gapSize = 12.dp // Increased gap for larger boxes
+        val minBoxWidth = 56.dp
+        val maxBoxWidth = 68.dp // Maximum box width for larger screens
+        val calculatedBoxWidth = ((availableWidth - (gapSize * (otpLength - 1))) / otpLength)
+            .coerceIn(minBoxWidth, maxBoxWidth)
+        
+        val boxHeight = (calculatedBoxWidth * 1.15f).coerceAtMost(76.dp) // Height proportional to width
+        
+        Row(
+            modifier = Modifier
+                .wrapContentWidth(Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(gapSize),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            repeat(otpLength) { index ->
             val char = if (index < otpText.length) otpText[index].toString() else ""
             val isFocused = isFocusedStates.value[index]
 
             val colorScheme = MaterialTheme.colorScheme
-            val borderColor = when {
-                isFocused -> colorScheme.primary
-                char.isNotEmpty() -> colorScheme.primary
-                else -> colorScheme.outline
-            }
-            val backgroundColor = if (char.isNotEmpty()) {
-                colorScheme.primaryContainer.copy(alpha = 0.2f)
+            
+            // Premium styling: Glass effect with focus animations
+            // Adapt to dark/light theme for proper contrast
+            val backgroundColor = if (isFocused) {
+                colorScheme.surface // Surface when focused
             } else {
-                colorScheme.surface
+                // Dark theme: use surface with slight opacity, Light: surfaceVariant
+                val isDark = isSystemInDarkTheme()
+                if (isDark) {
+                    colorScheme.surface.copy(alpha = 0.8f)
+                } else {
+                    colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                }
             }
+            
+            // Animated values for focus effects
+            val elevation by animateFloatAsState(
+                targetValue = if (isFocused) 12f else 0f,
+                animationSpec = tween(durationMillis = 300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                label = "elevation"
+            )
+            
+            val translateY by animateFloatAsState(
+                targetValue = if (isFocused) -4f else 0f,
+                animationSpec = tween(durationMillis = 300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                label = "translateY"
+            )
+            
+            // Underline pulse animation
+            val underlineAlpha by animateFloatAsState(
+                targetValue = if (isFocused) 1f else 0f,
+                animationSpec = tween(durationMillis = 300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                label = "underlineAlpha"
+            )
+            
+            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+            val pulseAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.4f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2000, easing = androidx.compose.animation.core.LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "pulse"
+            )
 
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(64.dp)
+                Box(
+                    modifier = Modifier
+                        .width(calculatedBoxWidth) // Responsive width
+                        .height(boxHeight) // Responsive height
+                        .offset(y = translateY.dp)
+                    .shadow(
+                        elevation = elevation.dp,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                        ambientColor = if (isFocused) colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
+                        spotColor = if (isFocused) colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
+                    )
                     .background(
                         color = backgroundColor,
-                        shape = OTPBoxShape
-                    )
-                    .border(
-                        width = 2.dp,
-                        color = borderColor,
-                        shape = OTPBoxShape
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                     )
                     .focusRequester(focusRequesters[index])
                     .onFocusChanged { focusState ->
                         val newStates = isFocusedStates.value.toMutableList()
                         newStates[index] = focusState.isFocused
                         isFocusedStates.value = newStates
-                    }
-                    .padding(8.dp),
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (char.isNotEmpty()) {
                     Text(
                         text = char,
                         style = TextStyle(
-                            fontSize = 24.sp,
+                            fontSize = 28.sp, // Increased for larger boxes
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurface
@@ -121,6 +187,7 @@ fun OTPInputField(
                     ),
                     onValueChange = { newValue ->
                         val input = newValue.text.filter { it.isDigit() }
+                        val previousLength = otpText.length
                         
                         // Handle paste: if input length matches or exceeds OTP length, take first N digits
                         if (input.length >= otpLength) {
@@ -134,48 +201,50 @@ fun OTPInputField(
                             return@BasicTextField
                         }
                         
+                        // Handle backspace: detect when text length decreased (backspace pressed)
+                        if (input.isEmpty() && previousLength > 0) {
+                            // Backspace was pressed on empty field - delete previous digit
+                            if (index > 0 && otpText.length == index) {
+                                // Current box is empty - delete previous digit and move focus
+                                otpText = otpText.substring(0, index - 1)
+                                focusRequesters[index - 1].requestFocus()
+                            } else if (otpText.length > index) {
+                                // Current box has a digit - delete it
+                                otpText = otpText.substring(0, index) + otpText.substring(index + 1)
+                                focusRequesters[index].requestFocus()
+                            }
+                            return@BasicTextField
+                        }
+                        
                         if (input.isNotEmpty()) {
                             val digit = input.last().toString()
-                            // Only add if current box is empty or we're at the right position
+                            // Always allow editing - even if OTP is already 6 digits
                             if (otpText.length == index) {
+                                // At correct position - append digit
                                 val newOtp = otpText + digit
-                                if (newOtp.length <= otpLength) {
-                                    otpText = newOtp
-                                    if (index < otpLength - 1) {
-                                        focusRequesters[index + 1].requestFocus()
-                                    } else {
-                                        keyboardController?.hide()
-                                    }
+                                otpText = newOtp.take(otpLength) // Clamp to max length
+                                if (index < otpLength - 1) {
+                                    focusRequesters[index + 1].requestFocus()
                                 }
                             } else if (otpText.length < index) {
                                 // Fill gap if user skipped boxes
                                 val newOtp = otpText + "0".repeat(index - otpText.length) + digit
-                                if (newOtp.length <= otpLength) {
-                                    otpText = newOtp
-                                    if (index < otpLength - 1) {
-                                        focusRequesters[index + 1].requestFocus()
-                                    } else {
-                                        keyboardController?.hide()
-                                    }
+                                otpText = newOtp.take(otpLength) // Clamp to max length
+                                if (index < otpLength - 1) {
+                                    focusRequesters[index + 1].requestFocus()
                                 }
-                            }
-                        } else {
-                            // Backspace handling: improved logic
-                            if (otpText.length > index) {
-                                // Delete current character
-                                otpText = otpText.substring(0, index) + otpText.substring(index + 1)
-                                if (index > 0) {
-                                    focusRequesters[index - 1].requestFocus()
+                            } else if (otpText.length > index) {
+                                // Replace digit at current position (editing existing)
+                                val newOtp = otpText.substring(0, index) + digit + otpText.substring(index + 1)
+                                otpText = newOtp.take(otpLength) // Clamp to max length
+                                if (index < otpLength - 1) {
+                                    focusRequesters[index + 1].requestFocus()
                                 }
-                            } else if (otpText.length == index && index > 0) {
-                                // Delete previous character if current is empty
-                                otpText = otpText.substring(0, index - 1)
-                                focusRequesters[index - 1].requestFocus()
                             }
                         }
                     },
                     textStyle = TextStyle(
-                        fontSize = 24.sp,
+                        fontSize = 28.sp, // Increased for larger boxes
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                         textAlign = TextAlign.Center,
                         color = androidx.compose.ui.graphics.Color.Transparent // Hide the actual text, we show it above
@@ -186,12 +255,59 @@ fun OTPInputField(
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = {
+                            // Optional: hide keyboard, but don't prevent editing
                             keyboardController?.hide()
+                        },
+                        onNext = {
+                            // Allow moving to next box even at 6 digits
+                            if (index < otpLength - 1) {
+                                focusRequesters[index + 1].requestFocus()
+                            }
                         }
                     ),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onKeyEvent { keyEvent ->
+                            // Additional backspace handling via key event (backup for better reliability)
+                            if (keyEvent.key == Key.Backspace) {
+                                if (otpText.length > index) {
+                                    // Current box has a digit - delete it
+                                    otpText = otpText.substring(0, index) + otpText.substring(index + 1)
+                                    focusRequesters[index].requestFocus()
+                                } else if (index > 0) {
+                                    // Current box is empty - delete previous digit and move focus
+                                    otpText = otpText.substring(0, index - 1)
+                                    focusRequesters[index - 1].requestFocus()
+                                }
+                                true // Consume the event
+                            } else {
+                                false // Don't consume other keys
+                            }
+                        }
                 )
+                
+                // Animated gradient underline (bottom border animation)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .align(Alignment.BottomCenter)
+                        .alpha(underlineAlpha * pulseAlpha)
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    colorScheme.primary,
+                                    Color.Transparent
+                                ),
+                                startX = 0f,
+                                endX = Float.POSITIVE_INFINITY
+                            ),
+                            shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
+                        )
+                )
+                }
             }
         }
     }

@@ -31,6 +31,7 @@ import com.nextserve.serveitpartnernew.ui.screen.payout.PayoutScreen
 
 @Composable
 fun MainAppScreen(
+    authViewModel: com.nextserve.serveitpartnernew.ui.viewmodel.AuthViewModel,
     modifier: Modifier = Modifier
 ) {
     val navController = rememberNavController()
@@ -149,6 +150,7 @@ fun MainAppScreen(
             composable(BottomNavItem.Profile.route) { backStackEntry ->
                 ProfileScreen(
                     navController = navController,
+                    authViewModel = authViewModel,
                     parentPaddingValues = paddingValues
                 )
             }

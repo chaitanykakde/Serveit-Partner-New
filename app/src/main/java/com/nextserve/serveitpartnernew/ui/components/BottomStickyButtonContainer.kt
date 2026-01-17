@@ -31,7 +31,7 @@ fun BottomStickyButtonContainer(
         // Content area - padding for button and navigation bar
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(bottom = 56.dp) // Space for button height
         ) {

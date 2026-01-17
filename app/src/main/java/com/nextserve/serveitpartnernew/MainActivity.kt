@@ -11,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -50,7 +51,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             ServeitPartnerNewTheme {
                 val navController = rememberNavController()
-                val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory())
+                val authViewModel: AuthViewModel = viewModel(
+                    factory = AuthViewModelFactory(LocalContext.current)
+                )
 
                 // Observe auth state with lifecycle awareness
                 val authState by authViewModel.authState.collectAsStateWithLifecycle()
