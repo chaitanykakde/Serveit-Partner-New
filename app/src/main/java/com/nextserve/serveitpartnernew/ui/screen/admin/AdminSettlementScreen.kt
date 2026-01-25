@@ -327,9 +327,9 @@ private fun SettlementSummaryCard(
     settlements: List<MonthlySettlement>,
     modifier: Modifier = Modifier
 ) {
-    val totalEarnings = settlements.sumOf { it.totalEarnings }
-    val totalPaid = settlements.sumOf { it.paidAmount }
-    val totalPending = settlements.sumOf { it.pendingAmount }
+    val totalEarnings = settlements.fold(0.0) { acc, it -> acc + it.totalEarnings }
+    val totalPaid = settlements.fold(0.0) { acc, it -> acc + it.paidAmount }
+    val totalPending = settlements.fold(0.0) { acc, it -> acc + it.pendingAmount }
 
     Card(
         modifier = modifier,

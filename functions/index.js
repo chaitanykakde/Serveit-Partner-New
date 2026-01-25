@@ -18,6 +18,7 @@
  */
 
 const functions = require("firebase-functions");
+const {onRequest} = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
 // Initialize Firebase Admin SDK (ONCE)
@@ -32,6 +33,18 @@ const collections = config.getCollectionNames();
 
 // Environment flag for conditional exports
 const isProduction = config.isProduction();
+
+// ═══════════════════════════════════════════════════════════
+// PRESERVED FUNCTION (Deployed by another teammate)
+// ═══════════════════════════════════════════════════════════
+
+// Minimal placeholder to preserve existing deployed 'api' function
+// DO NOT modify or remove - this function is managed by another codebase
+exports.api = onRequest({
+  region: "asia-south1",
+}, (req, res) => {
+  res.status(200).send("api placeholder - preserved");
+});
 
 // ═══════════════════════════════════════════════════════════
 // JOBS DOMAIN

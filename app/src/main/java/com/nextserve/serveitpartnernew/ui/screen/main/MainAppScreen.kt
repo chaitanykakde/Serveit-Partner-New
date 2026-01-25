@@ -27,7 +27,6 @@ import com.nextserve.serveitpartnernew.ui.screen.profile.edit.ProfileEditService
 import com.nextserve.serveitpartnernew.ui.screen.support.HelpSupportScreen
 import com.nextserve.serveitpartnernew.ui.screen.main.JobDetailsScreen
 import com.nextserve.serveitpartnernew.ui.screen.earnings.EarningsScreen
-import com.nextserve.serveitpartnernew.ui.screen.payout.PayoutScreen
 
 @Composable
 fun MainAppScreen(
@@ -143,9 +142,6 @@ fun MainAppScreen(
             }
             composable(BottomNavItem.Earnings.route) {
                 EarningsScreen()
-            }
-            composable(BottomNavItem.Payouts.route) {
-                PayoutScreen()
             }
             composable(BottomNavItem.Profile.route) { backStackEntry ->
                 ProfileScreen(

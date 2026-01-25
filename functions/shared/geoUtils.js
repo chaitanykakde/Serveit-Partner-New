@@ -25,35 +25,45 @@ async function findProvidersWithGeoQuery(db, collections, latitude, longitude, s
   const minLng = longitude - radiusDegrees;
   const maxLng = longitude + radiusDegrees;
 
-  // Use isVerified (root level) instead of verificationDetails.verified
-  const providersQuery = db.collection(collections.partners)
-      .where("isVerified", "==", true);
-
-  const providersSnapshot = await providersQuery.get();
+  // Query ALL providers (can't query nested verificationDetails.status in Firestore)
+  // We'll filter client-side using the same logic as sendVerificationNotification
+  const allProvidersSnapshot = await db.collection(collections.partners).get();
   const potentialProviders = [];
-
-  // DIAGNOSTIC: Check total providers (including unverified) for debugging
-  const allProvidersSnapshot = await db.collection(collections.partners).limit(10).get();
-  console.log(`[DIAGNOSTIC] Total providers in partners collection (first 10): ${allProvidersSnapshot.size}`);
-  allProvidersSnapshot.forEach((doc) => {
-    const data = doc.data();
-    console.log(`[DIAGNOSTIC] Provider ${doc.id}: isVerified=${data.isVerified}, approvalStatus=${data.approvalStatus}, hasLocation=${!!data.locationDetails?.latitude}, hasServices=${!!data.services}`);
-  });
 
   console.log(`[findProvidersWithGeoQuery] Service requested: ${serviceName}`);
   console.log(`[findProvidersWithGeoQuery] Job coordinates: [${latitude}, ${longitude}]`);
-  console.log(`[findProvidersWithGeoQuery] Total verified providers in database: ${providersSnapshot.size}`);
+  console.log(`[findProvidersWithGeoQuery] Total providers in database: ${allProvidersSnapshot.size}`);
 
-  providersSnapshot.forEach((doc) => {
+  // DIAGNOSTIC: Log first 10 providers for debugging
+  let diagnosticCount = 0;
+  allProvidersSnapshot.forEach((doc) => {
+    if (diagnosticCount < 10) {
+      const data = doc.data();
+      const status = data?.verificationDetails?.status;
+      console.log(`[DIAGNOSTIC] Provider ${doc.id}: verificationDetails.status=${status}, hasLocation=${!!data.locationDetails?.latitude}, hasServices=${!!data.services}`);
+      diagnosticCount++;
+    }
+  });
+
+  // Count verified providers
+  let verifiedCount = 0;
+  allProvidersSnapshot.forEach((doc) => {
+    const data = doc.data();
+    // Use same check as sendVerificationNotification.js (lines 24-27)
+    const status = data?.verificationDetails?.status;
+    if (status === "verified") {
+      verifiedCount++;
+    }
+  });
+  console.log(`[findProvidersWithGeoQuery] Total verified providers: ${verifiedCount}`);
+
+  allProvidersSnapshot.forEach((doc) => {
     const providerData = doc.data();
 
-    // Check verification status with fallback (support both nested and root level)
-    const isVerified = providerData.isVerified ||
-                      providerData.verificationDetails?.verified ||
-                      false;
-
-    if (!isVerified) {
-      console.log(`Provider ${doc.id}: Not verified (isVerified=${providerData.isVerified}, verificationDetails.verified=${providerData.verificationDetails?.verified})`);
+    // Use same verification check as sendVerificationNotification.js (lines 24-27)
+    const status = providerData?.verificationDetails?.status;
+    if (status !== "verified") {
+      console.log(`Provider ${doc.id}: Not verified (verificationDetails.status=${status})`);
       return;
     }
 

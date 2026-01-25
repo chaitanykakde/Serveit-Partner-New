@@ -1,7 +1,5 @@
 package com.nextserve.serveitpartnernew.ui.screen.main
 
-import android.graphics.Bitmap
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -9,11 +7,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -24,7 +22,6 @@ import com.nextserve.serveitpartnernew.ui.components.OutlinedInputField
 import com.nextserve.serveitpartnernew.ui.components.PrimaryButton
 import com.nextserve.serveitpartnernew.ui.components.SecondaryButton
 import com.nextserve.serveitpartnernew.ui.viewmodel.JobDetailsViewModel
-import com.nextserve.serveitpartnernew.utils.QrUtils
 
 /**
  * Payment Collection Screen for payment_pending jobs
@@ -48,35 +45,14 @@ fun PaymentCollectionScreen(
     val context = LocalContext.current
     
     // State tracking
-    var selectedPaymentMode by remember { mutableStateOf<String?>(job.paymentMode) }
     var amount by remember { mutableStateOf((job.paymentAmount ?: job.totalPrice).toString()) }
     var isProcessing by remember { mutableStateOf(false) }
-    var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     
-    // Track payment states
-    val qrGenerated = remember { mutableStateOf(job.qrGeneratedAt != null) }
+    // Track payment state
     val paymentConfirmed = remember { mutableStateOf(job.paymentStatus == "DONE") }
     
     val scrollState = rememberScrollState()
-    
-    // Generate QR bitmap if QR was already generated
-    LaunchedEffect(job.qrUpiUri, job.paymentMode) {
-        if (job.paymentMode == "UPI_QR" && job.qrUpiUri != null && qrBitmap == null) {
-            // QR was generated previously, regenerate bitmap for display
-            val amountValue = job.paymentAmount ?: job.totalPrice
-            qrBitmap = QrUtils.generateUpiQRCode(
-                customerName = job.userName,
-                customerContact = job.customerPhoneNumber,
-                serviceName = job.serviceName,
-                providerName = job.providerName ?: "Provider",
-                providerContact = job.providerMobileNo,
-                bookingId = job.bookingId,
-                amount = amountValue
-            )
-            qrGenerated.value = true
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -157,7 +133,7 @@ fun PaymentCollectionScreen(
                 )
             }
 
-            // Payment Mode Selection (only show if payment not confirmed)
+            // Payment Method Info (only show if payment not confirmed)
             if (!paymentConfirmed.value) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -175,58 +151,28 @@ fun PaymentCollectionScreen(
                             fontWeight = FontWeight.Bold
                         )
 
-                        // Cash Payment Option
+                        // Cash Payment Option (only option)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(
-                                    color = if (selectedPaymentMode == "CASH")
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    else
-                                        MaterialTheme.colorScheme.surface,
+                                    color = MaterialTheme.colorScheme.primaryContainer,
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            RadioButton(
-                                selected = selectedPaymentMode == "CASH",
-                                onClick = { selectedPaymentMode = "CASH" }
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Cash Payment",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Cash Payment", fontWeight = FontWeight.Medium)
                                 Text(
                                     "Customer pays in cash, generate OTP for verification",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        // UPI QR Payment Option
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    color = if (selectedPaymentMode == "UPI_QR")
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    else
-                                        MaterialTheme.colorScheme.surface,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = selectedPaymentMode == "UPI_QR",
-                                onClick = { selectedPaymentMode = "UPI_QR" }
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Online Payment (UPI QR)", fontWeight = FontWeight.Medium)
-                                Text(
-                                    "Generate QR code for customer to scan and pay",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -248,11 +194,7 @@ fun PaymentCollectionScreen(
                     )
 
                     PrimaryButton(
-                        text = when (selectedPaymentMode) {
-                            "CASH" -> "Confirm Cash Payment"
-                            "UPI_QR" -> "Generate QR Code"
-                            else -> "Select Payment Method"
-                        },
+                        text = "Confirm Cash Payment",
                         onClick = {
                             val amountDouble = amount.toDoubleOrNull()
                             if (amountDouble == null || amountDouble <= 0) {
@@ -260,128 +202,28 @@ fun PaymentCollectionScreen(
                                 return@PrimaryButton
                             }
 
-                            when (selectedPaymentMode) {
-                                "CASH" -> {
-                                    // Handle cash payment
-                                    isProcessing = true
-                                    viewModel.processCashPayment(amountDouble) { success, error ->
-                                        isProcessing = false
-                                        if (success) {
-                                            // Payment processed successfully - OTP will be shown during completion
-                                            onPaymentCompleted()
-                                        } else {
-                                            errorMessage = error ?: "Failed to process cash payment"
-                                        }
-                                    }
-                                }
-                                "UPI_QR" -> {
-                                    // Generate UPI QR
-                                    isProcessing = true
-                                    viewModel.processUpiPayment(amountDouble, null) { success, error ->
-                                        isProcessing = false
-                                        if (success) {
-                                            // Generate QR bitmap for display
-                                            qrBitmap = QrUtils.generateUpiQRCode(
-                                                customerName = job.userName,
-                                                customerContact = job.customerPhoneNumber,
-                                                serviceName = job.serviceName,
-                                                providerName = job.providerName ?: "Provider",
-                                                providerContact = job.providerMobileNo,
-                                                bookingId = job.bookingId,
-                                                amount = amountDouble
-                                            )
-                                            qrGenerated.value = true
-                                            // Reload job to get updated state
-                                            viewModel.loadJobDetails()
-                                        } else {
-                                            errorMessage = error ?: "Failed to generate QR code"
-                                        }
-                                    }
+                            // Handle cash payment
+                            isProcessing = true
+                            viewModel.processCashPayment(amountDouble) { success, error ->
+                                isProcessing = false
+                                if (success) {
+                                    // Payment processed successfully - OTP will be shown during completion
+                                    paymentConfirmed.value = true
+                                    onPaymentCompleted()
+                                } else {
+                                    errorMessage = error ?: "Failed to process cash payment"
                                 }
                             }
                         },
                         modifier = Modifier.weight(1f),
-                        enabled = selectedPaymentMode != null && !isProcessing && amount.isNotEmpty(),
+                        enabled = !isProcessing && amount.isNotEmpty(),
                         isLoading = isProcessing
                     )
                 }
             }
 
-            // QR Code Display (for UPI payments)
-            if (qrGenerated.value && qrBitmap != null && selectedPaymentMode == "UPI_QR") {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Scan QR Code to Pay",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Image(
-                            bitmap = qrBitmap!!.asImageBitmap(),
-                            contentDescription = "UPI QR Code",
-                            modifier = Modifier.size(200.dp)
-                        )
-
-                        Text(
-                            text = "Amount: ₹${amount}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-
-                        Text(
-                            text = "Ask customer to scan this QR code and complete payment",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        if (!paymentConfirmed.value) {
-                            // Show "Confirm Payment Received" button
-                            PrimaryButton(
-                                text = "Confirm Payment Received",
-                                onClick = {
-                                    isProcessing = true
-                                    viewModel.confirmPaymentReceived { success, error ->
-                                        isProcessing = false
-                                        if (success) {
-                                            paymentConfirmed.value = true
-                                            viewModel.loadJobDetails()
-                                        } else {
-                                            errorMessage = error ?: "Failed to confirm payment"
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                isLoading = isProcessing
-                            )
-                        } else {
-                            // Payment confirmed, return to job details screen
-                            PrimaryButton(
-                                text = "Return to Job Details",
-                                onClick = {
-                                    // Close payment screen - completion will be handled from job details screen
-                                    onPaymentCompleted()
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Payment Confirmed State (for both CASH and UPI)
-            if (paymentConfirmed.value && !qrGenerated.value) {
+            // Payment Confirmed State (for CASH)
+            if (paymentConfirmed.value) {
                 // Cash payment confirmed - show completion option
                 Card(
                     modifier = Modifier.fillMaxWidth(),

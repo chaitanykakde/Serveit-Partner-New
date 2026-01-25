@@ -43,19 +43,19 @@ fun LazyListScope.HomeTodaySection(
             Text(
                 text = "${todayCompletedJobs.size} jobs completed",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF64748B), // slate-500
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
             Text(
                 text = "•",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFFCBD5E1), // slate-300
+                color = MaterialTheme.colorScheme.outlineVariant,
                 fontSize = 12.sp
             )
             Text(
                 text = "₹${todayEarnings.toInt()} earned",
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF0056D2), // primary color from HTML
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -84,7 +84,7 @@ fun LazyListScope.HomeTodaySection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(1.dp)
-                            .background(Color(0xFFF1F5F9)) // slate-100
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     )
                 }
             }

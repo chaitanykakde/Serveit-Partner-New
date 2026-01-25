@@ -1,10 +1,12 @@
 package com.nextserve.serveitpartnernew.ui.screen.auth
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,7 +18,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nextserve.serveitpartnernew.R
@@ -48,6 +54,10 @@ fun LoginScreen(
     var phoneNumber by remember { mutableStateOf("") }
     // Track user interaction to delay error display
     var hasUserInteracted by remember { mutableStateOf(false) }
+    // Privacy policy checkbox state
+    var isPrivacyPolicyAccepted by remember { mutableStateOf(false) }
+    // Privacy policy dialog state
+    var showPrivacyDialog by remember { mutableStateOf(false) }
 
     // React to state changes - PRESERVED BUSINESS LOGIC
     when (authState) {
@@ -84,7 +94,7 @@ fun LoginScreen(
                 subtitle = "Please enter your details to continue"
             )
             
-            Spacer(modifier = Modifier.height(48.dp)) // mb-8 equivalent
+            Spacer(modifier = Modifier.height(64.dp)) // Increased spacing to move field down
             
             // Phone Number Input - PRESERVED BUSINESS LOGIC
             // Show error only after user interaction AND invalid input
@@ -121,19 +131,67 @@ fun LoginScreen(
                 )
             }
             
-            // Send OTP Button - PRESERVED BUSINESS LOGIC
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Privacy Policy Checkbox Section
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                Checkbox(
+                    checked = isPrivacyPolicyAccepted,
+                    onCheckedChange = { isPrivacyPolicyAccepted = it },
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = buildAnnotatedString {
+                        append("I agree to the ")
+                        withStyle(style = SpanStyle(
+                            color = MaterialTheme.colorScheme.primary,
+                            textDecoration = TextDecoration.Underline
+                        )) {
+                            append("Privacy Policy")
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .clickable { showPrivacyDialog = true }
+                        .weight(1f)
+                )
+            }
+            
+            // Show error if trying to send OTP without accepting privacy policy
+            if (!isPrivacyPolicyAccepted && hasUserInteracted && phoneNumber.length == 10) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Please accept the Privacy Policy to continue",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Send OTP Button - PRESERVED BUSINESS LOGIC (now requires privacy policy acceptance)
             PrimaryCtaButton(
                 text = when (authState) {
                     is AuthState.OtpSending -> stringResource(R.string.sending)
                     else -> "Get Verification Code" // Match HTML reference
                 },
                 onClick = {
-                    // PRESERVED: Exact same condition and call
-                    if (phoneNumber.length == 10 && activity != null) {
+                    // Mark user interaction when button is clicked
+                    hasUserInteracted = true
+                    // PRESERVED: Exact same condition and call, but now requires privacy policy acceptance
+                    if (phoneNumber.length == 10 && isPrivacyPolicyAccepted && activity != null) {
                         authViewModel.sendOtp(phoneNumber, activity)
                     }
                 },
                 enabled = phoneNumber.length == 10 &&
+                         isPrivacyPolicyAccepted &&
                          authState !is AuthState.OtpSending &&
                          authState !is AuthState.PhoneError,
                 isLoading = authState is AuthState.OtpSending,
@@ -168,6 +226,13 @@ fun LoginScreen(
                 .align(Alignment.BottomCenter)
         ) {
             LoginFooter()
+        }
+        
+        // Privacy Policy Dialog
+        if (showPrivacyDialog) {
+            PrivacyPolicyDialog(
+                onDismiss = { showPrivacyDialog = false }
+            )
         }
     }
 }

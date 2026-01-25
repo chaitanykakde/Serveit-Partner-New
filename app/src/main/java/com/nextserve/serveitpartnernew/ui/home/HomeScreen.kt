@@ -171,7 +171,7 @@ fun HomeScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
@@ -185,7 +185,7 @@ fun HomeScreen(
             }
         },
         modifier = modifier,
-        containerColor = Color.White
+        containerColor = MaterialTheme.colorScheme.background
     ) { scaffoldPaddingValues ->
         // ONE persistent LazyColumn for guaranteed scroll behavior
         // listState is created once and persists across all recompositions

@@ -242,7 +242,7 @@ fun JobDetailsDialogs(
                                         )
                                     }
                                 } else {
-                                    // For UPI or legacy bookings, proceed directly
+                                    // For legacy bookings, proceed directly
                                     {
                                         viewModel.markAsCompleted(
                                             onSuccess = {

@@ -31,18 +31,18 @@ fun JobStatusChip(
 ) {
     val (backgroundColor, textColor, text) = when (status.lowercase()) {
         "available" -> Triple(
-            Color(0xFFDCFCE7), // green-100
-            Color(0xFF166534), // green-800
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer,
             "Available"
         )
         "completed" -> Triple(
-            Color(0xFFDCFCE7), // green-100
-            Color(0xFF166534), // green-800
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer,
             "Completed"
         )
         else -> Triple(
-            Color(0xFFF3F4F6), // gray-100
-            Color(0xFF374151), // gray-700
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.onSurfaceVariant,
             status
         )
     }
@@ -84,14 +84,14 @@ fun JobHeaderRow(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(Color(0xFFEBF4FF), RoundedCornerShape(12.dp)), // blue-50
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Build,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    tint = Color(0xFF2563EB) // blue-600
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -103,7 +103,7 @@ fun JobHeaderRow(
                     text = job.serviceName,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1F2937) // gray-800
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 val statusText = when (job.status.lowercase()) {
@@ -124,12 +124,12 @@ fun JobHeaderRow(
                 text = "₹${job.totalPrice.toInt()}",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1F2937) // gray-800
+                    color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = "Total",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF6B7280), // gray-500
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End
             )
         }
@@ -154,12 +154,12 @@ fun JobMetaRow(
             imageVector = icon,
             contentDescription = null,
             modifier = Modifier.size(18.dp),
-            tint = Color(0xFF6B7280) // gray-500
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF6B7280), // gray-500
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium
         )
     }
@@ -176,7 +176,7 @@ fun InfoBanner(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFFFFF3CD), RoundedCornerShape(12.dp)) // yellow-50
+            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -185,13 +185,13 @@ fun InfoBanner(
             imageVector = Icons.Default.Info,
             contentDescription = null,
             modifier = Modifier.size(20.dp),
-            tint = Color(0xFFD97706) // yellow-600
+            tint = MaterialTheme.colorScheme.error
         )
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF92400E), // yellow-800
+            color = MaterialTheme.colorScheme.onErrorContainer,
             modifier = Modifier.weight(1f)
         )
     }
@@ -215,14 +215,14 @@ fun PrimaryActionButton(
         enabled = enabled,
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF2563EB), // blue-600
-            contentColor = Color.White
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
         )
     ) {
         if (isLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(16.dp),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onPrimary,
                 strokeWidth = 2.dp
             )
         } else {
@@ -260,7 +260,7 @@ fun SecondaryActionButton(
         enabled = enabled,
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = if (isDestructive) Color(0xFFDC2626) else Color(0xFF6B7280) // red-600 or gray-500
+            contentColor = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
         )
     ) {
         icon?.let {
@@ -295,7 +295,7 @@ fun JobCardBase(
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp
@@ -340,7 +340,7 @@ fun NewJobItem(
             .clickable { onJobClick(job) },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 1.dp
@@ -366,7 +366,7 @@ fun NewJobItem(
                     text = "₹${job.totalPrice.toInt()}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF2563EB) // primary blue
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -379,12 +379,12 @@ fun NewJobItem(
                     text = job.userName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFF374151) // slate-700
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Box(
                     modifier = Modifier
                         .size(4.dp)
-                        .background(Color(0xFFCBD5E1), RoundedCornerShape(50)) // slate-300
+                        .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(50))
                 )
                 job.subServicesSelected?.let { subServices ->
                     if (subServices.isNotEmpty()) {
@@ -392,7 +392,7 @@ fun NewJobItem(
                         Text(
                             text = serviceNames,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF6B7280) // slate-500
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -407,7 +407,7 @@ fun NewJobItem(
                     Text(
                         text = "${String.format("%.1f", distance)} km",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF9CA3AF), // slate-400
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -415,14 +415,14 @@ fun NewJobItem(
                 Box(
                     modifier = Modifier
                         .size(4.dp)
-                        .background(Color(0xFFCBD5E1), RoundedCornerShape(50))
+                        .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(50))
                 )
 
                 job.createdAt?.let { createdAt ->
                     Text(
                         text = formatRelativeTime(createdAt),
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF9CA3AF),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -430,7 +430,7 @@ fun NewJobItem(
                 Box(
                     modifier = Modifier
                         .size(4.dp)
-                        .background(Color(0xFFCBD5E1), RoundedCornerShape(50))
+                        .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(50))
                 )
 
                 Text(
@@ -463,7 +463,7 @@ fun NewJobItem(
                     if (isAccepting) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             strokeWidth = 2.dp
                         )
                     } else {
@@ -481,8 +481,8 @@ fun NewJobItem(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color(0xFFF1F5F9), // slate-100
-                        contentColor = Color(0xFF475569) // slate-600
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 ) {
                     Text(
@@ -497,7 +497,7 @@ fun NewJobItem(
                     onClick = { onJobClick(job) },
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                     colors = ButtonDefaults.textButtonColors(
-                        contentColor = Color(0xFF9CA3AF) // slate-400
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 ) {
                     Text(
@@ -526,14 +526,14 @@ fun HistoryJobItem(
             .clickable { onJobClick(job) },
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFF8F9FA) // card-bg
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 0.dp
         ),
         border = androidx.compose.foundation.BorderStroke(
             width = 1.dp,
-            color = Color(0xFFF1F5F9) // slate-100
+            color = MaterialTheme.colorScheme.outlineVariant
         )
     ) {
         Column(
@@ -575,14 +575,14 @@ fun HistoryJobItem(
                 )
                 Box(
                     modifier = Modifier
-                        .background(Color(0xFFDCFCE7).copy(alpha = 0.6f), RoundedCornerShape(8.dp)) // bg-emerald-100/60
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = "Completed",
                         style = MaterialTheme.typography.labelSmall, // text-[9px]
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF166534), // emerald-700
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         letterSpacing = 0.5.sp
                     )
                 }
@@ -612,7 +612,7 @@ fun HistoryJobItem(
                     Box(
                         modifier = Modifier
                             .size(4.dp)
-                            .background(Color(0xFFCBD5E1), RoundedCornerShape(50)) // text-slate-300
+                            .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(50)) // text-slate-300
                     )
 
                     Text(
@@ -629,7 +629,7 @@ fun HistoryJobItem(
                 Icon(
                     imageVector = Icons.Default.ArrowForward,
                     contentDescription = "View Details",
-                    tint = Color(0xFF9CA3AF), // slate-400
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -649,7 +649,7 @@ fun JobsTabRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         // New Jobs Tab
         Box(
@@ -660,7 +660,7 @@ fun JobsTabRow(
                 .then(
                     if (selectedTabIndex == 0) {
                         Modifier.background(
-                            Color(0xFF2563EB).copy(alpha = 0.05f)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
                         )
                     } else Modifier
                 )
@@ -673,14 +673,14 @@ fun JobsTabRow(
                     "New Jobs",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (selectedTabIndex == 0) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (selectedTabIndex == 0) Color(0xFF2563EB) else Color(0xFF6B7280)
+                    color = if (selectedTabIndex == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (selectedTabIndex == 0) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(2.dp)
-                            .background(Color(0xFF2563EB))
+                            .background(MaterialTheme.colorScheme.primary)
                     )
                 }
             }
@@ -695,7 +695,7 @@ fun JobsTabRow(
                 .then(
                     if (selectedTabIndex == 1) {
                         Modifier.background(
-                            Color(0xFF2563EB).copy(alpha = 0.05f)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
                         )
                     } else Modifier
                 )
@@ -708,14 +708,14 @@ fun JobsTabRow(
                     "History",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (selectedTabIndex == 1) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (selectedTabIndex == 1) Color(0xFF2563EB) else Color(0xFF6B7280)
+                    color = if (selectedTabIndex == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (selectedTabIndex == 1) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(2.dp)
-                            .background(Color(0xFF2563EB))
+                            .background(MaterialTheme.colorScheme.primary)
                     )
                 }
             }

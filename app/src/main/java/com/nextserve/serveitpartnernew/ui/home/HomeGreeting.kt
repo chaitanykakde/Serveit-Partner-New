@@ -38,7 +38,7 @@ fun HomeGreeting(
             modifier = Modifier
                 .size(48.dp)
                 .background(
-                    color = Color(0xFF1976D2), // Dark blue
+                    color = MaterialTheme.colorScheme.primary,
                     shape = RoundedCornerShape(12.dp)
                 ),
             contentAlignment = Alignment.Center
@@ -46,7 +46,7 @@ fun HomeGreeting(
             Icon(
                 imageVector = Icons.Default.Home,
                 contentDescription = null,
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(28.dp)
             )
         }

@@ -121,7 +121,7 @@ fun JobDetailsScreen(
                     // For cash payments, show OTP dialog
                     showStatusUpdateDialog = "completed"
                 } else {
-                    // For UPI or legacy bookings, proceed directly
+                    // For legacy bookings, proceed directly
                     showStatusUpdateDialog = "completed"
                 }
             }
@@ -251,7 +251,7 @@ fun JobDetailsScreen(
                                             // For cash payments, show OTP dialog
                                             showStatusUpdateDialog = "completed"
                                         } else {
-                                            // For UPI or legacy bookings, proceed directly
+                                            // For legacy bookings, proceed directly
                                             showStatusUpdateDialog = "completed"
                                         }
                                     }

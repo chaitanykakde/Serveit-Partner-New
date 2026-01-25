@@ -154,7 +154,7 @@ fun OngoingJobHeroCard(
                                     Icon(
                                         imageVector = Icons.Default.LocationOn,
                                         contentDescription = null,
-                                        tint = Color(0xFF757575),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(14.dp)
                                     )
                                 Text(
@@ -197,13 +197,13 @@ fun HighlightedJobCard(
         modifier = modifier
             .border(
                 width = 1.dp,
-                color = Color(0xFFF1F5F9), // slate-100
+                color = MaterialTheme.colorScheme.outlineVariant,
                 shape = RoundedCornerShape(16.dp)
             ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column(
@@ -222,13 +222,13 @@ fun HighlightedJobCard(
                         text = job.serviceName,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A) // slate-900
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = job.userName,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF64748B), // slate-500
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -240,7 +240,7 @@ fun HighlightedJobCard(
                         Text(
                             text = localArea,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF94A3B8), // slate-400
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             fontSize = 12.sp
                         )
                     } ?: run {
@@ -252,7 +252,7 @@ fun HighlightedJobCard(
                     text = "₹${job.totalPrice.toInt()}",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F172A), // slate-900
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 20.sp
                 )
             }
@@ -278,13 +278,13 @@ fun HighlightedJobCard(
                             Icon(
                                 imageVector = Icons.Default.LocationOn,
                                 contentDescription = null,
-                                tint = Color(0xFF94A3B8), // slate-400
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 text = "${String.format("%.1f", job.distance!!)} km",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF64748B), // slate-500
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -295,7 +295,7 @@ fun HighlightedJobCard(
                         Text(
                             text = "•",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF64748B) // slate-500
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     // Time display for new requests
@@ -303,7 +303,7 @@ fun HighlightedJobCard(
                         Text(
                             text = timeDisplay ?: "",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF64748B), // slate-500
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -317,8 +317,8 @@ fun HighlightedJobCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        Color(0xFFFFFBEB), // amber-50
-                        RoundedCornerShape(8.dp)
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(8.dp)
                     )
                     .padding(horizontal = 10.dp, vertical = 10.dp)
             ) {
@@ -329,13 +329,13 @@ fun HighlightedJobCard(
                     Icon(
                         imageVector = Icons.Default.Notifications,
                         contentDescription = null,
-                        tint = Color(0xFFD97706), // amber-600
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = "Respond quickly to secure this job",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF92400E), // amber-800
+                        color = MaterialTheme.colorScheme.onErrorContainer,
                         fontWeight = FontWeight.Medium,
                         fontSize = 11.sp
                     )
@@ -354,7 +354,7 @@ fun HighlightedJobCard(
                         .weight(1f)
                         .height(56.dp)
                         .background(
-                            color = if (!hasOngoingJob && !isAccepting) Color(0xFF0056D2) else Color(0xFF0056D2).copy(alpha = 0.6f),
+                            color = if (!hasOngoingJob && !isAccepting) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                             shape = RoundedCornerShape(12.dp)
                         )
                         .clickable(enabled = !hasOngoingJob && !isAccepting, onClick = { onAcceptClick(job) }),
@@ -367,7 +367,7 @@ fun HighlightedJobCard(
                         ) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -377,7 +377,7 @@ fun HighlightedJobCard(
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold
                                 ),
-                                color = Color.White
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                     } else {
@@ -387,7 +387,7 @@ fun HighlightedJobCard(
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
@@ -398,7 +398,7 @@ fun HighlightedJobCard(
                         .weight(1f)
                         .height(56.dp)
                         .background(
-                            color = Color(0xFFF1F5F9), // slate-100
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(12.dp)
                         )
                         .clickable(onClick = { onRejectClick(job) }),
@@ -410,7 +410,7 @@ fun HighlightedJobCard(
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF475569) // slate-600
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -432,13 +432,13 @@ fun OngoingJobCard(
             .clickable(onClick = onClick)
             .border(
                 width = 1.dp,
-                color = Color(0xFFF1F5F9), // slate-100
+                color = MaterialTheme.colorScheme.outlineVariant,
                 shape = RoundedCornerShape(16.dp)
             ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Row(
@@ -458,15 +458,15 @@ fun OngoingJobCard(
                     modifier = Modifier
                         .size(48.dp)
                         .background(
-                            Color(0xFFF8FAFC), // slate-50
-                            RoundedCornerShape(12.dp)
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(12.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                 Icon(
                     imageVector = getServiceIcon(job.serviceName),
                     contentDescription = null,
-                        tint = Color(0xFF94A3B8), // slate-400
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(24.dp)
                 )
                 }
@@ -480,13 +480,13 @@ fun OngoingJobCard(
                         text = job.serviceName,
                         style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF0F172A), // slate-900
+                            color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp
                     )
                         Text(
                             text = "• ${job.userName}",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF94A3B8), // slate-400
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             fontSize = 12.sp
                         )
                     }
@@ -498,7 +498,7 @@ fun OngoingJobCard(
                         Text(
                             text = localArea,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF94A3B8), // slate-400
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             fontSize = 11.sp
                         )
                     } ?: run {
@@ -518,14 +518,14 @@ fun OngoingJobCard(
                                 Text(
                                     text = "${String.format("%.1f", distance)} km",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF64748B), // slate-500
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 12.sp
                                 )
                                 // Separator dot
                                 Text(
                                     text = "•",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF64748B), // slate-500
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 12.sp
                                 )
                             } else {
@@ -544,7 +544,7 @@ fun OngoingJobCard(
                                 else -> job.status
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF64748B), // slate-500
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
                         // Status badge - emerald for in_progress
@@ -552,15 +552,15 @@ fun OngoingJobCard(
                             Box(
                                 modifier = Modifier
                                     .background(
-                                        Color(0xFFECFDF5), // emerald-50
-                                        RoundedCornerShape(6.dp)
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        shape = RoundedCornerShape(6.dp)
                                     )
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                     Text(
                                     text = "IN PROGRESS",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF059669), // emerald-600
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 11.sp,
                                     letterSpacing = 0.5.sp
@@ -575,7 +575,7 @@ fun OngoingJobCard(
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = "View details",
-                tint = Color(0xFFCBD5E1), // slate-300
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier.size(24.dp)
                 )
         }
@@ -613,15 +613,15 @@ fun TodayJobCard(
                     modifier = Modifier
                         .size(40.dp)
                         .background(
-                            Color(0xFFF8FAFC), // slate-50
-                            CircleShape
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                 Icon(
                     imageVector = getServiceIcon(job.serviceName),
                     contentDescription = null,
-                        tint = Color(0xFF94A3B8), // slate-400
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(20.dp)
                 )
                 }
@@ -631,14 +631,14 @@ fun TodayJobCard(
                         text = job.serviceName,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF0F172A), // slate-900
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 15.sp
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = job.userName,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF64748B), // slate-500
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )
                     // Local area name (first 1–2 parts of address)
@@ -647,7 +647,7 @@ fun TodayJobCard(
                         Text(
                             text = localArea,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF94A3B8), // slate-400
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             fontSize = 12.sp
                         )
                     }
@@ -662,7 +662,7 @@ fun TodayJobCard(
                 Icon(
                     Icons.Default.CheckCircle,
                     contentDescription = "Completed",
-                    tint = Color(0xFF10B981), // emerald-500
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
                 // Show "COMPLETED" text only if payment is done
@@ -670,7 +670,7 @@ fun TodayJobCard(
                     Text(
                         text = "COMPLETED",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF10B981), // emerald-500
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp,
                         letterSpacing = 0.5.sp
@@ -701,13 +701,13 @@ fun TodayJobCard(
                         Icon(
                             imageVector = Icons.Default.LocationOn,
                             contentDescription = null,
-                            tint = Color(0xFF94A3B8), // slate-400
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             modifier = Modifier.size(14.dp)
                         )
                         Text(
                             text = "${String.format("%.1f", job.distance!!)} km",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF94A3B8), // slate-400
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -718,7 +718,7 @@ fun TodayJobCard(
                     Text(
                         text = "•",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF94A3B8), // slate-400
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         fontSize = 12.sp
                     )
                 }
@@ -727,7 +727,7 @@ fun TodayJobCard(
                     Text(
                         text = timeDisplay ?: "",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF94A3B8), // slate-400
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -737,7 +737,7 @@ fun TodayJobCard(
                     Box(
                         modifier = Modifier
                             .size(4.dp)
-                            .background(Color(0xFFE2E8F0), CircleShape) // slate-200
+                            .background(MaterialTheme.colorScheme.outlineVariant, CircleShape)
                     )
                 }
                 // Payment mode
@@ -750,7 +750,7 @@ fun TodayJobCard(
                         Icon(
                             imageVector = Icons.Default.LocationOn,
                             contentDescription = null,
-                            tint = Color(0xFF94A3B8), // slate-400
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             modifier = Modifier.size(14.dp)
                 )
                 Text(
@@ -760,7 +760,7 @@ fun TodayJobCard(
                                 else -> paymentMode
                             },
                     style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF94A3B8), // slate-400
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )

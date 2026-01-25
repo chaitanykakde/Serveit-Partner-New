@@ -119,63 +119,30 @@ fun ActionButtonsSection(
                 }
             }
             "payment_pending" -> {
-                // Complex payment logic preserved
-                val qrGeneratedButNotConfirmed = job.paymentMode == "UPI_QR" &&
-                    job.qrGeneratedAt != null &&
-                    job.paymentStatus != "DONE"
-
-                if (qrGeneratedButNotConfirmed) {
-                    // Confirm Payment Received
+                // Simplified payment logic - cash only
+                if (job.paymentStatus == "DONE") {
+                    // Cash payment confirmed - Verify OTP & Complete
                     Button(
-                        onClick = { onStatusUpdateClick("collect_payment") },
+                        onClick = {
+                            viewModel.markAsCompleted(
+                                onSuccess = {
+                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                        onJobCompleted()
+                                    }
+                                },
+                                onError = { error ->
+                                    // Error handling would be done in the viewmodel
+                                },
+                                onOtpRequired = { onOtpDialogClick() }
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007AFF))
                     ) {
-                        Icon(Icons.Default.Build, contentDescription = "Confirm Payment", modifier = Modifier.size(20.dp), tint = Color.White)
+                        Icon(Icons.Default.CheckCircle, contentDescription = "Verify OTP & Complete", modifier = Modifier.size(20.dp), tint = Color.White)
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("Confirm Payment Received", fontWeight = FontWeight.Medium)
-                    }
-                } else if (job.paymentStatus == "DONE") {
-                    // Verify OTP & Complete
-                    when (job.paymentMode) {
-                        "CASH", "UPI_QR" -> {
-                            Button(
-                                onClick = {
-                                    viewModel.markAsCompleted(
-                                        onSuccess = {
-                                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                                                onJobCompleted()
-                                            }
-                                        },
-                                        onError = { error ->
-                                            // Error handling would be done in the viewmodel
-                                        },
-                                        onOtpRequired = { onOtpDialogClick() }
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth().height(56.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007AFF))
-                            ) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = "Verify OTP & Complete", modifier = Modifier.size(20.dp), tint = Color.White)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text("Verify OTP & Complete", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                            }
-                        }
-                        else -> {
-                            // Collect Payment for legacy
-                            Button(
-                                onClick = { onStatusUpdateClick("collect_payment") },
-                                modifier = Modifier.fillMaxWidth().height(56.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007AFF))
-                            ) {
-                                Icon(Icons.Default.Build, contentDescription = "Collect Payment", modifier = Modifier.size(20.dp), tint = Color.White)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text("Collect Payment", fontWeight = FontWeight.Medium)
-                            }
-                        }
+                        Text("Verify OTP & Complete", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                     }
                 } else {
                     // Collect Payment
@@ -185,7 +152,7 @@ fun ActionButtonsSection(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007AFF))
                     ) {
-                        Icon(Icons.Default.Build, contentDescription = "Collect Payment", modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Build, contentDescription = "Collect Payment", modifier = Modifier.size(20.dp), tint = Color.White)
                         Spacer(modifier = Modifier.width(12.dp))
                         Text("Collect Payment", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                     }
